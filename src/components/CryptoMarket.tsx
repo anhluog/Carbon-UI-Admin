@@ -38,27 +38,29 @@ const RecentTrades: React.FC = () => {
 
 // Enhanced component for trade history with filtering
 const TradeHistory: React.FC = () => {
-  const [historyFilter, setHistoryFilter] = useState<'All' | 'Buys' | 'Sells'>('All');
+  const [historyFilter, setHistoryFilter] = useState<'Buys' | 'Sells'>('Buys');
 
-  const allHistory = [
+  const [allHistory, setAllHistory] = useState([
     { id: 1, type: 'Buy', amount: 25.5, price: 2.31, time: '2024-05-20 10:15:45' },
     { id: 2, type: 'Sell', amount: 10.0, price: 2.38, time: '2024-05-19 18:30:12' },
     { id: 3, type: 'Buy', amount: 50.2, price: 2.25, time: '2024-05-18 09:45:33' },
     { id: 4, type: 'Sell', amount: 15.8, price: 2.32, time: '2024-05-17 14:22:01' },
     { id: 5, type: 'Buy', amount: 100.0, price: 2.15, time: '2024-05-16 21:10:59' },
-  ];
+  ]);
 
   const filteredHistory = allHistory.filter(trade => {
-    if (historyFilter === 'All') return true;
     if (historyFilter === 'Buys') return trade.type === 'Buy';
     if (historyFilter === 'Sells') return trade.type === 'Sell';
     return false;
   });
 
+  const deleteTrade = (id: number) => {
+    setAllHistory(allHistory.filter(trade => trade.id !== id));
+  };
+
   return (
     <div>
         <div className="flex mb-4 border-b">
-            <button onClick={() => setHistoryFilter('All')} className={`flex-1 py-2 text-center font-semibold ${historyFilter === 'All' ? 'text-gray-900 border-b-2 border-gray-900' : 'text-gray-500'}`}>All</button>
             <button onClick={() => setHistoryFilter('Buys')} className={`flex-1 py-2 text-center font-semibold ${historyFilter === 'Buys' ? 'text-green-600 border-b-2 border-green-600' : 'text-gray-500'}`}>Buys</button>
             <button onClick={() => setHistoryFilter('Sells')} className={`flex-1 py-2 text-center font-semibold ${historyFilter === 'Sells' ? 'text-red-600 border-b-2 border-red-600' : 'text-gray-500'}`}>Sells</button>
         </div>
@@ -70,6 +72,7 @@ const TradeHistory: React.FC = () => {
                         <th>Amount (NVQ)</th>
                         <th>Price (USD)</th>
                         <th>Time</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -79,6 +82,7 @@ const TradeHistory: React.FC = () => {
                             <td>{trade.amount}</td>
                             <td>{trade.price}</td>
                             <td className="text-gray-500 text-xs">{trade.time}</td>
+                            <td><button onClick={() => deleteTrade(trade.id)} className='text-red-500'>Delete</button></td>
                         </tr>
                     ))}
                 </tbody>

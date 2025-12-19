@@ -11,9 +11,7 @@ import {
   Download,
   Share2
 } from "lucide-react";
-import { ethers } from "ethers";
-import CarbonCredit from "../abi/CarbonCredit.json";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import CryptoMarket from "./CryptoMarket";
 
 interface MarketplaceProps {
   walletAddress: string;
@@ -25,22 +23,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProject, setSelectedProject] = useState<any | null>(null);
-
-  // Mock data for the chart
-  const chartData = [
-    { name: 'Jan', price: 4000 },
-    { name: 'Feb', price: 3000 },
-    { name: 'Mar', price: 5000 },
-    { name: 'Apr', price: 4500 },
-    { name: 'May', price: 6000 },
-    { name: 'Jun', price: 5500 },
-    { name: 'Jul', price: 7000 },
-    { name: 'Aug', price: 6800 },
-    { name: 'Sep', price: 7200 },
-    { name: 'Oct', price: 7500 },
-    { name: 'Nov', price: 7300 },
-    { name: 'Dec', price: 8000 },
-  ];
+  const [showCryptoMarket, setShowCryptoMarket] = useState(false);
 
   useEffect(() => {
     const loadProjects = async () => {
@@ -81,107 +64,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
                 'https://images.pexels.com/photos/1632790/pexels-photo-1632790.jpeg'
               ]
             },
-            {
-              id: 2,
-              projectName: 'Solar Energy Farm Thailand',
-              projectType: 'Renewable Energy',
-              location: 'Thailand',
-              methodology: 'CDM',
-              vintage: 2024,
-              retiredAmount: 25.0,
-              retiredDate: '2024-01-10',
-              retiredPrice: 2.45,
-              totalValue: 61.25,
-              certificateId: 'CDM-2024-002-TH-25.0',
-              retirementReason: 'Annual Carbon Offset Initiative',
-              beneficiary: 'EcoTech Corporation',
-              serialNumbers: 'TH-CDM-2024-002-001 to TH-CDM-2024-002-025',
-              projectDescription: '50MW solar photovoltaic power plant providing clean electricity to the national grid.',
-              projectDeveloper: 'Thai Solar Power Co.',
-              verificationStandard: 'Clean Development Mechanism (CDM)',
-              additionalCertifications: ['ISO 14001'],
-              environmentalBenefits: [
-                'GHG emissions reduction',
-                'Air pollution reduction',
-                'Renewable energy generation'
-              ],
-              socialBenefits: [
-                'Job creation',
-                'Technology transfer',
-                'Energy security'
-              ],
-              images: [
-                'https://images.pexels.com/photos/433308/pexels-photo-433308.jpeg'
-              ]
-            },
-            {
-              id: 3,
-              projectName: 'Wind Power Project Mexico',
-              projectType: 'Renewable Energy',
-              location: 'Mexico',
-              methodology: 'GS',
-              vintage: 2023,
-              retiredAmount: 75.2,
-              retiredDate: '2023-12-20',
-              retiredPrice: 2.28,
-              totalValue: 171.46,
-              certificateId: 'GS-2023-003-MX-75.2',
-              retirementReason: 'Supply Chain Carbon Neutrality',
-              beneficiary: 'Manufacturing Corp Ltd',
-              serialNumbers: 'MX-GS-2023-003-001 to MX-GS-2023-003-075',
-              projectDescription: '100MW wind farm generating clean electricity for 50,000 homes annually.',
-              projectDeveloper: 'Wind Energy Mexico',
-              verificationStandard: 'Gold Standard (GS)',
-              additionalCertifications: ['SD VISta'],
-              environmentalBenefits: [
-                'Clean energy generation',
-                'GHG emissions avoidance',
-                'Land use efficiency'
-              ],
-              socialBenefits: [
-                'Rural development',
-                'Local employment',
-                'Infrastructure development'
-              ],
-              images: [
-                'https://images.pexels.com/photos/414837/pexels-photo-414837.jpeg'
-              ]
-            },
-            {
-              id: 4,
-              projectName: 'Cookstove Efficiency Program',
-              projectType: 'Energy Efficiency',
-              location: 'India',
-              methodology: 'GS',
-              vintage: 2023,
-              retiredAmount: 30.8,
-              retiredDate: '2023-11-15',
-              retiredPrice: 1.85,
-              totalValue: 56.98,
-              certificateId: 'GS-2023-004-IN-30.8',
-              retirementReason: 'Event Carbon Neutrality',
-              beneficiary: 'Global Conference 2023',
-              serialNumbers: 'IN-GS-2023-004-001 to IN-GS-2023-004-030',
-              projectDescription: 'Distribution of efficient cookstoves to rural households reducing wood consumption and indoor air pollution.',
-              projectDeveloper: 'Clean Energy India',
-              verificationStandard: 'Gold Standard (GS)',
-              additionalCertifications: ['Women+ Standard'],
-              environmentalBenefits: [
-                'Deforestation reduction',
-                'Air quality improvement',
-                'Fuel efficiency'
-              ],
-              socialBenefits: [
-                'Women empowerment',
-                'Health improvement',
-                'Time savings',
-                'Cost reduction'
-              ],
-              images: [
-                'https://images.pexels.com/photos/6194401/pexels-photo-6194401.jpeg'
-              ]
-            }
-          ];
+        ];
       setProjects(mockRetiredProjects);
     };
 
@@ -209,22 +92,38 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
   };
 
   const handleNavigateToCryptoMarket = () => {
-    setActiveTab('crypto');
+    setShowCryptoMarket(true);
   };
 
   const handleDownloadCertificate = (project: any) => {
-    // Simulate certificate download
     console.log(`Downloading certificate for ${project.projectName}`);
   };
 
   const handleShareRetirement = (project: any) => {
-    // Simulate sharing retirement
     console.log(`Sharing retirement for ${project.projectName}`);
   };
 
 
   return (
     <div className="space-y-8">
+        {showCryptoMarket && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-100 rounded-2xl max-w-7xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+                <div className="flex justify-between items-start mb-6">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Crypto Market</h3>
+                    <button
+                    onClick={() => setShowCryptoMarket(false)}
+                    className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                    >
+                    <X className="h-6 w-6" />
+                    </button>
+                </div>
+                <CryptoMarket />
+            </div>
+            </div>
+      </div>
+      )}
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-4">
           🌍 Carbon Credits Marketplace
