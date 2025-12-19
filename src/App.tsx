@@ -1,23 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Leaf, Wallet, Building2, TrendingUp, Award, Plus, ShoppingCart, User, Users, CheckCircle, Shield } from 'lucide-react';
+import { Leaf, Wallet, Building2, Award, Plus, ShoppingCart, User, Users, CheckCircle, Shield } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import MintToken from './components/MintToken';
 import ManageOrg from './components/ManageOrg';
 import Marketplace from './components/Marketplace';
 import RetiredProjects from './components/RetiredProject';
-import CryptoMarket from './components/CryptoMarket';
 import RequestRole from './components/RequestRole';
 import VerifyRole from './components/VerifyRole';
 import VerifyProject from './components/VerifyProject';
 
-// Simulated admin accounts
 const ADMIN_ACCOUNTS = [
   '0x1234567890123456789012345678901234567890'.toLowerCase(),
-  '0xadminaddress2'.toLowerCase()
+  '0x9618BE83998121F29f93e47F9843cd62c60e221a'.toLowerCase()
 ];
 
 function App() {
-  const [activeTab, setActiveTab] = useState('marketplace'); // Default to a public tab
+  const [activeTab, setActiveTab] = useState('marketplace');
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState('');
   const [userRole, setUserRole] = useState('user');
@@ -28,7 +26,7 @@ function App() {
     setWalletAddress('');
     setUserRole('user');
     setShowLogoutConfirmation(false);
-    setActiveTab('marketplace'); // Reset to a public tab on logout
+    setActiveTab('marketplace');
   }, []);
 
   const handleLogin = async () => {
@@ -36,14 +34,24 @@ function App() {
       try {
         const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
         const account = accounts[0];
-        setWalletAddress(account);
-        setIsWalletConnected(true);
-        if (ADMIN_ACCOUNTS.includes(account.toLowerCase())) {
-          setUserRole('admin');
+
+        const message = `Welcome to CarbonCredit! Please sign this message to confirm your identity. This does not cost any gas.`;
+        const signature = await window.ethereum.request({
+            method: 'personal_sign',
+            params: [message, account],
+        });
+
+        if (signature) {
+            setWalletAddress(account);
+            setIsWalletConnected(true);
+            if (ADMIN_ACCOUNTS.includes(account.toLowerCase())) {
+              setUserRole('admin');
+            }
+            setActiveTab('dashboard');
         }
-        setActiveTab('dashboard'); // Switch to dashboard after login
       } catch (error) {
-        console.error("Error connecting to MetaMask", error);
+        console.error("Authentication failed:", error);
+        alert("Login failed. You need to sign the message to log in.");
       }
     } else {
       alert('Please install MetaMask to use this platform.');
@@ -70,12 +78,7 @@ function App() {
   useEffect(() => {
     if (window.ethereum) {
       const handleAccountsChanged = (accounts: string[]) => {
-        if (accounts.length > 0) {
-          const account = accounts[0];
-          setWalletAddress(account);
-          setIsWalletConnected(true);
-          setUserRole(ADMIN_ACCOUNTS.includes(account.toLowerCase()) ? 'admin' : 'user');
-        } else {
+        if (accounts.length === 0) {
           handleLogout();
         }
       };
@@ -90,7 +93,6 @@ function App() {
 
   const tabs = [
     { id: 'dashboard', name: 'User', icon: User, roles: ['user', 'admin'], restricted: true },
-    { id: 'crypto', name: 'Crypto Market', icon: TrendingUp, roles: ['user', 'admin'], restricted: false },
     { id: 'mint', name: 'Request Review', icon: Plus, roles: ['user', 'admin'], restricted: true },
     { id: 'requestRole', name: 'Request Role', icon: Users, roles: ['user', 'admin'], restricted: true },
     { id: 'marketplace', name: 'Marketplace', icon: ShoppingCart, roles: ['user', 'admin'], restricted: false },
@@ -122,7 +124,6 @@ function App() {
 
     switch (activeTab) {
       case 'dashboard': return <Dashboard walletAddress={walletAddress} />;
-      case 'crypto': return <CryptoMarket />;
       case 'mint': return <MintToken walletAddress={walletAddress} />;
       case 'requestRole': return <RequestRole walletAddress={walletAddress} />;
       case 'marketplace': return <Marketplace walletAddress={walletAddress} setActiveTab={setActiveTab} />;
