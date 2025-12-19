@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-import { Plus, Edit3, Eye, MapPin } from 'lucide-react';
+import { Plus, Edit3, Eye, MapPin, CheckCircle, Calendar } from 'lucide-react';
 
 const VerifyProject: React.FC = () => {
   const [showCreateProject, setShowCreateProject] = useState(false);
+  const [showRejectionPopup, setShowRejectionPopup] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [selectedProject, setSelectedProject] = useState<any>(null);
+  const [projectToVerify, setProjectToVerify] = useState<any>(null);
 
   const projects = [
     {
@@ -40,6 +44,33 @@ const VerifyProject: React.FC = () => {
     }
   ];
 
+  const handleOpenRejectionPopup = (project: any) => {
+    setProjectToVerify(project);
+    setShowRejectionPopup(true);
+  };
+
+  const handleCloseRejectionPopup = () => {
+    setProjectToVerify(null);
+    setShowRejectionPopup(false);
+    setRejectionReason('');
+  };
+
+  const handleReject = () => {
+    if (rejectionReason.trim() === '') return;
+    // Handle rejection logic here
+    console.log(`Project ${projectToVerify.name} rejected with reason: ${rejectionReason}`);
+    handleCloseRejectionPopup();
+  };
+
+  const handleAccept = (project: any) => {
+    // Handle acceptance logic here
+    console.log(`Project ${project.name} accepted`);
+  };
+
+  const handleViewProject = (project: any) => {
+    setSelectedProject(project);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -69,18 +100,26 @@ const VerifyProject: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  project.status === 'Active' 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-yellow-100 text-yellow-800'
-                }`}>
-                  {project.status}
-                </span>
-                <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                  <Edit3 className="h-4 w-4 text-gray-600" />
+                <button
+                  onClick={() => handleAccept(project)}
+                  className="px-4 py-2 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors flex items-center space-x-2"
+                >
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span>Accept</span>
                 </button>
-                <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                  <Eye className="h-4 w-4 text-gray-600" />
+                <button
+                  onClick={() => handleOpenRejectionPopup(project)}
+                  className="px-4 py-2 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors flex items-center space-x-2"
+                >
+                  <Edit3 className="h-4 w-4 text-red-600" />
+                  <span>Reject</span>
+                </button>
+                <button
+                  onClick={() => handleViewProject(project)}
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-2 rounded-xl font-medium hover:shadow-lg transition-all duration-200 flex items-center space-x-2"
+                >
+                  <Eye className="h-4 w-4" />
+                  <span>View Details</span>
                 </button>
               </div>
             </div>
@@ -108,6 +147,100 @@ const VerifyProject: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {showRejectionPopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-8">
+                <h2 className="text-xl font-bold mb-4">Reject Project</h2>
+                <p className="mb-4">Please provide a reason for rejecting this project.</p>
+                <textarea
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    placeholder="Enter rejection reason"
+                    className="w-full p-2 border rounded mb-4"
+                />
+                <div className="flex justify-end space-x-4">
+                    <button
+                        onClick={handleReject}
+                        disabled={rejectionReason.trim() === ''}
+                        className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:bg-gray-400"
+                    >
+                        Reject
+                    </button>
+                    <button onClick={handleCloseRejectionPopup} className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {selectedProject && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">{selectedProject.name}</h3>
+                  <div className="flex items-center space-x-4 text-sm text-gray-600">
+                    <span className="flex items-center space-x-1">
+                      <MapPin className="h-4 w-4" />
+                      <span>{selectedProject.location}</span>
+                    </span>
+                    <span className="flex items-center space-x-1">
+                      <Calendar className="h-4 w-4" />
+                      <span>Vintage {selectedProject.vintage}</span>
+                    </span>
+                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                      {selectedProject.type}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedProject(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <span className="sr-only">Close</span>
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <h4 className="font-semibold text-gray-900 mb-2">Project Details</h4>
+                  <p className="text-sm text-gray-600">No description available for this project. Details are shown as available.</p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                    <h4 className="font-semibold text-green-900 mb-3">Credit Summary</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-green-700">Total Credits:</span>
+                        <span className="font-medium text-green-900">{selectedProject.credits}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-green-700">Sold:</span>
+                        <span className="font-medium text-green-900">{selectedProject.sold}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-green-700">Price per CCT:</span>
+                        <span className="font-medium text-green-900">{selectedProject.price}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-green-700">Status:</span>
+                        <span className="font-medium text-green-900">{selectedProject.status}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

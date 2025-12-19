@@ -1,15 +1,49 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { ethers } from 'ethers';
 import { TrendingUp, TrendingDown, DollarSign, Leaf, Award, Activity, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import CarbonCredit from '../abi/CarbonCredit.json';
 
-interface DashboardProps {
+interface UserProps {
   walletAddress: string;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ walletAddress }) => {
+const User: React.FC<UserProps> = ({ walletAddress }) => {
+    const [cctBalance, setCctBalance] = useState('0');
+    const [portfolioValue, setPortfolioValue] = useState('0');
+    const [creditsOffset, setCreditsOffset] = useState('0');
+
+    useEffect(() => {
+        const fetchData = async () => {
+            if (window.ethereum && walletAddress) {
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const signer = provider.getSigner();
+                const cctContract = new ethers.Contract('0x5FbDB2315678afecb367f032d93F642f64180aa3', CarbonCredit.abi, signer);
+
+                // Fetch CCT Balance
+                const balance = await cctContract.balanceOf(walletAddress);
+                const formattedBalance = ethers.utils.formatUnits(balance, 18);
+                setCctBalance(formattedBalance);
+
+                // Fetch Portfolio Value (assuming a static price for now)
+                const price = 2.35; // Replace with dynamic price later
+                const value = parseFloat(formattedBalance) * price;
+                setPortfolioValue(value.toFixed(2));
+
+                // Fetch Credits Offset (assuming a function on the contract)
+                // This is a placeholder, as the actual implementation depends on the contract
+                // const offset = await cctContract.getCreditsOffset(walletAddress);
+                // setCreditsOffset(ethers.utils.formatUnits(offset, 18));
+
+            }
+        };
+
+        fetchData();
+    }, [walletAddress]);
+
   const stats = [
     {
       name: 'Total CCT Balance',
-      value: '1,250.45',
+      value: cctBalance,
       change: '+12.5%',
       changeType: 'increase',
       icon: Leaf,
@@ -17,7 +51,7 @@ const Dashboard: React.FC<DashboardProps> = ({ walletAddress }) => {
     },
     {
       name: 'Portfolio Value',
-      value: '$2,875.20',
+      value: `$${portfolioValue}`,
       change: '+8.2%',
       changeType: 'increase',
       icon: DollarSign,
@@ -25,7 +59,7 @@ const Dashboard: React.FC<DashboardProps> = ({ walletAddress }) => {
     },
     {
       name: 'Credits Offset',
-      value: '325.8 tCO₂',
+      value: `${creditsOffset} tCO₂`,
       change: '+15.3%',
       changeType: 'increase',
       icon: Award,
@@ -49,27 +83,6 @@ const Dashboard: React.FC<DashboardProps> = ({ walletAddress }) => {
       time: '2 hours ago',
       status: 'completed'
     },
-    {
-      type: 'sell',
-      amount: '25.0 CCT',
-      value: '$57.75',
-      time: '1 day ago',
-      status: 'completed'
-    },
-    {
-      type: 'mint',
-      amount: '100.0 CCT',
-      value: '$231.00',
-      time: '3 days ago',
-      status: 'completed'
-    },
-    {
-      type: 'transfer',
-      amount: '15.0 CCT',
-      value: '$34.65',
-      time: '1 week ago',
-      status: 'completed'
-    }
   ];
 
   const topProjects = [
@@ -79,18 +92,6 @@ const Dashboard: React.FC<DashboardProps> = ({ walletAddress }) => {
       price: '$2.31/CCT',
       change: '+5.2%'
     },
-    {
-      name: 'Solar Energy Project Thailand',
-      credits: '280.5 tCO₂',
-      price: '$2.45/CCT',
-      change: '+3.8%'
-    },
-    {
-      name: 'Wind Farm Development Mexico',
-      credits: '190.8 tCO₂',
-      price: '$2.28/CCT',
-      change: '+1.9%'
-    }
   ];
 
   return (
@@ -186,7 +187,7 @@ const Dashboard: React.FC<DashboardProps> = ({ walletAddress }) => {
         <div className="h-64 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl flex items-center justify-center border border-green-100">
           <div className="text-center">
             <Award className="h-12 w-12 text-green-600 mx-auto mb-4" />
-            <p className="text-lg font-semibold text-gray-900 mb-2">325.8 tCO₂ Offset</p>
+            <p className="text-lg font-semibold text-gray-900 mb-2">{`${creditsOffset} tCO₂ Offset`}</p>
             <p className="text-sm text-gray-600">Equivalent to planting 412 trees</p>
           </div>
         </div>
@@ -195,4 +196,4 @@ const Dashboard: React.FC<DashboardProps> = ({ walletAddress }) => {
   );
 };
 
-export default Dashboard;
+export default User;

@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Leaf, Wallet, Building2, Award, Plus, ShoppingCart, User, Users, CheckCircle, Shield } from 'lucide-react';
-import Dashboard from './components/Dashboard';
+import { Leaf, Wallet, Building2, Award, Plus, ShoppingCart, User as UserIcon, Users, CheckCircle, Shield } from 'lucide-react';
+import User from './components/User';
 import MintToken from './components/MintToken';
-import ManageOrg from './components/ManageOrg';
 import Marketplace from './components/Marketplace';
 import RetiredProjects from './components/RetiredProject';
 import RequestRole from './components/RequestRole';
@@ -47,7 +46,7 @@ function App() {
             if (ADMIN_ACCOUNTS.includes(account.toLowerCase())) {
               setUserRole('admin');
             }
-            setActiveTab('dashboard');
+            setActiveTab('user');
         }
       } catch (error) {
         console.error("Authentication failed:", error);
@@ -92,11 +91,10 @@ function App() {
   }, [handleLogout]);
 
   const tabs = [
-    { id: 'dashboard', name: 'User', icon: User, roles: ['user', 'admin'], restricted: true },
+    { id: 'user', name: 'User', icon: UserIcon, roles: ['user', 'admin'], restricted: true },
     { id: 'mint', name: 'Request Review', icon: Plus, roles: ['user', 'admin'], restricted: true },
     { id: 'requestRole', name: 'Request Role', icon: Users, roles: ['user', 'admin'], restricted: true },
     { id: 'marketplace', name: 'Marketplace', icon: ShoppingCart, roles: ['user', 'admin'], restricted: false },
-    { id: 'organization', name: 'Organization', icon: Building2, roles: ['user', 'admin'], restricted: true },
     { id: 'retired', name: 'RetiredProject', icon: Award, roles: ['user', 'admin'], restricted: false },
     { id: 'verifyRole', name: 'Verify Role', icon: CheckCircle, roles: ['admin'], restricted: true },
     { id: 'verifyProject', name: 'Verify Project', icon: Shield, roles: ['admin'], restricted: true }
@@ -123,11 +121,10 @@ function App() {
     }
 
     switch (activeTab) {
-      case 'dashboard': return <Dashboard walletAddress={walletAddress} />;
+      case 'user': return <User walletAddress={walletAddress} />;
       case 'mint': return <MintToken walletAddress={walletAddress} />;
       case 'requestRole': return <RequestRole walletAddress={walletAddress} />;
       case 'marketplace': return <Marketplace walletAddress={walletAddress} setActiveTab={setActiveTab} />;
-      case 'organization': return <ManageOrg walletAddress={walletAddress} />;
       case 'retired': return <RetiredProjects walletAddress={walletAddress} />;
       case 'verifyRole': return <VerifyRole />;
       case 'verifyProject': return <VerifyProject />;

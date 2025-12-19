@@ -54,7 +54,7 @@ const TradeHistory: React.FC = () => {
     return false;
   });
 
-  const deleteTrade = (id: number) => {
+  const cancelTrade = (id: number) => {
     setAllHistory(allHistory.filter(trade => trade.id !== id));
   };
 
@@ -82,7 +82,7 @@ const TradeHistory: React.FC = () => {
                             <td>{trade.amount}</td>
                             <td>{trade.price}</td>
                             <td className="text-gray-500 text-xs">{trade.time}</td>
-                            <td><button onClick={() => deleteTrade(trade.id)} className='text-red-500'>Delete</button></td>
+                            <td><button onClick={() => cancelTrade(trade.id)} className='text-red-500'>Cancel</button></td>
                         </tr>
                     ))}
                 </tbody>
