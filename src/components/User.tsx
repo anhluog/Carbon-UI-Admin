@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { TrendingUp, TrendingDown, DollarSign, Leaf, Award, Activity, ArrowUpRight, ArrowDownLeft, X, MapPin, Calendar, CheckCircle, Users, Bell } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Leaf, Award, Activity, X, MapPin, Calendar, Bell } from 'lucide-react';
 import CarbonCredit from '../abi/CarbonCredit.json';
 
 interface UserProps {
@@ -14,7 +14,6 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
     const [showProjectsPopup, setShowProjectsPopup] = useState(false);
     const [showTokenHistoryPopup, setShowTokenHistoryPopup] = useState(false);
     const [showTradesPopup, setShowTradesPopup] = useState(false);
-    const [showNotificationsPopup, setShowNotificationsPopup] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -86,6 +85,14 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
       action: () => setShowTokenHistoryPopup(true),
     },
     {
+      name: 'Credits Offset',
+      value: `${creditsOffset} tCO₂`,
+      change: '+15.3%',
+      changeType: 'increase',
+      icon: Award,
+      color: 'from-purple-500 to-pink-500'
+    },
+    {
       name: 'Active Trades',
       value: '7',
       change: '-2',
@@ -93,16 +100,7 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
       icon: Activity,
       color: 'from-orange-500 to-red-500',
         action: () => setShowTradesPopup(true),
-    },
-    {
-        name: 'Notifications',
-        value: notifications.length.toString(),
-        change: '+3',
-        changeType: 'increase',
-        icon: Bell,
-        color: 'from-yellow-500 to-amber-500',
-        action: () => setShowNotificationsPopup(true),
-    },
+    }
   ];
 
   return (
@@ -134,6 +132,32 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
             </div>
           );
         })}
+      </div>
+
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
+        <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center"><Bell className="h-6 w-6 mr-2"/>Notifications</h3>
+        <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                    <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Message</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                    {notifications.map((notification) => (
+                        <tr key={notification.id}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{notification.type}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{notification.message}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{notification.time}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${notification.status === 'Completed' ? 'bg-green-100 text-green-800' : notification.status === 'Approved' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>{notification.status}</span></td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
       </div>
 
         {showProjectsPopup && (
@@ -224,39 +248,6 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
                                     <td>{trade.amount}</td>
                                     <td>{trade.price}</td>
                                     <td className="text-gray-500 text-xs">{trade.time}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        )}
-
-        {showNotificationsPopup && (
-            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
-                    <div className="flex justify-between items-start mb-6">
-                        <h3 className="text-2xl font-bold text-gray-900">Notifications</h3>
-                        <button onClick={() => setShowNotificationsPopup(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                            <X className="h-6 w-6" />
-                        </button>
-                    </div>
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Message</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {notifications.map((notification) => (
-                                <tr key={notification.id}>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{notification.type}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{notification.message}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{notification.time}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${notification.status === 'Completed' ? 'bg-green-100 text-green-800' : notification.status === 'Approved' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>{notification.status}</span></td>
                                 </tr>
                             ))}
                         </tbody>
