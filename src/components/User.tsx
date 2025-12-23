@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { TrendingUp, TrendingDown, DollarSign, Leaf, Award, Activity, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Leaf, Award, Activity, ArrowUpRight, ArrowDownLeft, X, MapPin, Calendar, CheckCircle, Users, Bell } from 'lucide-react';
 import CarbonCredit from '../abi/CarbonCredit.json';
 
 interface UserProps {
@@ -11,6 +11,10 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
     const [cctBalance, setCctBalance] = useState('0');
     const [portfolioValue, setPortfolioValue] = useState('0');
     const [creditsOffset, setCreditsOffset] = useState('0');
+    const [showProjectsPopup, setShowProjectsPopup] = useState(false);
+    const [showTokenHistoryPopup, setShowTokenHistoryPopup] = useState(false);
+    const [showTradesPopup, setShowTradesPopup] = useState(false);
+    const [showNotificationsPopup, setShowNotificationsPopup] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -19,51 +23,67 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
                 const signer = provider.getSigner();
                 const cctContract = new ethers.Contract('0x5FbDB2315678afecb367f032d93F642f64180aa3', CarbonCredit.abi, signer);
 
-                // Fetch CCT Balance
                 const balance = await cctContract.balanceOf(walletAddress);
                 const formattedBalance = ethers.utils.formatUnits(balance, 18);
                 setCctBalance(formattedBalance);
 
-                // Fetch Portfolio Value (assuming a static price for now)
-                const price = 2.35; // Replace with dynamic price later
+                const price = 2.35;
                 const value = parseFloat(formattedBalance) * price;
                 setPortfolioValue(value.toFixed(2));
-
-                // Fetch Credits Offset (assuming a function on the contract)
-                // This is a placeholder, as the actual implementation depends on the contract
-                // const offset = await cctContract.getCreditsOffset(walletAddress);
-                // setCreditsOffset(ethers.utils.formatUnits(offset, 18));
-
             }
         };
 
         fetchData();
     }, [walletAddress]);
 
+    const projects = [
+        {
+            id: 1,
+            projectName: 'Amazon Rainforest Conservation',
+            projectType: 'Forest Protection',
+            location: 'Brazil',
+            retiree: '0x123...abc',
+            retiredAmount: 50.5,
+            vintage: 2024,
+            retiredDate: '2024-01-15',
+        },
+    ];
+
+    const tokenHistory = [
+        { type: 'Increase', amount: '100 CCT', date: '2023-05-20' },
+        { type: 'Decrease', amount: '25 CCT', date: '2023-05-19' },
+    ];
+
+    const trades = [
+        { id: 1, type: 'Buy', amount: 25.5, price: 2.31, time: '2024-05-20 10:15:45' },
+        { id: 2, type: 'Sell', amount: 10.0, price: 2.38, time: '2024-05-19 18:30:12' },
+    ];
+
+    const notifications = [
+        { id: 1, type: 'Trade', message: 'Your buy order for 50 CCT has been matched.', time: '2 hours ago', status: 'Completed' },
+        { id: 2, type: 'Approval', message: 'Your request for 1000 CCT issuance has been approved.', time: '1 day ago', status: 'Approved' },
+        { id: 3, type: 'Alert', message: 'CCT price has increased by 5% in the last 24 hours.', time: '2 days ago', status: 'Alert' },
+    ];
+
+
   const stats = [
     {
-      name: 'Total CCT Balance',
+      name: 'Total Project',
       value: cctBalance,
       change: '+12.5%',
       changeType: 'increase',
       icon: Leaf,
-      color: 'from-green-500 to-emerald-500'
+      color: 'from-green-500 to-emerald-500',
+      action: () => setShowProjectsPopup(true),
     },
     {
-      name: 'Portfolio Value',
+      name: 'Total Token',
       value: `$${portfolioValue}`,
       change: '+8.2%',
       changeType: 'increase',
       icon: DollarSign,
-      color: 'from-blue-500 to-cyan-500'
-    },
-    {
-      name: 'Credits Offset',
-      value: `${creditsOffset} tCO₂`,
-      change: '+15.3%',
-      changeType: 'increase',
-      icon: Award,
-      color: 'from-purple-500 to-pink-500'
+      color: 'from-blue-500 to-cyan-500',
+      action: () => setShowTokenHistoryPopup(true),
     },
     {
       name: 'Active Trades',
@@ -71,37 +91,27 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
       change: '-2',
       changeType: 'decrease',
       icon: Activity,
-      color: 'from-orange-500 to-red-500'
-    }
-  ];
-
-  const recentTransactions = [
-    {
-      type: 'buy',
-      amount: '50.0 CCT',
-      value: '$115.50',
-      time: '2 hours ago',
-      status: 'completed'
+      color: 'from-orange-500 to-red-500',
+        action: () => setShowTradesPopup(true),
     },
-  ];
-
-  const topProjects = [
     {
-      name: 'Amazon Rainforest Conservation',
-      credits: '450.2 tCO₂',
-      price: '$2.31/CCT',
-      change: '+5.2%'
+        name: 'Notifications',
+        value: notifications.length.toString(),
+        change: '+3',
+        changeType: 'increase',
+        icon: Bell,
+        color: 'from-yellow-500 to-amber-500',
+        action: () => setShowNotificationsPopup(true),
     },
   ];
 
   return (
     <div className="space-y-8">
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <div key={stat.name} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100 hover:shadow-lg transition-all duration-200">
+            <div key={stat.name} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100 hover:shadow-lg transition-all duration-200 cursor-pointer" onClick={stat.action}>
               <div className="flex items-center justify-between mb-4">
                 <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center shadow-lg`}>
                   <Icon className="h-6 w-6 text-white" />
@@ -126,74 +136,141 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
         })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Recent Transactions */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">Recent Transactions</h3>
-          <div className="space-y-4">
-            {recentTransactions.map((transaction, index) => (
-              <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                <div className="flex items-center space-x-4">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    transaction.type === 'buy' ? 'bg-green-100 text-green-600' :
-                    transaction.type === 'sell' ? 'bg-red-100 text-red-600' :
-                    transaction.type === 'mint' ? 'bg-blue-100 text-blue-600' :
-                    'bg-purple-100 text-purple-600'
-                  }`}>
-                    {transaction.type === 'buy' ? <ArrowDownLeft className="h-5 w-5" /> :
-                     transaction.type === 'sell' ? <ArrowUpRight className="h-5 w-5" /> :
-                     transaction.type === 'mint' ? <Leaf className="h-5 w-5" /> :
-                     <ArrowUpRight className="h-5 w-5" />}
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900 capitalize">{transaction.type}</p>
-                    <p className="text-sm text-gray-500">{transaction.time}</p>
-                  </div>
+        {showProjectsPopup && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6">
+                    <div className="flex justify-between items-start mb-6">
+                        <h3 className="text-2xl font-bold text-gray-900">Total Projects</h3>
+                        <button onClick={() => setShowProjectsPopup(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                            <X className="h-6 w-6" />
+                        </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Name</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Retiree</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount Retired</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vintage</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Retirement Date</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {projects.map((project) => (
+                                    <tr key={project.id}>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{project.projectName}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{project.projectType}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><div className="flex items-center"><MapPin className="h-4 w-4 mr-1.5 text-gray-400" />{project.location}</div></td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{project.retiree}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{project.retiredAmount}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{project.vintage}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><div className="flex items-center"><Calendar className="h-4 w-4 mr-1.5 text-gray-400" />{project.retiredDate}</div></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-medium text-gray-900">{transaction.amount}</p>
-                  <p className="text-sm text-gray-500">{transaction.value}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+            </div>
+        )}
 
-        {/* Top Projects */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">Top Carbon Projects</h3>
-          <div className="space-y-4">
-            {topProjects.map((project, index) => (
-              <div key={index} className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                <div className="flex items-start justify-between mb-2">
-                  <h4 className="font-medium text-gray-900 text-sm">{project.name}</h4>
-                  <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full">
-                    {project.change}
-                  </span>
+        {showTokenHistoryPopup && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6">
+                    <div className="flex justify-between items-start mb-6">
+                        <h3 className="text-2xl font-bold text-gray-900">Total Token History</h3>
+                        <button onClick={() => setShowTokenHistoryPopup(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                            <X className="h-6 w-6" />
+                        </button>
+                    </div>
+                    <ul className="space-y-4">
+                        {tokenHistory.map((item, index) => (
+                            <li key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                                <span className={`font-medium ${item.type === 'Increase' ? 'text-green-600' : 'text-red-600'}`}>{item.type}</span>
+                                <span>{item.amount}</span>
+                                <span className="text-sm text-gray-500">{item.date}</span>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-600">{project.credits}</p>
-                  <p className="text-sm font-medium text-gray-900">{project.price}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+            </div>
+        )}
 
-      {/* Carbon Footprint Chart */}
-      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-        <h3 className="text-lg font-semibold text-gray-900 mb-6">Carbon Impact Over Time</h3>
-        <div className="h-64 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl flex items-center justify-center border border-green-100">
-          <div className="text-center">
-            <Award className="h-12 w-12 text-green-600 mx-auto mb-4" />
-            <p className="text-lg font-semibold text-gray-900 mb-2">{`${creditsOffset} tCO₂ Offset`}</p>
-            <p className="text-sm text-gray-600">Equivalent to planting 412 trees</p>
-          </div>
-        </div>
-      </div>
+        {showTradesPopup && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
+                    <div className="flex justify-between items-start mb-6">
+                        <h3 className="text-2xl font-bold text-gray-900">Active Trades</h3>
+                        <button onClick={() => setShowTradesPopup(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                            <X className="h-6 w-6" />
+                        </button>
+                    </div>
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="text-left text-xs text-gray-500">
+                                <th>Type</th>
+                                <th>Amount (NVQ)</th>
+                                <th>Price (USD)</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {trades.map((trade) => (
+                                <tr key={trade.id} className="text-left font-medium">
+                                    <td className={trade.type === 'Buy' ? 'text-green-600' : 'text-red-600'}>{trade.type}</td>
+                                    <td>{trade.amount}</td>
+                                    <td>{trade.price}</td>
+                                    <td className="text-gray-500 text-xs">{trade.time}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        )}
+
+        {showNotificationsPopup && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+                    <div className="flex justify-between items-start mb-6">
+                        <h3 className="text-2xl font-bold text-gray-900">Notifications</h3>
+                        <button onClick={() => setShowNotificationsPopup(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                            <X className="h-6 w-6" />
+                        </button>
+                    </div>
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Message</th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {notifications.map((notification) => (
+                                <tr key={notification.id}>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{notification.type}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{notification.message}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{notification.time}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${notification.status === 'Completed' ? 'bg-green-100 text-green-800' : notification.status === 'Approved' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>{notification.status}</span></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        )}
     </div>
   );
 };
 
 export default User;
+
+interface MarketplaceProps {
+    walletAddress: string;
+    setActiveTab: (tab: string) => void;
+}
