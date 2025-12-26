@@ -14,6 +14,7 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
     const [showProjectsPopup, setShowProjectsPopup] = useState(false);
     const [showTokenHistoryPopup, setShowTokenHistoryPopup] = useState(false);
     const [showTradesPopup, setShowTradesPopup] = useState(false);
+    const [showRetiredTokensPopup, setShowRetiredTokensPopup] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -85,12 +86,13 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
       action: () => setShowTokenHistoryPopup(true),
     },
     {
-      name: 'Credits Offset',
+      name: 'Total Retired',
       value: `${creditsOffset} tCO₂`,
       change: '+15.3%',
       changeType: 'increase',
       icon: Award,
-      color: 'from-purple-500 to-pink-500'
+      color: 'from-purple-500 to-pink-500',
+      action: () => setShowRetiredTokensPopup(true),
     },
     {
       name: 'Active Trades',
@@ -252,6 +254,39 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
                             ))}
                         </tbody>
                     </table>
+                </div>
+            </div>
+        )}
+
+        {showRetiredTokensPopup && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6">
+                    <div className="flex justify-between items-start mb-6">
+                        <h3 className="text-2xl font-bold text-gray-900">Total Retired Tokens</h3>
+                        <button onClick={() => setShowRetiredTokensPopup(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                            <X className="h-6 w-6" />
+                        </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Name</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount Retired</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Retirement Date</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {projects.map((project) => (
+                                    <tr key={project.id}>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{project.projectName}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{project.retiredAmount} tCO₂</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><div className="flex items-center"><Calendar className="h-4 w-4 mr-1.5 text-gray-400" />{project.retiredDate}</div></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         )}

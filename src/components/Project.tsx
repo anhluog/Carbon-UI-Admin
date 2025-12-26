@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Award, Calendar, MapPin, Leaf, TrendingUp, Filter, Download, Share2, Eye, BarChart3, Globe, Users, CheckCircle } from 'lucide-react';
 
-interface RetiredProjectsProps {
+interface ProjectsProps {
   walletAddress: string;
 }
 
-const RetiredProjects: React.FC<RetiredProjectsProps> = ({ walletAddress }) => {
+const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
   const [activeFilter, setActiveFilter] = useState('all');
   const [timeFilter, setTimeFilter] = useState('all-time');
   const [selectedProject, setSelectedProject] = useState<any>(null);
@@ -524,4 +524,4 @@ const RetiredProjects: React.FC<RetiredProjectsProps> = ({ walletAddress }) => {
   );
 };
 
-export default RetiredProjects;
+export default Projects;
