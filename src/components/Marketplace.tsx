@@ -64,6 +64,75 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
                 'https://images.pexels.com/photos/1632790/pexels-photo-1632790.jpeg'
               ]
             },
+            {
+                id: 2,
+                projectName: 'African Wind Energy',
+                projectType: 'Renewable Energy',
+                location: 'Kenya',
+                methodology: 'Gold Standard',
+                vintage: 2023,
+                retiredAmount: 120,
+                retiredDate: '2024-02-20',
+                retiredPrice: 3.10,
+                totalValue: 372.00,
+                certificateId: 'GS-2023-002-KE-120',
+                retirementReason: 'Offsetting Travel Emissions',
+                beneficiary: 'Eco-Warriors Inc.',
+                serialNumbers: 'KE-GS-2023-002-001 to KE-GS-2023-002-120',
+                projectDescription: 'A 50 MW wind farm providing clean energy to the national grid and reducing reliance on fossil fuels.',
+                projectDeveloper: 'WindPower Africa',
+                verificationStandard: 'Gold Standard',
+                additionalCertifications: ['Fair Trade'],
+                environmentalBenefits: ['Reduced GHG emissions', 'Improved air quality'],
+                socialBenefits: ['Job creation', 'Energy independence'],
+                images: ['https://images.pexels.com/photos/220326/pexels-photo-220326.jpeg', 'https://images.pexels.com/photos/414837/pexels-photo-414837.jpeg']
+            },
+            {
+                id: 3,
+                projectName: 'Community Reforestation Initiative',
+                projectType: 'Afforestation',
+                location: 'India',
+                methodology: 'Plan Vivo',
+                vintage: 2023,
+                retiredAmount: 75,
+                retiredDate: '2024-03-10',
+                retiredPrice: 1.85,
+                totalValue: 138.75,
+                certificateId: 'PV-2023-003-IN-75',
+                retirementReason: 'Personal Carbon Footprint Offset',
+                beneficiary: 'Jane Doe',
+                serialNumbers: 'IN-PV-2023-003-001 to IN-PV-2023-003-075',
+                projectDescription: 'Reforestation of degraded lands by local communities, promoting biodiversity and creating sustainable livelihoods.',
+                projectDeveloper: 'Green India Project',
+                verificationStandard: 'Plan Vivo',
+                additionalCertifications: [],
+                environmentalBenefits: ['Carbon sequestration', 'Habitat restoration'],
+                socialBenefits: ['Poverty alleviation', 'Community empowerment'],
+                images: ['https://images.pexels.com/photos/957024/pexels-photo-957024.jpeg', 'https://images.pexels.com/photos/142497/pexels-photo-142497.jpeg']
+            },
+            {
+                id: 4,
+                projectName: 'Efficient Cookstoves Program',
+                projectType: 'Energy Efficiency',
+                location: 'Guatemala',
+                methodology: 'VCS',
+                vintage: 2024,
+                retiredAmount: 30,
+                retiredDate: '2024-04-05',
+                retiredPrice: 2.50,
+                totalValue: 75.00,
+                certificateId: 'VCS-2024-004-GT-30',
+                retirementReason: 'Corporate Social Responsibility',
+                beneficiary: 'Global Tech Corp',
+                serialNumbers: 'GT-VCS-2024-004-001 to GT-VCS-2024-004-030',
+                projectDescription: 'Distribution of high-efficiency cookstoves to rural households, reducing fuelwood consumption and indoor air pollution.',
+                projectDeveloper: 'CleanAir Solutions',
+                verificationStandard: 'Verified Carbon Standard (VCS)',
+                additionalCertifications: ['SD VISta'],
+                environmentalBenefits: ['Reduced deforestation', 'Lower black carbon emissions'],
+                socialBenefits: ['Improved health outcomes', 'Reduced fuel costs for families'],
+                images: ['https://images.pexels.com/photos/326874/pexels-photo-326874.jpeg', 'https://images.pexels.com/photos/207455/pexels-photo-207455.jpeg']
+            }
         ];
       setProjects(mockRetiredProjects);
     };
@@ -74,10 +143,10 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
   const filteredProjects = projects.filter((project) => {
     const matchesFilter =
       activeFilter === "all" ||
-      (activeFilter === "forest" && project.type === "Forest Protection") ||
-      (activeFilter === "renewable" && project.type === "Renewable Energy") ||
-      (activeFilter === "afforestation" && project.type === "Afforestation") ||
-      (activeFilter === "efficiency" && project.type === "Energy Efficiency");
+      (activeFilter === "forest" && project.projectType === "Forest Protection") ||
+      (activeFilter === "renewable" && project.projectType === "Renewable Energy") ||
+      (activeFilter === "afforestation" && project.projectType === "Afforestation") ||
+      (activeFilter === "efficiency" && project.projectType === "Energy Efficiency");
 
     const matchesSearch =
       project.projectName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -119,7 +188,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
                     <X className="h-6 w-6" />
                     </button>
                 </div>
-                <CryptoMarket />
+                <CryptoMarket projects={projects} />
             </div>
             </div>
       </div>
