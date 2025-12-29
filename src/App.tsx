@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Leaf, Wallet, Building2, Award, Plus, ShoppingCart, User as UserIcon, Users, CheckCircle, Shield } from 'lucide-react';
+import { Leaf, Wallet, Building2, Award, Plus, ShoppingCart, User as UserIcon, Users, CheckCircle, Shield, Edit3 } from 'lucide-react';
+import { ethers } from 'ethers';  // Import ethers cho provider/signer
+import axios from 'axios';  // Import axios cho API call
 import User from './components/User';
+import Profile from './components/UpdateProfile';  // Thêm import cho Profile component
 import MintToken from './components/MintToken';
 import Marketplace from './components/Marketplace';
 import RetiredProjects from './components/RetiredProject';
@@ -10,7 +13,8 @@ import VerifyProject from './components/VerifyProject';
 
 const ADMIN_ACCOUNTS = [
   '0x1234567890123456789012345678901234567890'.toLowerCase(),
-  '0x9618BE83998121F29f93e47F9843cd62c60e221a'.toLowerCase()
+  '0x9618BE83998121F29f93e47F9843cd62c60e221a'.toLowerCase(),
+  '0x9e14e3Fb3e9B6B033EA7Eb18787b40a333D6c4ED'.toLowerCase()
 ];
 
 function App() {
@@ -19,6 +23,138 @@ function App() {
   const [walletAddress, setWalletAddress] = useState('');
   const [userRole, setUserRole] = useState('user');
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const onConnect = useCallback((address: string, role: string = 'user') => {
+    setWalletAddress(address);
+    setIsWalletConnected(true);
+    setUserRole(role);
+    setActiveTab('user');
+    setError(null);
+  }, []);
+
+  const handleConnect = async (walletType: string) => {
+    if (walletType !== "MetaMask") {
+      alert(`🚧 ${walletType} chưa được hỗ trợ, chỉ hỗ trợ MetaMask hiện tại.`);
+      return;
+    }
+
+    setIsConnecting(true);
+    setError(null);
+
+    try {
+      // Kiểm tra có cài MetaMask chưa
+      if (!window.ethereum) {
+        throw new Error("Vui lòng cài đặt MetaMask trước khi tiếp tục!");
+      }
+
+      // Kiểm tra kết nối hiện tại (không mở popup nếu đã connect)
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const accounts = await provider.listAccounts();  // Lấy accounts hiện tại (không request)
+
+      let address: string;
+
+      const extractAddress = async (acct: any): Promise<string> => {
+        // If it's already a string address
+        if (typeof acct === 'string') return acct;
+        // If it's a signer-like object with getAddress()
+        if (acct && typeof acct === 'object') {
+          if (typeof (acct as any).getAddress === 'function') {
+            return await (acct as any).getAddress();
+          }
+          // Some providers return objects with an 'address' field
+          if (typeof (acct as any).address === 'string') {
+            return (acct as any).address;
+          }
+        }
+        throw new Error('Không thể lấy địa chỉ từ tài khoản được trả về');
+      };
+
+      if (accounts.length === 0) {
+        // Chưa connect: Yêu cầu kết nối (mở popup MetaMask)
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+        // Sau request, lấy lại accounts
+        const newAccounts = await provider.listAccounts();
+        if (newAccounts.length === 0) {
+          throw new Error("Người dùng từ chối kết nối ví!");
+        }
+        address = await extractAddress(newAccounts[0]);
+      } else {
+        // Đã connect: Lấy address hiện tại (không mở popup)
+        address = await extractAddress(accounts[0]);
+        console.log("✅ Đã kết nối sẵn:", address);
+      }
+
+      // Lấy signer từ provider (default to first account - no param to avoid type issue)
+      const signer = await provider.getSigner();  // This returns JsonRpcSigner, but we use it for methods only
+
+      // Kiểm tra network (Sepolia - chainId 11155111)
+      const network = await provider.getNetwork();
+      if (network.chainId !== 11155111n) {
+        try {
+          await window.ethereum.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: "0xaa36a7" }],  // Sepolia hex (fixed)
+          });
+        } catch (switchError: any) {
+          if (switchError.code === 4902) {
+            // Network chưa add: Add Sepolia
+            await window.ethereum.request({
+              method: "wallet_addEthereumChain",
+              params: [{
+                chainId: "0xaa36a7",
+                chainName: "Sepolia Testnet",
+                rpcUrls: ["https://rpc.sepolia.org"],
+                nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+                blockExplorerUrls: ["https://sepolia.etherscan.io"],
+              }],
+            });
+          } else {
+            throw new Error("Vui lòng chuyển sang mạng Sepolia!");
+          }
+        }
+      }
+
+      // Sign message để auth với BE (order: message, address)
+      const message = `Login to CarbonCredit App - ${new Date().toISOString()}`;
+      const signature = await signer.signMessage(message);  // Returns Promise<string> - type-safe
+
+      // Gọi BE API auth
+      const response = await axios.post("http://localhost:8080/api/auth/login", { 
+        address,
+        message,
+        signature
+      });
+
+      console.log("✅ Auth success:", response.data);
+
+      // ← SỬA: Lưu token chỉ khi success và token tồn tại
+      if (response.status === 200 && response.data.token) {
+        localStorage.setItem("token", response.data.token);  // Lưu token vào localStorage
+        console.log("Token saved to localStorage:", response.data.token.substring(0, 20) + "...");  // Debug
+        
+        // Set role từ response nếu có (backend trả roleId)
+        const role = response.data.user?.roleId === 'ADMIN' ? 'admin' : 'user';  // Giả sử backend trả user với roleId
+        onConnect(address.toLowerCase(), role);  // Redirect với role
+      } else {
+        throw new Error("Auth failed: No token in response");
+      }
+
+      // Lắng nghe thay đổi (reload trang để reset state)
+      window.ethereum.on("accountsChanged", () => window.location.reload());
+      window.ethereum.on("chainChanged", () => window.location.reload());
+
+    } catch (error: any) {
+      console.error("❌ Lỗi kết nối MetaMask:", error);
+      setError(error.message || "Kết nối thất bại. Vui lòng thử lại!");
+      if (error.code === 4001) {
+        setError("Người dùng từ chối kết nối ví!");
+      }
+    } finally {
+      setIsConnecting(false);
+    }
+  };
 
   const handleLogout = useCallback(() => {
     setIsWalletConnected(false);
@@ -26,36 +162,9 @@ function App() {
     setUserRole('user');
     setShowLogoutConfirmation(false);
     setActiveTab('marketplace');
+    localStorage.removeItem('token');  // Clear token khi logout
+    window.ethereum?.removeAllListeners();  // Clear listeners
   }, []);
-
-  const handleLogin = async () => {
-    if (window.ethereum) {
-      try {
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        const account = accounts[0];
-
-        const message = `Welcome to CarbonCredit! Please sign this message to confirm your identity. This does not cost any gas.`;
-        const signature = await window.ethereum.request({
-            method: 'personal_sign',
-            params: [message, account],
-        });
-
-        if (signature) {
-            setWalletAddress(account);
-            setIsWalletConnected(true);
-            if (ADMIN_ACCOUNTS.includes(account.toLowerCase())) {
-              setUserRole('admin');
-            }
-            setActiveTab('user');
-        }
-      } catch (error) {
-        console.error("Authentication failed:", error);
-        alert("Login failed. You need to sign the message to log in.");
-      }
-    } else {
-      alert('Please install MetaMask to use this platform.');
-    }
-  };
 
   const renderLogoutConfirmation = () => (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -97,7 +206,8 @@ function App() {
     { id: 'marketplace', name: 'Marketplace', icon: ShoppingCart, roles: ['user', 'admin'], restricted: false },
     { id: 'retired', name: 'RetiredProject', icon: Award, roles: ['user', 'admin'], restricted: false },
     { id: 'verifyRole', name: 'Verify Role', icon: CheckCircle, roles: ['admin'], restricted: true },
-    { id: 'verifyProject', name: 'Verify Project', icon: Shield, roles: ['admin'], restricted: true }
+    { id: 'verifyProject', name: 'Verify Project', icon: Shield, roles: ['admin'], restricted: true },
+    { id: 'updateProfile', name: 'Update Profile', icon: Edit3, roles: ['user', 'admin'], restricted: true }
   ];
 
   const displayedTabs = isWalletConnected
@@ -112,10 +222,15 @@ function App() {
         <div className="text-center pt-16">
           <h2 className="text-4xl font-bold text-gray-900 mb-4">Please Log In</h2>
           <p className="text-lg text-gray-600 mb-8">You need to connect your wallet to access this page.</p>
-          <button onClick={handleLogin} className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:shadow-lg transition-all duration-200 flex items-center space-x-3 mx-auto">
+          <button 
+            onClick={() => handleConnect('MetaMask')} 
+            disabled={isConnecting}
+            className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:shadow-lg transition-all duration-200 flex items-center space-x-3 mx-auto disabled:opacity-50"
+          >
             <Wallet className="h-6 w-6" />
-            <span>Log In with MetaMask</span>
+            <span>{isConnecting ? 'Connecting...' : 'Log In with MetaMask'}</span>
           </button>
+          {error && <p className="mt-4 text-red-600 text-sm">{error}</p>}
         </div>
       );
     }
@@ -128,6 +243,7 @@ function App() {
       case 'retired': return <RetiredProjects walletAddress={walletAddress} />;
       case 'verifyRole': return <VerifyRole />;
       case 'verifyProject': return <VerifyProject />;
+      case 'updateProfile': return <Profile walletAddress={walletAddress} setActiveTab={setActiveTab} />;
       default: return <Marketplace walletAddress={walletAddress} setActiveTab={setActiveTab} />;
     }
   };
@@ -164,9 +280,13 @@ function App() {
                 </div>
               </div>
             ) : (
-              <button onClick={handleLogin} className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-2 rounded-xl font-medium hover:shadow-lg transition-all duration-200 flex items-center space-x-2">
+              <button 
+                onClick={() => handleConnect('MetaMask')} 
+                disabled={isConnecting}
+                className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-2 rounded-xl font-medium hover:shadow-lg transition-all duration-200 flex items-center space-x-2 disabled:opacity-50"
+              >
                 <Wallet className="h-5 w-5" />
-                <span>Connect Wallet</span>
+                <span>{isConnecting ? 'Connecting...' : 'Connect Wallet'}</span>
               </button>
             )}
           </div>
