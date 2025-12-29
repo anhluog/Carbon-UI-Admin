@@ -57,7 +57,9 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
   const roles = [
     { value: 'OWNER', label: 'Owner' },
     { value: 'VERIFIER', label: 'Verifier' },
-    { value: 'GOVERNMENT', label: 'Government' }
+    { value: 'GOVERNMENT', label: 'Government' },
+    { value: 'ADMIN', label: 'Admin' },
+
   ];
 
   if (showSuccess) {

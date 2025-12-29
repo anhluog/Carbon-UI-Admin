@@ -11,11 +11,6 @@ import RequestRole from './components/RequestRole';
 import VerifyRole from './components/VerifyRole';
 import VerifyProject from './components/VerifyProject';
 
-const ADMIN_ACCOUNTS = [
-  '0x1234567890123456789012345678901234567890'.toLowerCase(),
-  '0x9618BE83998121F29f93e47F9843cd62c60e221a'.toLowerCase(),
-  '0x9e14e3Fb3e9B6B033EA7Eb18787b40a333D6c4ED'.toLowerCase()
-];
 
 function App() {
   const [activeTab, setActiveTab] = useState('marketplace');
@@ -89,29 +84,29 @@ function App() {
       // Lấy signer từ provider (default to first account - no param to avoid type issue)
       const signer = await provider.getSigner();  // This returns JsonRpcSigner, but we use it for methods only
 
-      // Kiểm tra network (Sepolia - chainId 11155111)
+      // Kiểm tra network (Polygon Amoy - chainId 80002 / 0x13882)
       const network = await provider.getNetwork();
-      if (network.chainId !== 11155111n) {
+      if (network.chainId !== 80002n) {
         try {
           await window.ethereum.request({
             method: "wallet_switchEthereumChain",
-            params: [{ chainId: "0xaa36a7" }],  // Sepolia hex (fixed)
+            params: [{ chainId: "0x13882" }],  // Polygon Amoy hex
           });
         } catch (switchError: any) {
           if (switchError.code === 4902) {
-            // Network chưa add: Add Sepolia
+            // Network chưa add: Add Polygon Amoy
             await window.ethereum.request({
               method: "wallet_addEthereumChain",
               params: [{
-                chainId: "0xaa36a7",
-                chainName: "Sepolia Testnet",
-                rpcUrls: ["https://rpc.sepolia.org"],
-                nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
-                blockExplorerUrls: ["https://sepolia.etherscan.io"],
+                chainId: "0x13882",
+                chainName: "Polygon Amoy",
+                rpcUrls: ["https://polygon-amoy.infura.io/v3/9280fa3258a544b4a595e79e909d3f85"],
+                nativeCurrency: { name: "MATIC", symbol: "MATIC", decimals: 18 },
+                blockExplorerUrls: ["https://amoy.polygonscan.com/"],
               }],
             });
           } else {
-            throw new Error("Vui lòng chuyển sang mạng Sepolia!");
+            throw new Error("Vui lòng chuyển sang mạng Polygon Amoy!");
           }
         }
       }
@@ -135,8 +130,24 @@ function App() {
         console.log("Token saved to localStorage:", response.data.token.substring(0, 20) + "...");  // Debug
         
         // Set role từ response nếu có (backend trả roleId)
-        const role = response.data.user?.roleId === 'ADMIN' ? 'admin' : 'user';  // Giả sử backend trả user với roleId
-        onConnect(address.toLowerCase(), role);  // Redirect với role
+        let role = 'user';  // Default role
+        if(response.data.user?.roleId == 'ADMIN'){
+          role = 'admin';
+        }
+        else if(response.data.user?.roleId == 'VERIFIER'){
+          role = 'verifier';
+        }else if(response.data.user?.roleId == 'GOVERNMENT'){
+          role = 'government';
+        }else if(response.data.user?.roleId == 'OWNER'){
+          role = 'owner';
+        }else if(response.data.user?.roleId == 'SUPERADMIN'){
+          role = 'superadmin';
+        }
+
+        onConnect(address.toLowerCase(),role );  // Redirect với role
+
+        console.log(`✅ Wallet connected: ${address} with role ${role}`);
+        
       } else {
         throw new Error("Auth failed: No token in response");
       }
@@ -200,14 +211,14 @@ function App() {
   }, [handleLogout]);
 
   const tabs = [
-    { id: 'user', name: 'User', icon: UserIcon, roles: ['user', 'admin'], restricted: true },
-    { id: 'mint', name: 'Request Review', icon: Plus, roles: ['user', 'admin'], restricted: true },
-    { id: 'requestRole', name: 'Request Role', icon: Users, roles: ['user', 'admin'], restricted: true },
-    { id: 'marketplace', name: 'Marketplace', icon: ShoppingCart, roles: ['user', 'admin'], restricted: false },
-    { id: 'project', name: 'Project', icon: Award, roles: ['user', 'admin'], restricted: false },
-    { id: 'verifyRole', name: 'Verify Role', icon: CheckCircle, roles: ['admin'], restricted: true },
-    { id: 'verifyProject', name: 'Verify Project', icon: Shield, roles: ['admin'], restricted: true },
-    { id: 'updateProfile', name: 'Update Profile', icon: Edit3, roles: ['user', 'admin'], restricted: true }
+    { id: 'user', name: 'User', icon: UserIcon, roles: ['user', 'admin', 'superadmin', 'verifier','government'], restricted: true },
+    { id: 'mint', name: 'Request Review', icon: Plus, roles: ['owner'], restricted: true },
+    { id: 'requestRole', name: 'Request Role', icon: Users, roles: ['user',], restricted: true },
+    { id: 'marketplace', name: 'Marketplace', icon: ShoppingCart, roles: ['user','owner','verifier', 'admin','government'], restricted: false },
+    { id: 'project', name: 'Project', icon: Award, roles: ['owner'], restricted: false },
+    { id: 'verifyRole', name: 'Verify Role', icon: CheckCircle, roles: ['admin','superadmin'], restricted: true },
+    { id: 'verifyProject', name: 'Verify Project', icon: Shield, roles: ['verifier'], restricted: true },
+    { id: 'updateProfile', name: 'Update Profile', icon: Edit3, roles: ['user'], restricted: true }
   ];
 
   const displayedTabs = isWalletConnected
