@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-import { Leaf, Upload, Calendar, MapPin, Award, Plus, CheckCircle, Users } from 'lucide-react';
-import { ethers } from "ethers";
-import CarbonCreditToken from '../abi/CarbonCredit.json';
-import axios from 'axios';
+import { Leaf, Award, CheckCircle, Users } from 'lucide-react';
 
 interface RequestRoleProps {
   walletAddress: string;
@@ -11,14 +8,8 @@ interface RequestRoleProps {
 const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
   const [formData, setFormData] = useState({
     receiver: '',
-    projectName: '',
-    carbonAmount: '',
-    location: '',
     methodology: '',
-    vintage: '',
-    price: '',
     description: '',
-    imageFile: null as File | null,
     docFile: null as File | null,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -70,7 +61,7 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Request Submitted Successfully!</h2>
           <p className="text-gray-600 mb-6">
-            Your role request for <strong>{formData.projectName}</strong> has been submitted. 
+            Your role request has been submitted. 
             Reference ID: {txHash}
           </p>
           <div className="bg-green-50 border border-green-200 rounded-xl p-4">
@@ -107,20 +98,6 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
                   >
                 </input>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  name="projectName"
-                  value={formData.projectName}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
-                  placeholder="e.g., John Doe"
-                  required
-                />
-              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -134,27 +111,13 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
                     required
                   >
+                    <option value="" disabled>Select a role</option>
                     {methodologies.map((method) => (
                       <option key={method.value} value={method.value}>
                         {method.label}
                       </option>
                     ))}
                   </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Contact Email *
-                  </label>
-                  <input
-                    type="email"
-                    name="price"
-                    value={formData.price}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
-                    placeholder="you@example.com"
-                    required
-                  />
                 </div>
               </div>
 
@@ -190,7 +153,7 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
             <div className="mt-8 flex justify-end">
               <button
                 type="submit"
-                disabled={isSubmitting || !formData.projectName || !formData.price}
+                disabled={isSubmitting || !formData.methodology}
                 className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
               >
                 {isSubmitting ? (
@@ -226,13 +189,6 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
                 <div>
                   <p className="font-medium text-gray-900">Project Developer</p>
                   <p className="text-gray-600">Can create and submit new projects.</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
-                <MapPin className="h-5 w-5 text-green-600 mt-0.5" />
-                <div>
-                  <p className="font-medium text-gray-900">Registry</p>
-                  <p className="text-gray-600">Can issue and retire carbon credits.</p>
                 </div>
               </div>
             </div>

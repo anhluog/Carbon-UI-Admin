@@ -6,8 +6,9 @@ const VerifyRole: React.FC = () => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [selectedRole, setSelectedRole] = useState<any>(null);
   const [roleToVerify, setRoleToVerify] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState('review');
 
-  const teamMembers = [
+  const [pendingRoles, setPendingRoles] = useState([
     {
       name: 'Maria Santos',
       role: 'Project Director',
@@ -26,7 +27,8 @@ const VerifyRole: React.FC = () => {
       email: 'ana@greenfuture.com',
       permissions: 'Financial Access'
     }
-  ];
+  ]);
+  const [consideredRoles, setConsideredRoles] = useState<any[]>([]);
 
   const handleOpenRejectionPopup = (member: any) => {
     setRoleToVerify(member);
@@ -40,12 +42,15 @@ const VerifyRole: React.FC = () => {
   };
 
   const handleReject = () => {
-    if (rejectionReason.trim() === '') return;
+    if (rejectionReason.trim() === '' || !roleToVerify) return;
+    setPendingRoles(pendingRoles.filter(p => p.email !== roleToVerify.email));
     console.log(`Role for ${roleToVerify.name} rejected with reason: ${rejectionReason}`);
     handleCloseRejectionPopup();
   };
 
   const handleAccept = (member: any) => {
+    setPendingRoles(pendingRoles.filter(p => p.email !== member.email));
+    setConsideredRoles([...consideredRoles, member]);
     console.log(`Role for ${member.name} accepted`);
   };
 
@@ -56,56 +61,99 @@ const VerifyRole: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h3 className="text-xl font-semibold text-gray-900">Team Management</h3>
+        <h3 className="text-xl font-semibold text-gray-900">Verify Role</h3>
         <button className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-200 flex items-center space-x-2">
           <Plus className="h-5 w-5" />
           <span>Add Member</span>
         </button>
       </div>
 
-      <div className="grid gap-4">
-        {teamMembers.map((member, index) => (
-          <div key={index} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-            <div className="flex justify-between items-start">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-emerald-600 rounded-full flex items-center justify-center">
-                  <span className="text-white font-medium">
-                    {member.name.split(' ').map(n => n[0]).join('')}
-                  </span>
+      <div className="flex border-b">
+        <button onClick={() => setActiveTab('review')} className={`flex-1 py-2 text-center font-semibold ${activeTab === 'review' ? 'text-green-600 border-b-2 border-green-600' : 'text-gray-500'}`}>
+          Waiting For Review ({pendingRoles.length})
+        </button>
+        <button onClick={() => setActiveTab('considered')} className={`flex-1 py-2 text-center font-semibold ${activeTab === 'considered' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>
+          Roles Considered ({consideredRoles.length})
+        </button>
+      </div>
+
+      {activeTab === 'review' && (
+        <div className="grid gap-4">
+          {pendingRoles.length > 0 ? pendingRoles.map((member, index) => (
+            <div key={index} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-emerald-600 rounded-full flex items-center justify-center">
+                    <span className="text-white font-medium">
+                      {member.name.split(' ').map(n => n[0]).join('')}
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900">{member.name}</h4>
+                    <p className="text-sm text-gray-600">{member.role}</p>
+                    <p className="text-sm text-gray-500">{member.email}</p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900">{member.name}</h4>
-                  <p className="text-sm text-gray-600">{member.role}</p>
-                  <p className="text-sm text-gray-500">{member.email}</p>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleAccept(member)}
+                    className="px-4 py-2 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors flex items-center space-x-2"
+                  >
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span>Accept</span>
+                  </button>
+                  <button
+                    onClick={() => handleOpenRejectionPopup(member)}
+                    className="px-4 py-2 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors flex items-center space-x-2"
+                  >
+                    <Edit3 className="h-4 w-4 text-red-600" />
+                    <span>Reject</span>
+                  </button>
+                  <button
+                    onClick={() => handleViewRole(member)}
+                    className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-2 rounded-xl font-medium hover:shadow-lg transition-all duration-200 flex items-center space-x-2"
+                  >
+                    <Eye className="h-4 w-4" />
+                    <span>View Details</span>
+                  </button>
                 </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => handleAccept(member)}
-                  className="px-4 py-2 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors flex items-center space-x-2"
-                >
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <span>Accept</span>
-                </button>
-                <button
-                  onClick={() => handleOpenRejectionPopup(member)}
-                  className="px-4 py-2 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors flex items-center space-x-2"
-                >
-                  <Edit3 className="h-4 w-4 text-red-600" />
-                  <span>Reject</span>
-                </button>
-                <button
-                  onClick={() => handleViewRole(member)}
-                  className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-2 rounded-xl font-medium hover:shadow-lg transition-all duration-200 flex items-center space-x-2"
-                >
-                  <Eye className="h-4 w-4" />
-                  <span>View Details</span>
-                </button>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          )) : <p className="text-center text-gray-500 py-8">No roles are waiting for review.</p>}
+        </div>
+      )}
+
+      {activeTab === 'considered' && (
+        <div className="grid gap-4">
+          {consideredRoles.length > 0 ? consideredRoles.map((member, index) => (
+            <div key={index} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-blue-100">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center">
+                    <span className="text-white font-medium">
+                      {member.name.split(' ').map(n => n[0]).join('')}
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900">{member.name}</h4>
+                    <p className="text-sm text-gray-600">{member.role}</p>
+                    <p className="text-sm text-gray-500">{member.email}</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleViewRole(member)}
+                    className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-4 py-2 rounded-xl font-medium"
+                  >
+                    <Eye className="h-4 w-4" />
+                    <span>View Details</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )) : <p className="text-center text-gray-500 py-8">No roles have been considered yet.</p>}
+        </div>
+      )}
 
       {showRejectionPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
