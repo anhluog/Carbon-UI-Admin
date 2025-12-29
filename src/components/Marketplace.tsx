@@ -267,7 +267,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
                       </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button onClick={handleNavigateToCryptoMarket} className="text-green-600 hover:text-green-900">
-                        View Certificate
+                        Details
                       </button>
                     </td>
                   </tr>

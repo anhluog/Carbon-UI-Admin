@@ -10,7 +10,8 @@ import VerifyProject from './components/VerifyProject';
 
 const ADMIN_ACCOUNTS = [
   '0x1234567890123456789012345678901234567890'.toLowerCase(),
-  '0x9618BE83998121F29f93e47F9843cd62c60e221a'.toLowerCase()
+  '0x9618BE83998121F29f93e47F9843cd62c60e221a'.toLowerCase(),
+  '0xE388cf1dD58d26766196fC86763a450256241D6a'.toLowerCase(),
 ];
 
 function App() {

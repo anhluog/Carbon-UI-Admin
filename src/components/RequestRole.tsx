@@ -56,9 +56,9 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
   };
 
   const methodologies = [
-    { value: 'auditor', label: 'Auditor' },
-    { value: 'project_developer', label: 'Project Developer' },
-    { value: 'registry', label: 'Registry' }
+    { value: 'OWNER', label: 'Project Owner' },
+    { value: 'VERIFIER', label: 'Verifier' },
+    { value: 'GOVERNMENT', label: 'Government' }
   ];
 
   if (showSuccess) {
