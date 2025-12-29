@@ -37,6 +37,40 @@ const RecentTrades: React.FC = () => {
   );
 };
 
+const SuccessfulTrades: React.FC = () => {
+    const trades = [
+      { time: '10:20:01', price: 2.30, amount: 75, type: 'buy' },
+      { time: '10:19:45', price: 2.31, amount: 40, type: 'sell' },
+      { time: '10:18:11', price: 2.29, amount: 90, type: 'buy' },
+      { time: '10:17:54', price: 2.32, amount: 60, type: 'sell' },
+      { time: '10:15:03', price: 2.28, amount: 25, type: 'buy' },
+    ];
+
+    return (
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-green-100">
+        <h3 className="text-lg font-bold text-gray-900 mb-4">Successful Trading</h3>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs text-gray-500">
+              <th>Price (USD)</th>
+              <th>Amount</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            {trades.map((trade, index) => (
+              <tr key={index} className={`text-left font-medium`}>
+                <td className={trade.type === 'buy' ? 'text-green-600' : 'text-red-600'}>{trade.price.toFixed(2)}</td>
+                <td>{trade.amount}</td>
+                <td>{trade.time}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
 // Enhanced component for trade history with filtering
 const TradeHistory: React.FC = () => {
   const [historyFilter, setHistoryFilter] = useState<'Buys' | 'Sells'>('Buys');
@@ -116,17 +150,17 @@ const ProjectDistributionChart: React.FC = () => (
 );
 
 const creditData = [
-  { month: 'Jan', issued: 4000, retired: 2400 },
-  { month: 'Feb', issued: 3000, retired: 1398 },
-  { month: 'Mar', issued: 2000, retired: 9800 },
-  { month: 'Apr', issued: 2780, retired: 3908 },
-  { month: 'May', issued: 1890, retired: 4800 },
-  { month: 'Jun', issued: 2390, retired: 3800 },
+  { month: 'Jan', issued: 4000, used: 2400 },
+  { month: 'Feb', issued: 3000, used: 1398 },
+  { month: 'Mar', issued: 2000, used: 9800 },
+  { month: 'Apr', issued: 2780, used: 3908 },
+  { month: 'May', issued: 1890, used: 4800 },
+  { month: 'Jun', issued: 2390, used: 3800 },
 ];
 
 const IssuedCreditsChart: React.FC = () => (
   <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-    <h3 className="text-lg font-bold text-gray-900 mb-4">Issued vs. Retired Credits</h3>
+    <h3 className="text-lg font-bold text-gray-900 mb-4">Issued vs. Used Credits</h3>
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={creditData}>
         <CartesianGrid strokeDasharray="3 3" />
@@ -135,7 +169,7 @@ const IssuedCreditsChart: React.FC = () => (
         <Tooltip />
         <Legend />
         <Bar dataKey="issued" fill="#82ca9d" name="Issued" />
-        <Bar dataKey="retired" fill="#d88484" name="Retired" />
+        <Bar dataKey="used" fill="#d88484" name="Used" />
       </BarChart>
     </ResponsiveContainer>
   </div>
@@ -375,6 +409,7 @@ const CryptoMarket: React.FC = () => {
       <div className="lg:col-span-3 space-y-4">
         <OrderBook />
         <RecentTrades />
+        <SuccessfulTrades />
       </div>
     </div>
   );

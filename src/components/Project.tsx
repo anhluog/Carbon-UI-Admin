@@ -10,7 +10,7 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
   const [timeFilter, setTimeFilter] = useState('all-time');
   const [selectedProject, setSelectedProject] = useState<any>(null);
 
-  const retiredProjects = [
+  const projects = [
     {
       id: 1,
       projectName: 'Amazon Rainforest Conservation',
@@ -18,12 +18,12 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
       location: 'Brazil',
       methodology: 'VCS',
       vintage: 2024,
-      retiredAmount: 50.5,
-      retiredDate: '2024-01-15',
-      retiredPrice: 2.31,
+      amount: 50.5,
+      date: '2024-01-15',
+      price: 2.31,
       totalValue: 116.66,
       certificateId: 'VCS-2024-001-BR-50.5',
-      retirementReason: 'Corporate Carbon Neutrality Program',
+      reason: 'Corporate Carbon Neutrality Program',
       beneficiary: 'Green Future Solutions',
       serialNumbers: 'BR-VCS-2024-001-001 to BR-VCS-2024-001-050',
       projectDescription: 'Protection of 10,000 hectares of Amazon rainforest from deforestation through community-based conservation programs.',
@@ -54,12 +54,12 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
       location: 'Thailand',
       methodology: 'CDM',
       vintage: 2024,
-      retiredAmount: 25.0,
-      retiredDate: '2024-01-10',
-      retiredPrice: 2.45,
+      amount: 25.0,
+      date: '2024-01-10',
+      price: 2.45,
       totalValue: 61.25,
       certificateId: 'CDM-2024-002-TH-25.0',
-      retirementReason: 'Annual Carbon Offset Initiative',
+      reason: 'Annual Carbon Offset Initiative',
       beneficiary: 'EcoTech Corporation',
       serialNumbers: 'TH-CDM-2024-002-001 to TH-CDM-2024-002-025',
       projectDescription: '50MW solar photovoltaic power plant providing clean electricity to the national grid.',
@@ -87,12 +87,12 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
       location: 'Mexico',
       methodology: 'GS',
       vintage: 2023,
-      retiredAmount: 75.2,
-      retiredDate: '2023-12-20',
-      retiredPrice: 2.28,
+      amount: 75.2,
+      date: '2023-12-20',
+      price: 2.28,
       totalValue: 171.46,
       certificateId: 'GS-2023-003-MX-75.2',
-      retirementReason: 'Supply Chain Carbon Neutrality',
+      reason: 'Supply Chain Carbon Neutrality',
       beneficiary: 'Manufacturing Corp Ltd',
       serialNumbers: 'MX-GS-2023-003-001 to MX-GS-2023-003-075',
       projectDescription: '100MW wind farm generating clean electricity for 50,000 homes annually.',
@@ -120,12 +120,12 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
       location: 'India',
       methodology: 'GS',
       vintage: 2023,
-      retiredAmount: 30.8,
-      retiredDate: '2023-11-15',
-      retiredPrice: 1.85,
+      amount: 30.8,
+      date: '2023-11-15',
+      price: 1.85,
       totalValue: 56.98,
       certificateId: 'GS-2023-004-IN-30.8',
-      retirementReason: 'Event Carbon Neutrality',
+      reason: 'Event Carbon Neutrality',
       beneficiary: 'Global Conference 2023',
       serialNumbers: 'IN-GS-2023-004-001 to IN-GS-2023-004-030',
       projectDescription: 'Distribution of efficient cookstoves to rural households reducing wood consumption and indoor air pollution.',
@@ -150,20 +150,20 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
   ];
 
   const totalStats = {
-    totalRetired: retiredProjects.reduce((sum, project) => sum + project.retiredAmount, 0),
-    totalValue: retiredProjects.reduce((sum, project) => sum + project.totalValue, 0),
-    totalProjects: retiredProjects.length,
-    averagePrice: retiredProjects.reduce((sum, project) => sum + project.retiredPrice, 0) / retiredProjects.length
+    totalAmount: projects.reduce((sum, project) => sum + project.amount, 0),
+    totalValue: projects.reduce((sum, project) => sum + project.totalValue, 0),
+    totalProjects: projects.length,
+    averagePrice: projects.reduce((sum, project) => sum + project.price, 0) / projects.length
   };
 
   const projectTypes = [
-    { id: 'all', name: 'All Projects', count: retiredProjects.length },
-    { id: 'forest', name: 'Forest Protection', count: retiredProjects.filter(p => p.projectType === 'Forest Protection').length },
-    { id: 'renewable', name: 'Renewable Energy', count: retiredProjects.filter(p => p.projectType === 'Renewable Energy').length },
-    { id: 'efficiency', name: 'Energy Efficiency', count: retiredProjects.filter(p => p.projectType === 'Energy Efficiency').length }
+    { id: 'all', name: 'All Projects', count: projects.length },
+    { id: 'forest', name: 'Forest Protection', count: projects.filter(p => p.projectType === 'Forest Protection').length },
+    { id: 'renewable', name: 'Renewable Energy', count: projects.filter(p => p.projectType === 'Renewable Energy').length },
+    { id: 'efficiency', name: 'Energy Efficiency', count: projects.filter(p => p.projectType === 'Energy Efficiency').length }
   ];
 
-  const filteredProjects = retiredProjects.filter(project => {
+  const filteredProjects = projects.filter(project => {
     const matchesType = activeFilter === 'all' || 
       (activeFilter === 'forest' && project.projectType === 'Forest Protection') ||
       (activeFilter === 'renewable' && project.projectType === 'Renewable Energy') ||
@@ -181,16 +181,16 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
     console.log(`Downloading certificate for ${project.projectName}`);
   };
 
-  const handleShareRetirement = (project: any) => {
-    // Simulate sharing retirement
-    console.log(`Sharing retirement for ${project.projectName}`);
+  const handleShare = (project: any) => {
+    // Simulate sharing
+    console.log(`Sharing project for ${project.projectName}`);
   };
 
   return (
     <div className="space-y-8">
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Retired Carbon Credits</h2>
-        <p className="text-gray-600">Track your environmental impact through retired carbon credit projects.</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Carbon Credits</h2>
+        <p className="text-gray-600">Track your environmental impact through carbon credit projects.</p>
       </div>
 
       {/* Summary Stats */}
@@ -202,8 +202,8 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
               Total
             </span>
           </div>
-          <h3 className="text-2xl font-bold text-gray-900 mb-1">{totalStats.totalRetired.toFixed(1)} tCO₂</h3>
-          <p className="text-sm text-gray-600">Credits Retired</p>
+          <h3 className="text-2xl font-bold text-gray-900 mb-1">{totalStats.totalAmount.toFixed(1)} tCO₂</h3>
+          <p className="text-sm text-gray-600">Credits</p>
         </div>
 
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
@@ -298,24 +298,20 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-sm font-medium text-green-600">Retired</span>
-                  </div>
                   <p className="text-sm text-gray-500">
-                    {new Date(project.retiredDate).toLocaleDateString()}
+                    {new Date(project.date).toLocaleDateString()}
                   </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                 <div>
-                  <p className="text-sm text-gray-600">Amount Retired</p>
-                  <p className="font-semibold text-gray-900">{project.retiredAmount} tCO₂</p>
+                  <p className="text-sm text-gray-600">Amount</p>
+                  <p className="font-semibold text-gray-900">{project.amount} tCO₂</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Retirement Price</p>
-                  <p className="font-semibold text-gray-900">${project.retiredPrice}/tCO₂</p>
+                  <p className="text-sm text-gray-600">Price</p>
+                  <p className="font-semibold text-gray-900">${project.price}/tCO₂</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Total Value</p>
@@ -328,9 +324,9 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
               </div>
 
               <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
-                <h4 className="font-medium text-green-900 mb-2">Retirement Details</h4>
+                <h4 className="font-medium text-green-900 mb-2">Details</h4>
                 <div className="space-y-1 text-sm text-green-700">
-                  <p><span className="font-medium">Reason:</span> {project.retirementReason}</p>
+                  <p><span className="font-medium">Reason:</span> {project.reason}</p>
                   <p><span className="font-medium">Beneficiary:</span> {project.beneficiary}</p>
                   <p><span className="font-medium">Serial Numbers:</span> {project.serialNumbers}</p>
                 </div>
@@ -338,11 +334,11 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
 
               <div className="flex justify-between items-center">
                 <div className="flex items-center space-x-4">
-                  <span className="text-sm text-gray-600">Environmental Impact: {project.retiredAmount} tCO₂ offset</span>
+                  <span className="text-sm text-gray-600">Environmental Impact: {project.amount} tCO₂ offset</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
-                    onClick={() => handleShareRetirement(project)}
+                    onClick={() => handleShare(project)}
                     className="px-4 py-2 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors flex items-center space-x-2"
                   >
                     <Share2 className="h-4 w-4" />
@@ -372,8 +368,8 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
       {filteredProjects.length === 0 && (
         <div className="text-center py-12">
           <Award className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500 text-lg mb-2">No retired projects found</p>
-          <p className="text-gray-400">Try adjusting your filters or retire some carbon credits to see them here.</p>
+          <p className="text-gray-500 text-lg mb-2">No projects found</p>
+          <p className="text-gray-400">Try adjusting your filters to find what you're looking for.</p>
         </div>
       )}
 
@@ -425,16 +421,16 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
 
                 <div className="space-y-4">
                   <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                    <h4 className="font-semibold text-green-900 mb-3">Retirement Summary</h4>
+                    <h4 className="font-semibold text-green-900 mb-3">Summary</h4>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-green-700">Amount Retired:</span>
-                        <span className="font-medium text-green-900">{selectedProject.retiredAmount} tCO₂</span>
+                        <span className="text-green-700">Amount:</span>
+                        <span className="font-medium text-green-900">{selectedProject.amount} tCO₂</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-green-700">Retirement Date:</span>
+                        <span className="text-green-700">Date:</span>
                         <span className="font-medium text-green-900">
-                          {new Date(selectedProject.retiredDate).toLocaleDateString()}
+                          {new Date(selectedProject.date).toLocaleDateString()}
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -502,11 +498,11 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
 
               <div className="flex justify-end space-x-4 mt-6 pt-6 border-t border-gray-200">
                 <button
-                  onClick={() => handleShareRetirement(selectedProject)}
+                  onClick={() => handleShare(selectedProject)}
                   className="px-6 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors flex items-center space-x-2"
                 >
                   <Share2 className="h-4 w-4" />
-                  <span>Share Impact</span>
+                  <span>Information</span>
                 </button>
                 <button
                   onClick={() => handleDownloadCertificate(selectedProject)}
