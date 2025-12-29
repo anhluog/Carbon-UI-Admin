@@ -9,7 +9,7 @@ import {
   Users,
   CheckCircle,
   Download,
-  Share2
+  Info
 } from "lucide-react";
 import CryptoMarket from "./CryptoMarket";
 
@@ -27,7 +27,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
 
   useEffect(() => {
     const loadProjects = async () => {
-        const mockRetiredProjects = [
+        const mockProjects = [
             {
               id: 1,
               projectName: 'Amazon Rainforest Conservation',
@@ -35,12 +35,11 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
               location: 'Brazil',
               methodology: 'VCS',
               vintage: 2024,
-              retiredAmount: 50.5,
-              retiredDate: '2024-01-15',
-              retiredPrice: 2.31,
+              date: '2024-01-15',
+              price: 2.31,
               totalValue: 116.66,
               certificateId: 'VCS-2024-001-BR-50.5',
-              retirementReason: 'Corporate Carbon Neutrality Program',
+              reason: 'Corporate Carbon Neutrality Program',
               beneficiary: 'Green Future Solutions',
               serialNumbers: 'BR-VCS-2024-001-001 to BR-VCS-2024-001-050',
               projectDescription: 'Protection of 10,000 hectares of Amazon rainforest from deforestation through community-based conservation programs.',
@@ -62,7 +61,8 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
               images: [
                 'https://images.pexels.com/photos/975771/pexels-photo-975771.jpeg',
                 'https://images.pexels.com/photos/1632790/pexels-photo-1632790.jpeg'
-              ]
+              ],
+              ipfsUrl: 'https://gateway.pinata.cloud/ipfs/QmHash1'
             },
             {
                 id: 2,
@@ -71,12 +71,11 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
                 location: 'Kenya',
                 methodology: 'Gold Standard',
                 vintage: 2023,
-                retiredAmount: 120,
-                retiredDate: '2024-02-20',
-                retiredPrice: 3.10,
+                date: '2024-02-20',
+                price: 3.10,
                 totalValue: 372.00,
                 certificateId: 'GS-2023-002-KE-120',
-                retirementReason: 'Offsetting Travel Emissions',
+                reason: 'Offsetting Travel Emissions',
                 beneficiary: 'Eco-Warriors Inc.',
                 serialNumbers: 'KE-GS-2023-002-001 to KE-GS-2023-002-120',
                 projectDescription: 'A 50 MW wind farm providing clean energy to the national grid and reducing reliance on fossil fuels.',
@@ -85,7 +84,8 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
                 additionalCertifications: ['Fair Trade'],
                 environmentalBenefits: ['Reduced GHG emissions', 'Improved air quality'],
                 socialBenefits: ['Job creation', 'Energy independence'],
-                images: ['https://images.pexels.com/photos/220326/pexels-photo-220326.jpeg', 'https://images.pexels.com/photos/414837/pexels-photo-414837.jpeg']
+                images: ['https://images.pexels.com/photos/220326/pexels-photo-220326.jpeg', 'https://images.pexels.com/photos/414837/pexels-photo-414837.jpeg'],
+                ipfsUrl: 'https://gateway.pinata.cloud/ipfs/QmHash2'
             },
             {
                 id: 3,
@@ -94,12 +94,11 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
                 location: 'India',
                 methodology: 'Plan Vivo',
                 vintage: 2023,
-                retiredAmount: 75,
-                retiredDate: '2024-03-10',
-                retiredPrice: 1.85,
+                date: '2024-03-10',
+                price: 1.85,
                 totalValue: 138.75,
                 certificateId: 'PV-2023-003-IN-75',
-                retirementReason: 'Personal Carbon Footprint Offset',
+                reason: 'Personal Carbon Footprint Offset',
                 beneficiary: 'Jane Doe',
                 serialNumbers: 'IN-PV-2023-003-001 to IN-PV-2023-003-075',
                 projectDescription: 'Reforestation of degraded lands by local communities, promoting biodiversity and creating sustainable livelihoods.',
@@ -108,7 +107,8 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
                 additionalCertifications: [],
                 environmentalBenefits: ['Carbon sequestration', 'Habitat restoration'],
                 socialBenefits: ['Poverty alleviation', 'Community empowerment'],
-                images: ['https://images.pexels.com/photos/957024/pexels-photo-957024.jpeg', 'https://images.pexels.com/photos/142497/pexels-photo-142497.jpeg']
+                images: ['https://images.pexels.com/photos/957024/pexels-photo-957024.jpeg', 'https://images.pexels.com/photos/142497/pexels-photo-142497.jpeg'],
+                ipfsUrl: 'https://gateway.pinata.cloud/ipfs/QmHash3'
             },
             {
                 id: 4,
@@ -117,12 +117,11 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
                 location: 'Guatemala',
                 methodology: 'VCS',
                 vintage: 2024,
-                retiredAmount: 30,
-                retiredDate: '2024-04-05',
-                retiredPrice: 2.50,
+                date: '2024-04-05',
+                price: 2.50,
                 totalValue: 75.00,
                 certificateId: 'VCS-2024-004-GT-30',
-                retirementReason: 'Corporate Social Responsibility',
+                reason: 'Corporate Social Responsibility',
                 beneficiary: 'Global Tech Corp',
                 serialNumbers: 'GT-VCS-2024-004-001 to GT-VCS-2024-004-030',
                 projectDescription: 'Distribution of high-efficiency cookstoves to rural households, reducing fuelwood consumption and indoor air pollution.',
@@ -131,10 +130,11 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
                 additionalCertifications: ['SD VISta'],
                 environmentalBenefits: ['Reduced deforestation', 'Lower black carbon emissions'],
                 socialBenefits: ['Improved health outcomes', 'Reduced fuel costs for families'],
-                images: ['https://images.pexels.com/photos/326874/pexels-photo-326874.jpeg', 'https://images.pexels.com/photos/207455/pexels-photo-207455.jpeg']
+                images: ['https://images.pexels.com/photos/326874/pexels-photo-326874.jpeg', 'https://images.pexels.com/photos/207455/pexels-photo-207455.jpeg'],
+                ipfsUrl: 'https://gateway.pinata.cloud/ipfs/QmHash4'
             }
         ];
-      setProjects(mockRetiredProjects);
+      setProjects(mockProjects);
     };
 
     loadProjects();
@@ -151,7 +151,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
     const matchesSearch =
       project.projectName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.retiree?.toLowerCase().includes(searchTerm.toLowerCase());
+      project.beneficiary?.toLowerCase().includes(searchTerm.toLowerCase());
 
     return matchesFilter && matchesSearch;
   });
@@ -168,8 +168,10 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
     console.log(`Downloading certificate for ${project.projectName}`);
   };
 
-  const handleShareRetirement = (project: any) => {
-    console.log(`Sharing retirement for ${project.projectName}`);
+  const handleViewInformation = (project: any) => {
+    if (project.ipfsUrl) {
+      window.open(project.ipfsUrl, '_blank');
+    }
   };
 
 
@@ -198,7 +200,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
           🌍 Carbon Credits Marketplace
         </h2>
         <p className="text-gray-600">
-          Browse and verify retired carbon credits from environmental projects.
+          Browse and verify carbon credits from environmental projects.
         </p>
       </div>
 
@@ -208,7 +210,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by project, location, or retiree..."
+              placeholder="Search by project, location, or beneficiary..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
@@ -223,7 +225,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
           <button onClick={() => setActiveFilter("efficiency")} className={`px-4 py-2 rounded-lg text-sm ${activeFilter === 'efficiency' ? 'bg-green-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>Energy Efficiency</button>
         </div>
 
-        <h3 className="text-xl font-bold text-gray-900 mb-4">Retired Projects</h3>
+        <h3 className="text-xl font-bold text-gray-900 mb-4">Projects</h3>
         <div className="overflow-x-auto">
           {filteredProjects.length > 0 ? (
             <table className="min-w-full divide-y divide-gray-200">
@@ -232,10 +234,9 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Name</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Retiree</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount Retired</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Beneficiary</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vintage</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Retirement Date</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                   <th scope="col" className="relative px-6 py-3">
                     <span className="sr-only">Certificate</span>
                   </th>
@@ -256,13 +257,12 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
                         {project.location}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{project.retiree}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{project.retiredAmount}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{project.beneficiary}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{project.vintage}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div className="flex items-center">
                         <Calendar className="h-4 w-4 mr-1.5 text-gray-400" />
-                        {project.retiredDate}
+                        {project.date}
                       </div>
                       </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -277,7 +277,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
           ) : (
             <div className="text-center py-12">
               <Award className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 text-lg mb-2">No retired projects found</p>
+              <p className="text-gray-500 text-lg mb-2">No projects found</p>
               <p className="text-gray-400">Try adjusting your filters to find what you're looking for.</p>
             </div>
           )}
@@ -328,16 +328,12 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
       
                       <div className="space-y-4">
                         <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                          <h4 className="font-semibold text-green-900 mb-3">Retirement Summary</h4>
+                          <h4 className="font-semibold text-green-900 mb-3">Summary</h4>
                           <div className="space-y-2 text-sm">
                             <div className="flex justify-between">
-                              <span className="text-green-700">Amount Retired:</span>
-                              <span className="font-medium text-green-900">{selectedProject.retiredAmount} tCO₂</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-green-700">Retirement Date:</span>
+                              <span className="text-green-700">Date:</span>
                               <span className="font-medium text-green-900">
-                                {new Date(selectedProject.retiredDate).toLocaleDateString()}
+                                {new Date(selectedProject.date).toLocaleDateString()}
                               </span>
                             </div>
                             <div className="flex justify-between">
@@ -405,11 +401,11 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
       
                     <div className="flex justify-end space-x-4 mt-6 pt-6 border-t border-gray-200">
                       <button
-                        onClick={() => handleShareRetirement(selectedProject)}
+                        onClick={() => handleViewInformation(selectedProject)}
                         className="px-6 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors flex items-center space-x-2"
                       >
-                        <Share2 className="h-4 w-4" />
-                        <span>Share Impact</span>
+                        <Info className="h-4 w-4" />
+                        <span>Information</span>
                       </button>
                       <button
                         onClick={() => handleDownloadCertificate(selectedProject)}

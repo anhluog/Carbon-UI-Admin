@@ -6,7 +6,7 @@ import User from './components/User';
 import Profile from './components/UpdateProfile';  // Thêm import cho Profile component
 import MintToken from './components/MintToken';
 import Marketplace from './components/Marketplace';
-import RetiredProjects from './components/RetiredProject';
+import Projects from './components/Project';
 import RequestRole from './components/RequestRole';
 import VerifyRole from './components/VerifyRole';
 import VerifyProject from './components/VerifyProject';
@@ -204,7 +204,7 @@ function App() {
     { id: 'mint', name: 'Request Review', icon: Plus, roles: ['user', 'admin'], restricted: true },
     { id: 'requestRole', name: 'Request Role', icon: Users, roles: ['user', 'admin'], restricted: true },
     { id: 'marketplace', name: 'Marketplace', icon: ShoppingCart, roles: ['user', 'admin'], restricted: false },
-    { id: 'retired', name: 'RetiredProject', icon: Award, roles: ['user', 'admin'], restricted: false },
+    { id: 'project', name: 'Project', icon: Award, roles: ['user', 'admin'], restricted: false },
     { id: 'verifyRole', name: 'Verify Role', icon: CheckCircle, roles: ['admin'], restricted: true },
     { id: 'verifyProject', name: 'Verify Project', icon: Shield, roles: ['admin'], restricted: true },
     { id: 'updateProfile', name: 'Update Profile', icon: Edit3, roles: ['user', 'admin'], restricted: true }
@@ -240,7 +240,7 @@ function App() {
       case 'mint': return <MintToken walletAddress={walletAddress} />;
       case 'requestRole': return <RequestRole walletAddress={walletAddress} />;
       case 'marketplace': return <Marketplace walletAddress={walletAddress} setActiveTab={setActiveTab} />;
-      case 'retired': return <RetiredProjects walletAddress={walletAddress} />;
+      case 'project': return <Projects walletAddress={walletAddress} />;
       case 'verifyRole': return <VerifyRole />;
       case 'verifyProject': return <VerifyProject />;
       case 'updateProfile': return <Profile walletAddress={walletAddress} setActiveTab={setActiveTab} />;

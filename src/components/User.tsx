@@ -11,9 +11,12 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
     const [cctBalance, setCctBalance] = useState('0');
     const [portfolioValue, setPortfolioValue] = useState('0');
     const [creditsOffset, setCreditsOffset] = useState('0');
-    const [showProjectsPopup, setShowProjectsPopup] = useState(false);
+    const [showRechargePopup, setShowRechargePopup] = useState(false);
+    const [showWithdrawalPopup, setShowWithdrawalPopup] = useState(false);
     const [showTokenHistoryPopup, setShowTokenHistoryPopup] = useState(false);
     const [showTradesPopup, setShowTradesPopup] = useState(false);
+    const [rechargeType, setRechargeType] = useState('Money');
+    const [withdrawalType, setWithdrawalType] = useState('Money');
 
     useEffect(() => {
         const fetchData = async () => {
@@ -35,22 +38,11 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
         fetchData();
     }, [walletAddress]);
 
-    const projects = [
-        {
-            id: 1,
-            projectName: 'Amazon Rainforest Conservation',
-            projectType: 'Forest Protection',
-            location: 'Brazil',
-            retiree: '0x123...abc',
-            retiredAmount: 50.5,
-            vintage: 2024,
-            retiredDate: '2024-01-15',
-        },
-    ];
-
     const tokenHistory = [
         { type: 'Increase', amount: '100 CCT', date: '2023-05-20' },
         { type: 'Decrease', amount: '25 CCT', date: '2023-05-19' },
+        { type: 'Increase', amount: '50 CCT', date: '2023-05-18' },
+        { type: 'Decrease', amount: '10 CCT', date: '2023-05-17' },
     ];
 
     const trades = [
@@ -64,16 +56,24 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
         { id: 3, type: 'Alert', message: 'CCT price has increased by 5% in the last 24 hours.', time: '2 days ago', status: 'Alert' },
     ];
 
-
   const stats = [
     {
-      name: 'Total Project',
+      name: 'Recharge',
       value: cctBalance,
       change: '+12.5%',
       changeType: 'increase',
       icon: Leaf,
       color: 'from-green-500 to-emerald-500',
-      action: () => setShowProjectsPopup(true),
+      action: () => setShowRechargePopup(true),
+    },
+    {
+      name: 'Withdrawal',
+      value: `${creditsOffset} tCO₂`,
+      change: '+15.3%',
+      changeType: 'increase',
+      icon: Award,
+      color: 'from-purple-500 to-pink-500',
+      action: () => setShowWithdrawalPopup(true),
     },
     {
       name: 'Total Token',
@@ -85,21 +85,13 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
       action: () => setShowTokenHistoryPopup(true),
     },
     {
-      name: 'Credits Offset',
-      value: `${creditsOffset} tCO₂`,
-      change: '+15.3%',
-      changeType: 'increase',
-      icon: Award,
-      color: 'from-purple-500 to-pink-500'
-    },
-    {
-      name: 'Active Trades',
+      name: 'Certificate',
       value: '7',
       change: '-2',
       changeType: 'decrease',
       icon: Activity,
       color: 'from-orange-500 to-red-500',
-        action: () => setShowTradesPopup(true),
+      action: () => setShowTradesPopup(true),
     }
   ];
 
@@ -160,65 +152,131 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
         </div>
       </div>
 
-        {showProjectsPopup && (
+        {showRechargePopup && (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6">
+                <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
                     <div className="flex justify-between items-start mb-6">
-                        <h3 className="text-2xl font-bold text-gray-900">Total Projects</h3>
-                        <button onClick={() => setShowProjectsPopup(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                        <h3 className="text-2xl font-bold text-gray-900">Recharge</h3>
+                        <button onClick={() => setShowRechargePopup(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                             <X className="h-6 w-6" />
                         </button>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Name</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Retiree</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount Retired</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vintage</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Retirement Date</th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {projects.map((project) => (
-                                    <tr key={project.id}>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{project.projectName}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{project.projectType}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><div className="flex items-center"><MapPin className="h-4 w-4 mr-1.5 text-gray-400" />{project.location}</div></td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{project.retiree}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{project.retiredAmount}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{project.vintage}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><div className="flex items-center"><Calendar className="h-4 w-4 mr-1.5 text-gray-400" />{project.retiredDate}</div></td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="flex mb-4 border-b">
+                        <button onClick={() => setRechargeType('Money')} className={`flex-1 py-2 text-center font-semibold ${rechargeType === 'Money' ? 'text-green-600 border-b-2 border-green-600' : 'text-gray-500 hover:text-green-600'}`}>Money</button>
+                        <button onClick={() => setRechargeType('Token')} className={`flex-1 py-2 text-center font-semibold ${rechargeType === 'Token' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-blue-600'}`}>Token</button>
                     </div>
+
+                    {rechargeType === 'Money' ? (
+                      <div className="space-y-4">
+                        <div>
+                          <label htmlFor="amount" className="block text-sm font-medium text-gray-500">Amount (USD)</label>
+                          <input type="text" id="amount" placeholder="0.00" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500" />
+                        </div>
+                        <button className={`w-full text-white px-4 py-3 rounded-lg font-semibold text-lg bg-green-600 hover:bg-green-700'}`}>
+                          Deposit Money
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                      <div>
+                        <label htmlFor="amount" className="block text-sm font-medium text-gray-500">Amount (NVQ)</label>
+                        <input type="text" id="amount" placeholder="0.00" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500" />
+                      </div>
+                      <button className={`w-full text-white px-4 py-3 rounded-lg font-semibold text-lg bg-blue-600 hover:bg-blue-700'}`}>
+                        Deposit Token
+                      </button>
+                    </div>
+                    )}
+                </div>
+            </div>
+        )}
+
+        {showWithdrawalPopup && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
+                    <div className="flex justify-between items-start mb-6">
+                        <h3 className="text-2xl font-bold text-gray-900">Withdrawal</h3>
+                        <button onClick={() => setShowWithdrawalPopup(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                            <X className="h-6 w-6" />
+                        </button>
+                    </div>
+                    <div className="flex mb-4 border-b">
+                        <button onClick={() => setWithdrawalType('Money')} className={`flex-1 py-2 text-center font-semibold ${withdrawalType === 'Money' ? 'text-purple-600 border-b-2 border-purple-600' : 'text-gray-500 hover:text-purple-600'}`}>Money</button>
+                        <button onClick={() => setWithdrawalType('Token')} className={`flex-1 py-2 text-center font-semibold ${withdrawalType === 'Token' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-pink-600'}`}>Token</button>
+                    </div>
+
+                    {withdrawalType === 'Money' ? (
+                      <div className="space-y-4">
+                        <div>
+                          <label htmlFor="amount" className="block text-sm font-medium text-gray-500">Amount (USD)</label>
+                          <input type="text" id="amount" placeholder="0.00" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500" />
+                        </div>
+                        <button className={`w-full text-white px-4 py-3 rounded-lg font-semibold text-lg bg-purple-600 hover:bg-purple-700'}`}>
+                          Withdraw Money
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                      <div>
+                        <label htmlFor="amount" className="block text-sm font-medium text-gray-500">Amount (NVQ)</label>
+                        <input type="text" id="amount" placeholder="0.00" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500" />
+                      </div>
+                      <button className={`w-full text-white px-4 py-3 rounded-lg font-semibold text-lg bg-pink-600 hover:bg-pink-700'}`}>
+                        Withdraw Token
+                      </button>
+                    </div>
+                    )}
                 </div>
             </div>
         )}
 
         {showTokenHistoryPopup && (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6">
+                <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6">
                     <div className="flex justify-between items-start mb-6">
                         <h3 className="text-2xl font-bold text-gray-900">Total Token History</h3>
                         <button onClick={() => setShowTokenHistoryPopup(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                             <X className="h-6 w-6" />
                         </button>
                     </div>
-                    <ul className="space-y-4">
-                        {tokenHistory.map((item, index) => (
-                            <li key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                                <span className={`font-medium ${item.type === 'Increase' ? 'text-green-600' : 'text-red-600'}`}>{item.type}</span>
-                                <span>{item.amount}</span>
-                                <span className="text-sm text-gray-500">{item.date}</span>
-                            </li>
-                        ))}
-                    </ul>
+                    <div className="text-center mb-6">
+                      <p className="text-lg text-gray-600">Total Token Value</p>
+                      <p className="text-4xl font-bold text-gray-900">$${portfolioValue}</p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="p-4 border border-green-200 rounded-lg">
+                            <h4 className="font-semibold text-lg text-green-600 mb-2 text-center">Increase</h4>
+                            <table className="w-full text-sm">
+                                <thead className="text-left text-xs text-gray-500">
+                                    <tr><th>Amount</th><th>Date</th></tr>
+                                </thead>
+                                <tbody>
+                                    {tokenHistory.filter(t => t.type === 'Increase').map((item, index) => (
+                                        <tr key={index} className="text-left font-medium">
+                                            <td className="text-green-600">{item.amount}</td>
+                                            <td className="text-gray-500">{item.date}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="p-4 border border-red-200 rounded-lg">
+                            <h4 className="font-semibold text-lg text-red-600 mb-2 text-center">Decrease</h4>
+                            <table className="w-full text-sm">
+                                <thead className="text-left text-xs text-gray-500">
+                                    <tr><th>Amount</th><th>Date</th></tr>
+                                </thead>
+                                <tbody>
+                                    {tokenHistory.filter(t => t.type === 'Decrease').map((item, index) => (
+                                        <tr key={index} className="text-left font-medium">
+                                            <td className="text-red-600">{item.amount}</td>
+                                            <td className="text-gray-500">{item.date}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         )}
@@ -260,8 +318,3 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
 };
 
 export default User;
-
-interface MarketplaceProps {
-    walletAddress: string;
-    setActiveTab: (tab: string) => void;
-}
