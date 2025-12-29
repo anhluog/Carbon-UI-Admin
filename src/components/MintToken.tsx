@@ -10,13 +10,11 @@ interface MintTokenProps {
 
 const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
   const [formData, setFormData] = useState({
-    receiver: '',
     projectName: '',
     carbonAmount: '',
     location: '',
     methodology: '',
     vintage: '',
-    price: '',
     description: '',
     imageFile: null as File | null,
     docFile: null as File | null,
@@ -35,30 +33,29 @@ const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    console.log("🚀 === BẮT ĐẦU MINT CARBON CREDIT ===");
-    console.log("📦 Dữ liệu form gửi đi:", formData);
+    console.log("🚀 === STARTING CARBON CREDIT MINTING ===");
+    console.log("📦 Form data submitted:", formData);
     console.log("🌍 Contract address:", import.meta.env.VITE_CARBONCREDIT_ADDRESS);
 
     try {
       if (!(window as any).ethereum) throw new Error("❌ MetaMask not detected!");
-      console.log("🦊 MetaMask phát hiện thành công.");
+      console.log("🦊 MetaMask detected successfully.");
 
       const provider = new ethers.BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
       const signerAddress = await signer.getAddress();
-      console.log("👤 Địa chỉ ví signer:", signerAddress);
+      console.log("👤 Signer wallet address:", signerAddress);
 
       const contract = new ethers.Contract(
         import.meta.env.VITE_CARBONCREDIT_ADDRESS!,
         CarbonCreditToken.abi,
         signer
       );
-      console.log("✅ Khởi tạo contract thành công:", contract.target);
+      console.log("✅ Contract initialized successfully:", contract.target);
 
-      // === Upload ảnh ===
       let imageUrl = "";
       if (formData.imageFile) {
-        console.log("📤 Bắt đầu upload ảnh lên IPFS...");
+        console.log("📤 Starting image upload to IPFS...");
         const imgForm = new FormData();
         imgForm.append("file", formData.imageFile);
 
@@ -74,19 +71,18 @@ const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
             }
           );
           imageUrl = `https://gateway.pinata.cloud/ipfs/${imgRes.data.IpfsHash}`;
-          console.log("✅ Ảnh đã upload thành công:", imageUrl);
+          console.log("✅ Image uploaded successfully:", imageUrl);
         } catch (ipfsErr) {
-          console.error("❌ Lỗi upload ảnh:", ipfsErr);
-          throw new Error("Không thể upload ảnh lên IPFS!");
+          console.error("❌ Image upload error:", ipfsErr);
+          throw new Error("Failed to upload image to IPFS!");
         }
       } else {
-        console.warn("⚠️ Không có file ảnh để upload.");
+        console.warn("⚠️ No image file to upload.");
       }
 
-      // === Upload tài liệu ===
       let docUrl = "";
       if (formData.docFile) {
-        console.log("📤 Bắt đầu upload tài liệu lên IPFS...");
+        console.log("📤 Starting document upload to IPFS...");
         const docForm = new FormData();
         docForm.append("file", formData.docFile);
         try {
@@ -101,30 +97,27 @@ const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
             }
           );
           docUrl = `https://gateway.pinata.cloud/ipfs/${docRes.data.IpfsHash}`;
-          console.log("✅ Tài liệu đã upload thành công:", docUrl);
+          console.log("✅ Document uploaded successfully:", docUrl);
         } catch (ipfsErr) {
-          console.error("❌ Lỗi upload tài liệu:", ipfsErr);
-          throw new Error("Không thể upload tài liệu lên IPFS!");
+          console.error("❌ Document upload error:", ipfsErr);
+          throw new Error("Failed to upload document to IPFS!");
         }
       } else {
-        console.warn("⚠️ Không có file tài liệu để upload.");
+        console.warn("⚠️ No document file to upload.");
       }
 
-      // === Upload metadata ===
       const metadata = {
         projectName: formData.projectName,
         description: formData.description,
         location: formData.location,
         methodology: formData.methodology,
         vintage: formData.vintage,
-        price: formData.price,
-        receiver: formData.receiver,
         image: imageUrl,
         document: docUrl,
         timestamp: new Date().toISOString(),
       };
 
-      console.log("🧩 Metadata chuẩn bị upload:", metadata);
+      console.log("🧩 Metadata to upload:", metadata);
 
       const metaRes = await axios.post(
         "https://api.pinata.cloud/pinning/pinJSONToIPFS",
@@ -139,68 +132,42 @@ const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
       );
 
       const metadataHash = metaRes.data.IpfsHash;
-      console.log("✅ Metadata đã upload:", metadataHash);
+      console.log("✅ Metadata uploaded:", metadataHash);
 
-      // === Gọi contract issueCredit ===
-      console.log("📡 Gọi hàm issueCredit trên contract...");
-      console.log("➡️ Receiver:", formData.receiver);
+      console.log("📡 Calling issueCredit function on contract...");
+      console.log("➡️ Receiver:", signerAddress);
       console.log("➡️ ProjectName:", formData.projectName);
       console.log("➡️ MetadataHash:", metadataHash);
       console.log("➡️ CarbonAmount:", formData.carbonAmount);
-      const owner = await contract.owner();
-      console.log("👑 Owner của contract là:", owner);
-      console.log("👤 Ví đang kết nối (signer):", signer.address);
-
 
       const tx = await contract.issueCredit(
-        formData.receiver,
+        signerAddress,
         formData.projectName.trim(),
         metadataHash,
         ethers.parseUnits(formData.carbonAmount, 18)
       );
 
-
-
-
-      console.log("📤 Gửi transaction thành công, hash:", tx.hash);
+      console.log("📤 Transaction sent successfully, hash:", tx.hash);
       const receipt = await tx.wait();
-      console.log("✅ Transaction đã xác nhận:", receipt);
-
-      // // === Lưu dữ liệu vào backend ===
-      // const projectData = {
-      //   ...metadata,
-      //   amountMinted: Number(formData.carbonAmount),
-      //   txHash: receipt.hash,
-      //   ipfsHash: metadataHash,
-      //   status: "Active",
-      // };
-      // console.log("💾 Gửi dữ liệu lưu DB:", projectData);
-
-      // await axios.post("http://localhost:8080/api/projects/save", projectData);
-      // console.log("✅ Dữ liệu đã lưu vào backend thành công.");
+      console.log("✅ Transaction confirmed:", receipt);
 
       setTxHash(receipt.hash);
       setShowSuccess(true);
       alert("✅ Mint & Upload successful!");
 
     } catch (err: any) {
-      console.error("🔥 LỖI KHI MINT:", err);
-      if (err?.reason) console.error("⚠️ Lý do từ contract:", err.reason);
+      console.error("🔥 MINTING ERROR:", err);
+      if (err?.reason) console.error("⚠️ Contract Reason:", err.reason);
       if (err?.error) console.error("⚙️ err.error:", err.error);
       if (err?.data) console.error("📜 err.data:", err.data);
       if (err?.stack) console.error("🧠 Stack trace:", err.stack);
 
-      alert(`❌ Error: ${err.message || "Gặp lỗi khi Request Review!"}`);
+      alert(`❌ Error: ${err.message || "An error occurred during the request!"}`);
     } finally {
-      console.log("🏁 Kết thúc quá trình mint.\n-------------------------");
+      console.log("🏁 Minting process finished.\n-------------------------");
       setIsSubmitting(false);
     }
   };
-
-
-
-
-
 
   const methodologies = [
     { value: 'VCS', label: 'Verified Carbon Standard (VCS)' },
@@ -239,24 +206,9 @@ const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Mint Form */}
         <div className="lg:col-span-2">
           <form onSubmit={handleSubmit} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
             <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Address Organization</label>
-                <input
-                  type = 'text'
-                  name = 'receiver'
-                  value ={formData.receiver}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
-                  placeholder="Address ...."
-                  required
-                  >
-                </input>
-              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Project Name *
@@ -318,6 +270,7 @@ const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
                     required
                   >
+                    <option value="" disabled>Select a methodology</option>
                     {methodologies.map((method) => (
                       <option key={method.value} value={method.value}>
                         {method.label}
@@ -346,22 +299,6 @@ const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Initial Price (USD per NVQ)
-                </label>
-                <input
-                  type="number"
-                  name="price"
-                  value={formData.price}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
-                  placeholder="2.50"
-                  min="0.01"
-                  step="0.01"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Project Description
                 </label>
                 <textarea
@@ -374,8 +311,6 @@ const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
                 />
               </div>
 
-              {/* Certificate Upload */}
-              {/* Upload ảnh đại diện dự án */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Project Image
@@ -388,10 +323,8 @@ const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
                     setFormData({ ...formData, imageFile: file });
                   }}
                 />
-
               </div>
 
-              {/* Upload file xác minh (PDF, Word, v.v.) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Verification Documents
@@ -404,10 +337,7 @@ const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
                     setFormData({ ...formData, docFile: file });
                   }}
                 />
-
               </div>
-
-
             </div>
 
             <div className="mt-8 flex justify-end">
@@ -432,7 +362,6 @@ const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
           </form>
         </div>
 
-        {/* Info Panel */}
         <div className="space-y-6">
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Minting Information</h3>
