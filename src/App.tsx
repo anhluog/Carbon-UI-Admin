@@ -7,6 +7,7 @@ import Projects from './components/Project';
 import RequestRole from './components/RequestRole';
 import VerifyRole from './components/VerifyRole';
 import VerifyProject from './components/VerifyProject';
+import MyToken from './components/MyToken';
 
 const ADMIN_ACCOUNTS = [
   '0x1234567890123456789012345678901234567890'.toLowerCase(),
@@ -92,6 +93,7 @@ function App() {
 
   const tabs = [
     { id: 'user', name: 'User', icon: UserIcon, roles: ['user', 'admin'], restricted: true },
+    { id: 'myToken', name: 'My Token', icon: Building2, roles: ['user', 'admin'], restricted: true },
     { id: 'mint', name: 'Request Review', icon: Plus, roles: ['user', 'admin'], restricted: true },
     { id: 'requestRole', name: 'Request Role', icon: Users, roles: ['user', 'admin'], restricted: true },
     { id: 'marketplace', name: 'Marketplace', icon: ShoppingCart, roles: ['user', 'admin'], restricted: false },
@@ -122,6 +124,7 @@ function App() {
 
     switch (activeTab) {
       case 'user': return <User walletAddress={walletAddress} />;
+      case 'myToken': return <MyToken />;
       case 'mint': return <MintToken walletAddress={walletAddress} />;
       case 'requestRole': return <RequestRole walletAddress={walletAddress} />;
       case 'marketplace': return <Marketplace walletAddress={walletAddress} setActiveTab={setActiveTab} />;
