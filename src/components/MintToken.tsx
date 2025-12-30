@@ -47,17 +47,16 @@ const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
 
     try {
       if (!(window as any).ethereum) throw new Error("❌ MetaMask not detected!");
-      console.log("🦊 MetaMask phát hiện thành công.");
+      console.log("🦊 MetaMask detected successfully.");
 
       const provider = new ethers.BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
       const signerAddress = await signer.getAddress();
       console.log("👤 Địa chỉ ví signer:", signerAddress);
 
-      // === Upload ảnh ===
       let imageUrl = "";
       if (formData.imageFile) {
-        console.log("📤 Bắt đầu upload ảnh lên IPFS...");
+        console.log("📤 Starting image upload to IPFS...");
         const imgForm = new FormData();
         imgForm.append("file", formData.imageFile);
 
@@ -73,19 +72,18 @@ const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
             }
           );
           imageUrl = `https://gateway.pinata.cloud/ipfs/${imgRes.data.IpfsHash}`;
-          console.log("✅ Ảnh đã upload thành công:", imageUrl);
+          console.log("✅ Image uploaded successfully:", imageUrl);
         } catch (ipfsErr) {
-          console.error("❌ Lỗi upload ảnh:", ipfsErr);
-          throw new Error("Không thể upload ảnh lên IPFS!");
+          console.error("❌ Image upload error:", ipfsErr);
+          throw new Error("Failed to upload image to IPFS!");
         }
       } else {
-        console.warn("⚠️ Không có file ảnh để upload.");
+        console.warn("⚠️ No image file to upload.");
       }
 
-      // === Upload tài liệu ===
       let docUrl = "";
       if (formData.docFile) {
-        console.log("📤 Bắt đầu upload tài liệu lên IPFS...");
+        console.log("📤 Starting document upload to IPFS...");
         const docForm = new FormData();
         docForm.append("file", formData.docFile);
         try {
@@ -100,16 +98,15 @@ const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
             }
           );
           docUrl = `https://gateway.pinata.cloud/ipfs/${docRes.data.IpfsHash}`;
-          console.log("✅ Tài liệu đã upload thành công:", docUrl);
+          console.log("✅ Document uploaded successfully:", docUrl);
         } catch (ipfsErr) {
-          console.error("❌ Lỗi upload tài liệu:", ipfsErr);
-          throw new Error("Không thể upload tài liệu lên IPFS!");
+          console.error("❌ Document upload error:", ipfsErr);
+          throw new Error("Failed to upload document to IPFS!");
         }
       } else {
-        console.warn("⚠️ Không có file tài liệu để upload.");
+        console.warn("⚠️ No document file to upload.");
       }
 
-      // === Upload metadata ===
       const metadata = {
         projectName: formData.projectName,
         vintage: formData.vintage,
@@ -123,7 +120,7 @@ const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
         timestamp: new Date().toISOString(),
       };
 
-      console.log("🧩 Metadata chuẩn bị upload:", metadata);
+      console.log("🧩 Metadata to upload:", metadata);
 
       const metaRes = await axios.post(
         "https://api.pinata.cloud/pinning/pinJSONToIPFS",
@@ -231,7 +228,6 @@ const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Mint Form */}
         <div className="lg:col-span-2">
           <form onSubmit={handleSubmit} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100 space-y-6">
             {/* Address Organization */}
@@ -428,7 +424,6 @@ const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
           </form>
         </div>
 
-        {/* Info Panel */}
         <div className="space-y-6">
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Saving Information</h3>
