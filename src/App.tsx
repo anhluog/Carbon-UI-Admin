@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Leaf, Wallet, Building2, Award, Plus, ShoppingCart, User as UserIcon, Users, CheckCircle, Shield, Edit3 } from 'lucide-react';
-import { ethers } from 'ethers';  // Import ethers cho provider/signer
+import { ethers, id } from 'ethers';  // Import ethers cho provider/signer
 import axios from 'axios';  // Import axios cho API call
 import User from './components/User';
 import Profile from './components/UpdateProfile';  // Thêm import cho Profile component
@@ -10,6 +10,7 @@ import Projects from './components/Project';
 import RequestRole from './components/RequestRole';
 import VerifyRole from './components/VerifyRole';
 import VerifyProject from './components/VerifyProject';
+import ApprovedProject from './components/ApprovedProject';
 
 
 function App() {
@@ -122,12 +123,16 @@ function App() {
         signature
       });
 
+
       console.log("✅ Auth success:", response.data);
 
       // ← SỬA: Lưu token chỉ khi success và token tồn tại
       if (response.status === 200 && response.data.token) {
-        localStorage.setItem("token", response.data.token);  // Lưu token vào localStorage
+        // Ví dụ trong login handler
+        localStorage.setItem('user', JSON.stringify(response.data.user)); // Đảm bảo response.data.user có { id: '...', ... }
+        localStorage.setItem('token', response.data.token);
         console.log("Token saved to localStorage:", response.data.token.substring(0, 20) + "...");  // Debug
+
         
         // Set role từ response nếu có (backend trả roleId)
         let role = 'user';  // Default role
@@ -217,8 +222,9 @@ function App() {
     { id: 'marketplace', name: 'Marketplace', icon: ShoppingCart, roles: ['user','owner','verifier', 'admin','government'], restricted: false },
     { id: 'project', name: 'Project', icon: Award, roles: ['owner'], restricted: false },
     { id: 'verifyRole', name: 'Verify Role', icon: CheckCircle, roles: ['admin','superadmin'], restricted: true },
-    { id: 'verifyProject', name: 'Verify Project', icon: Shield, roles: ['verifier'], restricted: true },
-    { id: 'updateProfile', name: 'Update Profile', icon: Edit3, roles: ['user'], restricted: true }
+    { id: 'verifyProject', name: 'Verify Project', icon: Shield, roles: ['verifier','admin'], restricted: true },
+    { id: 'updateProfile', name: 'Update Profile', icon: Edit3, roles: ['user'], restricted: true },
+    { id: 'approvedProject', name: 'Approved Project', icon: CheckCircle, roles: ['government'], restricted: true },
   ];
 
   const displayedTabs = isWalletConnected
@@ -255,6 +261,7 @@ function App() {
       case 'verifyRole': return <VerifyRole />;
       case 'verifyProject': return <VerifyProject />;
       case 'updateProfile': return <Profile walletAddress={walletAddress} setActiveTab={setActiveTab} />;
+      case 'approvedProject': return <ApprovedProject  />;
       default: return <Marketplace walletAddress={walletAddress} setActiveTab={setActiveTab} />;
     }
   };
