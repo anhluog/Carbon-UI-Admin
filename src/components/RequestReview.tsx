@@ -4,11 +4,11 @@ import { ethers } from "ethers";
 import CarbonCreditToken from '../abi/CarbonCredit.json';
 import axios from 'axios';
 
-interface MintTokenProps {
+interface RequestReviewProps {
   walletAddress: string;
 }
 
-const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
+const RequestReview: React.FC<RequestReviewProps> = ({ walletAddress }) => {
   const [formData, setFormData] = useState({
     projectName: '',
     carbonAmount: '',
@@ -408,4 +408,4 @@ const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
   );
 };
 
-export default MintToken;
+export default RequestReview;
