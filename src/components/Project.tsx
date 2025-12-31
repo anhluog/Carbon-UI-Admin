@@ -9,6 +9,7 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
   const [activeFilter, setActiveFilter] = useState('all');
   const [timeFilter, setTimeFilter] = useState('all-time');
   const [selectedProject, setSelectedProject] = useState<any>(null);
+  const [projectStatus, setProjectStatus] = useState('Approved');
 
   const projects = [
     {
@@ -45,7 +46,8 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
       images: [
         'https://images.pexels.com/photos/975771/pexels-photo-975771.jpeg',
         'https://images.pexels.com/photos/1632790/pexels-photo-1632790.jpeg'
-      ]
+      ],
+      status: 'Approved'
     },
     {
       id: 2,
@@ -78,7 +80,8 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
       ],
       images: [
         'https://images.pexels.com/photos/433308/pexels-photo-433308.jpeg'
-      ]
+      ],
+      status: 'Approved'
     },
     {
       id: 3,
@@ -111,7 +114,8 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
       ],
       images: [
         'https://images.pexels.com/photos/414837/pexels-photo-414837.jpeg'
-      ]
+      ],
+      status: 'Pending Approval'
     },
     {
       id: 4,
@@ -145,16 +149,18 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
       ],
       images: [
         'https://images.pexels.com/photos/6194401/pexels-photo-6194401.jpeg'
-      ]
+      ],
+      status: 'Approved'
     }
   ];
 
-  const totalStats = {
-    totalAmount: projects.reduce((sum, project) => sum + project.amount, 0),
-    totalValue: projects.reduce((sum, project) => sum + project.totalValue, 0),
-    totalProjects: projects.length,
-    averagePrice: projects.reduce((sum, project) => sum + project.price, 0) / projects.length
-  };
+  const approvedAmount = projects
+    .filter(p => p.status === 'Approved')
+    .reduce((sum, project) => sum + project.amount, 0);
+
+  const pendingValue = projects
+    .filter(p => p.status === 'Pending Approval')
+    .reduce((sum, project) => sum + project.amount, 0);
 
   const projectTypes = [
     { id: 'all', name: 'All Projects', count: projects.length },
@@ -164,6 +170,7 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
   ];
 
   const filteredProjects = projects.filter(project => {
+    const matchesStatus = project.status === projectStatus;
     const matchesType = activeFilter === 'all' || 
       (activeFilter === 'forest' && project.projectType === 'Forest Protection') ||
       (activeFilter === 'renewable' && project.projectType === 'Renewable Energy') ||
@@ -173,7 +180,7 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
       (timeFilter === '2024' && project.vintage === 2024) ||
       (timeFilter === '2023' && project.vintage === 2023);
     
-    return matchesType && matchesTime;
+    return matchesStatus && matchesType && matchesTime;
   });
 
   const handleDownloadCertificate = (project: any) => {
@@ -194,40 +201,21 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div onClick={() => setProjectStatus('Approved')} className={`bg-white/80 backdrop-blur-sm rounded-2xl p-6 border cursor-pointer ${projectStatus === 'Approved' ? 'border-green-400' : 'border-green-100'}`}>
           <div className="flex items-center justify-between mb-4">
             <Award className="h-8 w-8 text-green-600" />
-            <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full font-medium">
-              Total
-            </span>
           </div>
-          <h3 className="text-2xl font-bold text-gray-900 mb-1">{totalStats.totalAmount.toFixed(1)} tCO₂</h3>
-          <p className="text-sm text-gray-600">Credits</p>
+          <h3 className="text-2xl font-bold text-gray-900 mb-1">{approvedAmount.toFixed(1)} tCO₂</h3>
+          <p className="text-sm text-gray-600">Approved</p>
         </div>
 
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
+        <div onClick={() => setProjectStatus('Pending Approval')} className={`bg-white/80 backdrop-blur-sm rounded-2xl p-6 border cursor-pointer ${projectStatus === 'Pending Approval' ? 'border-blue-400' : 'border-blue-100'}`}>
           <div className="flex items-center justify-between mb-4">
             <BarChart3 className="h-8 w-8 text-blue-600" />
           </div>
-          <h3 className="text-2xl font-bold text-gray-900 mb-1">${totalStats.totalValue.toFixed(2)}</h3>
-          <p className="text-sm text-gray-600">Total Investment</p>
-        </div>
-
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-          <div className="flex items-center justify-between mb-4">
-            <Globe className="h-8 w-8 text-purple-600" />
-          </div>
-          <h3 className="text-2xl font-bold text-gray-900 mb-1">{totalStats.totalProjects}</h3>
-          <p className="text-sm text-gray-600">Projects Supported</p>
-        </div>
-
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-          <div className="flex items-center justify-between mb-4">
-            <TrendingUp className="h-8 w-8 text-orange-600" />
-          </div>
-          <h3 className="text-2xl font-bold text-gray-900 mb-1">${totalStats.averagePrice.toFixed(2)}</h3>
-          <p className="text-sm text-gray-600">Avg. Price/tCO₂</p>
+          <h3 className="text-2xl font-bold text-gray-900 mb-1">{pendingValue.toFixed(2)} tCO₂</h3>
+          <p className="text-sm text-gray-600">Pending Approval</p>
         </div>
       </div>
 
@@ -290,8 +278,8 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
                         <Calendar className="h-4 w-4" />
                         <span>Vintage {project.vintage}</span>
                       </span>
-                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
-                        {project.methodology}
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${project.status === 'Approved' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                        {project.status}
                       </span>
                     </div>
                     <p className="text-sm text-gray-600">{project.projectType}</p>
@@ -390,8 +378,8 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
                       <Calendar className="h-4 w-4" />
                       <span>Vintage {selectedProject.vintage}</span>
                     </span>
-                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
-                      {selectedProject.methodology}
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${selectedProject.status === 'Approved' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                      {selectedProject.status}
                     </span>
                   </div>
                 </div>
