@@ -4,7 +4,7 @@ import { ethers, id } from 'ethers';  // Import ethers cho provider/signer
 import axios from 'axios';  // Import axios cho API call
 import User from './components/User';
 import Profile from './components/UpdateProfile';  // Thêm import cho Profile component
-import MintToken from './components/MintToken';
+import RequestReview from './components/RequestReview';
 import Marketplace from './components/Marketplace';
 import Projects from './components/Project';
 import RequestRole from './components/RequestRole';
@@ -218,7 +218,7 @@ function App() {
 
   const tabs = [
     { id: 'user', name: 'User', icon: UserIcon, roles: ['user', 'admin', 'superadmin', 'verifier','government'], restricted: true },
-    { id: 'mint', name: 'Request Review', icon: Plus, roles: ['owner'], restricted: true },
+    { id: 'requestReview', name: 'Request Review', icon: Plus, roles: ['owner'], restricted: true },
     { id: 'requestRole', name: 'Request Role', icon: Users, roles: ['user',], restricted: true },
     { id: 'marketplace', name: 'Marketplace', icon: ShoppingCart, roles: ['user','owner','verifier', 'admin','government'], restricted: false },
     { id: 'project', name: 'Project', icon: Award, roles: ['owner'], restricted: false },
