@@ -7,6 +7,12 @@ interface UserProps {
   walletAddress: string;
 }
 
+interface RetiredEntry {
+    amount: string;
+    dateOfIssue: string;
+    equivalentTrees: string;
+}
+
 const User: React.FC<UserProps> = ({ walletAddress }) => {
     const [cctBalance, setCctBalance] = useState('0');
     const [portfolioValue, setPortfolioValue] = useState('0');
@@ -15,6 +21,8 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
     const [showWithdrawalPopup, setShowWithdrawalPopup] = useState(false);
     const [showTokenHistoryPopup, setShowTokenHistoryPopup] = useState(false);
     const [showTradesPopup, setShowTradesPopup] = useState(false);
+    const [showCertificatePopup, setShowCertificatePopup] = useState(false);
+    const [selectedCertificate, setSelectedCertificate] = useState<RetiredEntry | null>(null);
     const [rechargeType, setRechargeType] = useState('Money');
     const [withdrawalType, setWithdrawalType] = useState('Money');
 
@@ -56,6 +64,24 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
         { id: 3, type: 'Alert', message: 'CCT price has increased by 5% in the last 24 hours.', time: '2 days ago', status: 'Alert' },
     ];
 
+    const retiredEntries: RetiredEntry[] = [
+        {
+            amount: '10.00',
+            dateOfIssue: '2024-05-21 10:30:00',
+            equivalentTrees: '165'
+        },
+        {
+            amount: '5.50',
+            dateOfIssue: '2024-04-15 14:00:00',
+            equivalentTrees: '90'
+        },
+        {
+            amount: '12.75',
+            dateOfIssue: '2024-03-28 18:45:00',
+            equivalentTrees: '210'
+        }
+    ];
+
   const stats = [
     {
       name: 'Recharge',
@@ -85,14 +111,14 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
       action: () => setShowTokenHistoryPopup(true),
     },
     {
-      name: 'Certificate',
-      value: '7',
-      change: '-2',
-      changeType: 'decrease',
-      icon: Activity,
-      color: 'from-orange-500 to-red-500',
-      action: () => setShowTradesPopup(true),
-    }
+        name: 'Certificate',
+        value: 'View',
+        change: '',
+        changeType: 'increase',
+        icon: Activity,
+        color: 'from-orange-500 to-red-500',
+        action: () => setShowCertificatePopup(true),
+      }
   ];
 
   return (
@@ -313,6 +339,68 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
                 </div>
             </div>
         )}
+       {showCertificatePopup && (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex justify-between items-start mb-6">
+                <h3 className="text-2xl font-bold text-gray-900">
+                    {selectedCertificate ? 'Carbon Credit Certificate' : 'Carbon Credit Certificates'}
+                </h3>
+                <button onClick={() => {
+                    setShowCertificatePopup(false);
+                    setSelectedCertificate(null);
+                }} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                    <X className="h-6 w-6" />
+                </button>
+            </div>
+
+            {selectedCertificate ? (
+                <div>
+                    <button onClick={() => setSelectedCertificate(null)} className="mb-4 text-sm text-gray-600 hover:text-gray-900">
+                        &larr; Back to list
+                    </button>
+                    <div className="border-2 border-green-600 p-8 rounded-lg bg-green-50/50 text-center relative">
+                        <div className="absolute top-4 left-4 text-green-600">
+                            <Leaf className="w-12 h-12" />
+                        </div>
+                        <div className="absolute top-4 right-4 text-green-600">
+                            <Award className="w-12 h-12" />
+                        </div>
+                        <h1 className="text-4xl font-bold text-green-800 mb-2">Certificate of Carbon Offset</h1>
+                        <p className="text-lg text-gray-600 mb-6">This certificate is awarded to</p>
+                        <p className="text-2xl font-semibold text-gray-800 mb-4">{walletAddress}</p>
+                        <p className="text-lg text-gray-600 mb-6">for offsetting</p>
+                        <p className="text-5xl font-bold text-green-600 mb-4">{selectedCertificate.amount} tCO₂</p>
+                        <p className="text-sm text-gray-500 mb-8">Equivalent to planting {selectedCertificate.equivalentTrees} trees</p>
+                        <div className="grid grid-cols-1 gap-4 text-left">
+                            <div>
+                                <p className="text-xs text-gray-500 flex items-center"><Calendar className="w-4 h-4 mr-1"/> Date of Issue</p>
+                                <p className="font-semibold text-gray-700">{selectedCertificate.dateOfIssue}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Retired Amount</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {retiredEntries.map((entry, index) => (
+                            <tr key={index} onClick={() => setSelectedCertificate(entry)} className="cursor-pointer hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.amount} tCO₂</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.dateOfIssue}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
+        </div>
+    </div>
+)}
     </div>
   );
 };

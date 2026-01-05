@@ -10,6 +10,7 @@ import Projects from './components/Project';
 import RequestRole from './components/RequestRole';
 import VerifyRole from './components/VerifyRole';
 import VerifyProject from './components/VerifyProject';
+import MyToken from './components/MyToken';
 import ApprovedProject from './components/ApprovedProject';
 
 
@@ -254,7 +255,8 @@ function App() {
 
     switch (activeTab) {
       case 'user': return <User walletAddress={walletAddress} />;
-      case 'mint': return <MintToken walletAddress={walletAddress} />;
+      case 'myToken': return <MyToken />;
+      case 'requestReview': return <RequestReview walletAddress={walletAddress} />;
       case 'requestRole': return <RequestRole walletAddress={walletAddress} />;
       case 'marketplace': return <Marketplace walletAddress={walletAddress} setActiveTab={setActiveTab} />;
       case 'project': return <Projects walletAddress={walletAddress} />;

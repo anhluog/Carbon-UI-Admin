@@ -4,11 +4,11 @@ import { ethers } from "ethers";
 import axios from 'axios';
 import api from '../utils/axiosInstance';
 
-interface MintTokenProps {
+interface RequestReviewProps {
   walletAddress: string;
 }
 
-const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
+const RequestReview: React.FC<RequestReviewProps> = ({ walletAddress }) => {
   const [formData, setFormData] = useState({
     projectName: '',
     vintage: '',
@@ -470,4 +470,4 @@ const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
   );
 };
 
-export default MintToken;
+export default RequestReview;
