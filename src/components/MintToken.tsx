@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Leaf, Upload, Calendar, MapPin, Award, Plus, CheckCircle } from 'lucide-react';
+import { Leaf, Calendar, MapPin, Award, Plus, CheckCircle } from 'lucide-react';
 import { ethers } from "ethers";
 import axios from 'axios';
 import api from '../utils/axiosInstance';
@@ -8,7 +8,7 @@ interface MintTokenProps {
   walletAddress: string;
 }
 
-const MintToken: React.FC<MintTokenProps> = ({ walletAddress }) => {
+const MintToken: React.FC<MintTokenProps> = ({ }) => {
   const [formData, setFormData] = useState({
     projectName: '',
     vintage: '',

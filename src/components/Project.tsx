@@ -18,6 +18,8 @@ interface Project {
   updatedAt: string;
 }
 
+
+// Đổi lại định nghĩa component:
 const VerifyProject: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);

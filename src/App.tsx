@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Leaf, Wallet, Building2, Award, Plus, ShoppingCart, User as UserIcon, Users, CheckCircle, Shield, Edit3 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Leaf, Wallet, Award, Plus, ShoppingCart, User as UserIcon, Users, CheckCircle, Shield, Edit3 } from 'lucide-react';
 import { ethers } from 'ethers';  // Import ethers cho provider/signer
 import axios from 'axios';  // Import axios cho API call
 import User from './components/User';
@@ -11,6 +11,20 @@ import RequestRole from './components/RequestRole';
 import VerifyRole from './components/VerifyRole';
 import VerifyProject from './components/VerifyProject';
 
+interface EthereumProvider {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+  on: (event: string, callback: (...args: unknown[]) => void) => void;
+  removeListener: (event: string, callback: (...args: unknown[]) => void) => void;
+  removeAllListeners: () => void;
+  selectedAddress: string | null;
+  isMetaMask?: boolean;
+}
+
+declare global {
+  interface Window {
+    ethereum?: EthereumProvider;
+  }
+}
 
 function App() {
   const [activeTab, setActiveTab] = useState('marketplace');
@@ -50,17 +64,19 @@ function App() {
 
       let address: string;
 
-      const extractAddress = async (acct: any): Promise<string> => {
+      const extractAddress = async (acct: unknown): Promise<string> => {
         // If it's already a string address
         if (typeof acct === 'string') return acct;
+        
         // If it's a signer-like object with getAddress()
         if (acct && typeof acct === 'object') {
-          if (typeof (acct as any).getAddress === 'function') {
-            return await (acct as any).getAddress();
+          // Type guard for object with getAddress method
+          if ('getAddress' in acct && typeof acct.getAddress === 'function') {
+            return await (acct.getAddress as () => Promise<string>)();
           }
           // Some providers return objects with an 'address' field
-          if (typeof (acct as any).address === 'string') {
-            return (acct as any).address;
+          if ('address' in acct && typeof acct.address === 'string') {
+            return acct.address;
           }
         }
         throw new Error('Không thể lấy địa chỉ từ tài khoản được trả về');
@@ -92,8 +108,18 @@ function App() {
             method: "wallet_switchEthereumChain",
             params: [{ chainId: "0x13882" }],  // Polygon Amoy hex
           });
-        } catch (switchError: any) {
-          if (switchError.code === 4902) {
+        } catch (switchError: unknown) {
+          // Type guard to check if error has code property
+          const isErrorWithCode = (err: unknown): err is { code: number } => {
+            return (
+              typeof err === 'object' &&
+              err !== null &&
+              'code' in err &&
+              typeof (err as { code: unknown }).code === 'number'
+            );
+          };
+
+          if (isErrorWithCode(switchError) && switchError.code === 4902) {
             // Network chưa add: Add Polygon Amoy
             await window.ethereum.request({
               method: "wallet_addEthereumChain",
@@ -156,10 +182,31 @@ function App() {
       window.ethereum.on("accountsChanged", () => window.location.reload());
       window.ethereum.on("chainChanged", () => window.location.reload());
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Lỗi kết nối MetaMask:", error);
-      setError(error.message || "Kết nối thất bại. Vui lòng thử lại!");
-      if (error.code === 4001) {
+      
+      // Type guard to check if error is an Error object
+      const isError = (err: unknown): err is Error => {
+        return err instanceof Error;
+      };
+
+      // Type guard to check if error has code property
+      const hasCode = (err: unknown): err is { code: number } => {
+        return (
+          typeof err === 'object' &&
+          err !== null &&
+          'code' in err &&
+          typeof (err as { code: unknown }).code === 'number'
+        );
+      };
+
+      if (isError(error)) {
+        setError(error.message || "Kết nối thất bại. Vui lòng thử lại!");
+      } else {
+        setError("Kết nối thất bại. Vui lòng thử lại!");
+      }
+
+      if (hasCode(error) && error.code === 4001) {
         setError("Người dùng từ chối kết nối ví!");
       }
     } finally {
@@ -196,16 +243,19 @@ function App() {
 
   useEffect(() => {
     if (window.ethereum) {
-      const handleAccountsChanged = (accounts: string[]) => {
-        if (accounts.length === 0) {
-          handleLogout();
+      const handleAccountsChanged = (accounts: unknown) => {
+        // Type guard to check if accounts is an array
+        if (Array.isArray(accounts)) {
+          if (accounts.length === 0) {
+            handleLogout();
+          }
         }
       };
 
       window.ethereum.on('accountsChanged', handleAccountsChanged);
 
       return () => {
-        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        window.ethereum?.removeListener('accountsChanged', handleAccountsChanged);
       };
     }
   }, [handleLogout]);
@@ -251,7 +301,7 @@ function App() {
       case 'mint': return <MintToken walletAddress={walletAddress} />;
       case 'requestRole': return <RequestRole walletAddress={walletAddress} />;
       case 'marketplace': return <Marketplace walletAddress={walletAddress} setActiveTab={setActiveTab} />;
-      case 'project': return <Projects walletAddress={walletAddress} />;
+      case 'project': return <Projects />;
       case 'verifyRole': return <VerifyRole />;
       case 'verifyProject': return <VerifyProject />;
       case 'updateProfile': return <Profile walletAddress={walletAddress} setActiveTab={setActiveTab} />;

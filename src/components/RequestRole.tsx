@@ -45,9 +45,14 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
       } else {
         setError('Failed to submit request');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Interceptor đã handle alert cho 400/500, nhưng set UI error
-      setError(err.response?.data?.message || 'Error submitting request');
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { response?: { data?: { message?: string } } };
+        setError(axiosError.response?.data?.message || 'Error submitting request');
+      } else {
+        setError('Error submitting request');
+      }
       console.error('❌ Request role error:', err);
     } finally {
       setIsSubmitting(false);

@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { TrendingUp, TrendingDown, DollarSign, Leaf, Award, Activity, X, MapPin, Calendar, Bell } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Leaf, Award, Activity, X, Bell } from 'lucide-react';
 import CarbonCredit from '../abi/CarbonCredit.json';
 
 interface UserProps {
   walletAddress: string;
 }
 
-const User: React.FC<UserProps> = ({ walletAddress }) => {
+const User = ({ walletAddress }: UserProps) => {
     const [cctBalance, setCctBalance] = useState('0');
     const [portfolioValue, setPortfolioValue] = useState('0');
-    const [creditsOffset, setCreditsOffset] = useState('0');
+    const [creditsOffset] = useState('0');
     const [showRechargePopup, setShowRechargePopup] = useState(false);
     const [showWithdrawalPopup, setShowWithdrawalPopup] = useState(false);
     const [showTokenHistoryPopup, setShowTokenHistoryPopup] = useState(false);
@@ -21,12 +21,12 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
     useEffect(() => {
         const fetchData = async () => {
             if (window.ethereum && walletAddress) {
-                const provider = new ethers.providers.Web3Provider(window.ethereum);
-                const signer = provider.getSigner();
+                const provider = new ethers.BrowserProvider(window.ethereum);
+                const signer = await provider.getSigner();
                 const cctContract = new ethers.Contract('0x5FbDB2315678afecb367f032d93F642f64180aa3', CarbonCredit.abi, signer);
 
                 const balance = await cctContract.balanceOf(walletAddress);
-                const formattedBalance = ethers.utils.formatUnits(balance, 18);
+                const formattedBalance = ethers.formatUnits(balance, 18);
                 setCctBalance(formattedBalance);
 
                 const price = 2.35;
