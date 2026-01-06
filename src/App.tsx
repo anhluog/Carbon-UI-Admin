@@ -1,30 +1,18 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Leaf, Wallet, Award, Plus, ShoppingCart, User as UserIcon, Users, CheckCircle, Shield, Edit3 } from 'lucide-react';
-import { ethers } from 'ethers';  // Import ethers cho provider/signer
+import React, { useState, useEffect, useCallback } from 'react';
+import { Leaf, Wallet, Building2, Award, Plus, ShoppingCart, User as UserIcon, Users, CheckCircle, Shield, Edit3 } from 'lucide-react';
+import { ethers, id } from 'ethers';  // Import ethers cho provider/signer
 import axios from 'axios';  // Import axios cho API call
 import User from './components/User';
 import Profile from './components/UpdateProfile';  // Thêm import cho Profile component
-import MintToken from './components/MintToken';
+import RequestReview from './components/RequestReview';
 import Marketplace from './components/Marketplace';
 import Projects from './components/Project';
 import RequestRole from './components/RequestRole';
 import VerifyRole from './components/VerifyRole';
 import VerifyProject from './components/VerifyProject';
+import MyToken from './components/MyToken';
+import ApprovedProject from './components/ApprovedProject';
 
-interface EthereumProvider {
-  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-  on: (event: string, callback: (...args: unknown[]) => void) => void;
-  removeListener: (event: string, callback: (...args: unknown[]) => void) => void;
-  removeAllListeners: () => void;
-  selectedAddress: string | null;
-  isMetaMask?: boolean;
-}
-
-declare global {
-  interface Window {
-    ethereum?: EthereumProvider;
-  }
-}
 
 function App() {
   const [activeTab, setActiveTab] = useState('marketplace');
@@ -148,12 +136,16 @@ function App() {
         signature
       });
 
+
       console.log("✅ Auth success:", response.data);
 
       // ← SỬA: Lưu token chỉ khi success và token tồn tại
       if (response.status === 200 && response.data.token) {
-        localStorage.setItem("token", response.data.token);  // Lưu token vào localStorage
+        // Ví dụ trong login handler
+        localStorage.setItem('user', JSON.stringify(response.data.user)); // Đảm bảo response.data.user có { id: '...', ... }
+        localStorage.setItem('token', response.data.token);
         console.log("Token saved to localStorage:", response.data.token.substring(0, 20) + "...");  // Debug
+
         
         // Set role từ response nếu có (backend trả roleId)
         let role = 'user';  // Default role
@@ -262,13 +254,14 @@ function App() {
 
   const tabs = [
     { id: 'user', name: 'User', icon: UserIcon, roles: ['user', 'admin', 'superadmin', 'verifier','government'], restricted: true },
-    { id: 'mint', name: 'Request Review', icon: Plus, roles: ['owner'], restricted: true },
+    { id: 'requestReview', name: 'Request Review', icon: Plus, roles: ['owner'], restricted: true },
     { id: 'requestRole', name: 'Request Role', icon: Users, roles: ['user',], restricted: true },
     { id: 'marketplace', name: 'Marketplace', icon: ShoppingCart, roles: ['user','owner','verifier', 'admin','government'], restricted: false },
     { id: 'project', name: 'Project', icon: Award, roles: ['owner'], restricted: false },
     { id: 'verifyRole', name: 'Verify Role', icon: CheckCircle, roles: ['admin','superadmin'], restricted: true },
-    { id: 'verifyProject', name: 'Verify Project', icon: Shield, roles: ['verifier'], restricted: true },
-    { id: 'updateProfile', name: 'Update Profile', icon: Edit3, roles: ['user'], restricted: true }
+    { id: 'verifyProject', name: 'Verify Project', icon: Shield, roles: ['verifier','admin'], restricted: true },
+    { id: 'updateProfile', name: 'Update Profile', icon: Edit3, roles: ['user'], restricted: true },
+    { id: 'approvedProject', name: 'Approved Project', icon: CheckCircle, roles: ['government'], restricted: true },
   ];
 
   const displayedTabs = isWalletConnected
@@ -298,13 +291,15 @@ function App() {
 
     switch (activeTab) {
       case 'user': return <User walletAddress={walletAddress} />;
-      case 'mint': return <MintToken walletAddress={walletAddress} />;
+      case 'myToken': return <MyToken />;
+      case 'requestReview': return <RequestReview walletAddress={walletAddress} />;
       case 'requestRole': return <RequestRole walletAddress={walletAddress} />;
       case 'marketplace': return <Marketplace walletAddress={walletAddress} setActiveTab={setActiveTab} />;
       case 'project': return <Projects />;
       case 'verifyRole': return <VerifyRole />;
       case 'verifyProject': return <VerifyProject />;
       case 'updateProfile': return <Profile walletAddress={walletAddress} setActiveTab={setActiveTab} />;
+      case 'approvedProject': return <ApprovedProject  />;
       default: return <Marketplace walletAddress={walletAddress} setActiveTab={setActiveTab} />;
     }
   };
