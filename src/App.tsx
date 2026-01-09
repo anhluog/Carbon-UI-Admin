@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Leaf, Wallet, Building2, Award, Plus, ShoppingCart, User as UserIcon, Users, CheckCircle, Shield, Edit3 } from 'lucide-react';
-import { ethers, id } from 'ethers';  // Import ethers cho provider/signer
+import { Leaf, Wallet, Building2, Award, Plus, ShoppingCart, User as UserIcon, Users, CheckCircle, Shield, Edit3, ArrowLeft } from 'lucide-react';
+import { ethers } from 'ethers';  // Import ethers cho provider/signer
 import axios from 'axios';  // Import axios cho API call
 import User from './components/User';
 import Profile from './components/UpdateProfile';  // Thêm import cho Profile component
@@ -12,7 +12,9 @@ import VerifyRole from './components/VerifyRole';
 import VerifyProject from './components/VerifyProject';
 import MyToken from './components/MyToken';
 import ApprovedProject from './components/ApprovedProject';
-
+import CryptoMarket from './components/CryptoMarket';
+import OrderBook from './components/OrderBook';
+import ProjectDetailPage from './components/ProjectDetail';  // Import mới cho full page detail
 
 function App() {
   const [activeTab, setActiveTab] = useState('marketplace');
@@ -22,6 +24,9 @@ function App() {
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Thêm state cho ProjectDetailPage (sử dụng projectId thay vì full project để fetch data tươi)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
   const onConnect = useCallback((address: string, role: string = 'user') => {
     setWalletAddress(address);
@@ -55,7 +60,6 @@ function App() {
       const extractAddress = async (acct: unknown): Promise<string> => {
         // If it's already a string address
         if (typeof acct === 'string') return acct;
-        
         // If it's a signer-like object with getAddress()
         if (acct && typeof acct === 'object') {
           // Type guard for object with getAddress method
@@ -130,7 +134,7 @@ function App() {
       const signature = await signer.signMessage(message);  // Returns Promise<string> - type-safe
 
       // Gọi BE API auth
-      const response = await axios.post("http://localhost:8080/api/auth/login", { 
+      const response = await axios.post("http://localhost:8080/api/auth/login", {
         address,
         message,
         signature
@@ -146,26 +150,26 @@ function App() {
         localStorage.setItem('token', response.data.token);
         console.log("Token saved to localStorage:", response.data.token.substring(0, 20) + "...");  // Debug
 
-        
+
         // Set role từ response nếu có (backend trả roleId)
         let role = 'user';  // Default role
-        if(response.data.user?.roleId == 'ADMIN'){
+        if (response.data.user?.roleId == 'ADMIN') {
           role = 'admin';
         }
-        else if(response.data.user?.roleId == 'VERIFIER'){
+        else if (response.data.user?.roleId == 'VERIFIER') {
           role = 'verifier';
-        }else if(response.data.user?.roleId == 'GOVERNMENT'){
+        } else if (response.data.user?.roleId == 'GOVERNMENT') {
           role = 'government';
-        }else if(response.data.user?.roleId == 'OWNER'){
+        } else if (response.data.user?.roleId == 'OWNER') {
           role = 'owner';
-        }else if(response.data.user?.roleId == 'SUPERADMIN'){
+        } else if (response.data.user?.roleId == 'SUPERADMIN') {
           role = 'superadmin';
         }
 
-        onConnect(address.toLowerCase(),role );  // Redirect với role
+        onConnect(address.toLowerCase(), role);  // Redirect với role
 
         console.log(`✅ Wallet connected: ${address} with role ${role}`);
-        
+
       } else {
         throw new Error("Auth failed: No token in response");
       }
@@ -176,29 +180,8 @@ function App() {
 
     } catch (error: unknown) {
       console.error("❌ Lỗi kết nối MetaMask:", error);
-      
-      // Type guard to check if error is an Error object
-      const isError = (err: unknown): err is Error => {
-        return err instanceof Error;
-      };
-
-      // Type guard to check if error has code property
-      const hasCode = (err: unknown): err is { code: number } => {
-        return (
-          typeof err === 'object' &&
-          err !== null &&
-          'code' in err &&
-          typeof (err as { code: unknown }).code === 'number'
-        );
-      };
-
-      if (isError(error)) {
-        setError(error.message || "Kết nối thất bại. Vui lòng thử lại!");
-      } else {
-        setError("Kết nối thất bại. Vui lòng thử lại!");
-      }
-
-      if (hasCode(error) && error.code === 4001) {
+      setError(error.message || "Kết nối thất bại. Vui lòng thử lại!");
+      if (error.code === 4001) {
         setError("Người dùng từ chối kết nối ví!");
       }
     } finally {
@@ -214,22 +197,23 @@ function App() {
     setActiveTab('marketplace');
     localStorage.removeItem('token');  // Clear token khi logout
     window.ethereum?.removeAllListeners();  // Clear listeners
+    setSelectedProjectId(null);  // Reset project khi logout
   }, []);
 
   const renderLogoutConfirmation = () => (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-8">
-            <h2 className="text-xl font-bold mb-4">Confirm Logout</h2>
-            <p className="mb-4">Are you sure you want to log out?</p>
-            <div className="flex justify-end space-x-4">
-                <button onClick={() => setShowLogoutConfirmation(false)} className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">
-                    Cancel
-                </button>
-                <button onClick={handleLogout} className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600">
-                    Logout
-                </button>
-            </div>
+      <div className="bg-white rounded-lg p-8">
+        <h2 className="text-xl font-bold mb-4">Confirm Logout</h2>
+        <p className="mb-4">Are you sure you want to log out?</p>
+        <div className="flex justify-end space-x-4">
+          <button onClick={() => setShowLogoutConfirmation(false)} className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">
+            Cancel
+          </button>
+          <button onClick={handleLogout} className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600">
+            Logout
+          </button>
         </div>
+      </div>
     </div>
   );
 
@@ -252,16 +236,26 @@ function App() {
     }
   }, [handleLogout]);
 
+  // Handlers cho ProjectDetailPage (sử dụng projectId để fetch data)
+  const openProjectDetail = useCallback((projectId: string) => {
+    setSelectedProjectId(projectId);
+    setActiveTab('projectDetail');  // Nhảy sang tab detail
+  }, []);
+
   const tabs = [
-    { id: 'user', name: 'User', icon: UserIcon, roles: ['user', 'admin', 'superadmin', 'verifier','government'], restricted: true },
+    { id: 'user', name: 'User', icon: UserIcon, roles: ['user', 'admin', 'superadmin', 'verifier', 'government'], restricted: true },
     { id: 'requestReview', name: 'Request Review', icon: Plus, roles: ['owner'], restricted: true },
     { id: 'requestRole', name: 'Request Role', icon: Users, roles: ['user',], restricted: true },
-    { id: 'marketplace', name: 'Marketplace', icon: ShoppingCart, roles: ['user','owner','verifier', 'admin','government'], restricted: false },
+    { id: 'marketplace', name: 'Marketplace', icon: ShoppingCart, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
     { id: 'project', name: 'Project', icon: Award, roles: ['owner'], restricted: false },
-    { id: 'verifyRole', name: 'Verify Role', icon: CheckCircle, roles: ['admin','superadmin'], restricted: true },
-    { id: 'verifyProject', name: 'Verify Project', icon: Shield, roles: ['verifier','admin'], restricted: true },
+    { id: 'verifyRole', name: 'Verify Role', icon: CheckCircle, roles: ['admin', 'superadmin'], restricted: true },
+    { id: 'verifyProject', name: 'Verify Project', icon: Shield, roles: ['verifier', 'admin'], restricted: true },
     { id: 'updateProfile', name: 'Update Profile', icon: Edit3, roles: ['user'], restricted: true },
     { id: 'approvedProject', name: 'Approved Project', icon: CheckCircle, roles: ['government'], restricted: true },
+    { id: 'cryptomarket', name: 'Crypto Market', icon: ShoppingCart, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
+    { id: 'orderbook', name: 'Order Book', icon: Building2, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
+    { id: 'myToken', name: 'My Token', icon: Award, roles: ['user', 'owner'], restricted: true },
+    { id: 'projectDetail', name: 'Project Detail', icon: Award, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
   ];
 
   const displayedTabs = isWalletConnected
@@ -276,8 +270,8 @@ function App() {
         <div className="text-center pt-16">
           <h2 className="text-4xl font-bold text-gray-900 mb-4">Please Log In</h2>
           <p className="text-lg text-gray-600 mb-8">You need to connect your wallet to access this page.</p>
-          <button 
-            onClick={() => handleConnect('MetaMask')} 
+          <button
+            onClick={() => handleConnect('MetaMask')}
             disabled={isConnecting}
             className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:shadow-lg transition-all duration-200 flex items-center space-x-3 mx-auto disabled:opacity-50"
           >
@@ -295,11 +289,32 @@ function App() {
       case 'requestReview': return <RequestReview walletAddress={walletAddress} />;
       case 'requestRole': return <RequestRole walletAddress={walletAddress} />;
       case 'marketplace': return <Marketplace walletAddress={walletAddress} setActiveTab={setActiveTab} />;
-      case 'project': return <Projects />;
+      case 'project': return <Projects walletAddress={walletAddress} onOpenProjectDetail={openProjectDetail} />;  // Truyền handler để mở detail từ list (với projectId)
       case 'verifyRole': return <VerifyRole />;
       case 'verifyProject': return <VerifyProject />;
       case 'updateProfile': return <Profile walletAddress={walletAddress} setActiveTab={setActiveTab} />;
-      case 'approvedProject': return <ApprovedProject  />;
+      case 'approvedProject': return <ApprovedProject />;
+      case 'cryptomarket': return <CryptoMarket />;
+      case 'orderbook': return <OrderBook />;
+      case 'projectDetail':
+        return selectedProjectId ? (
+          <ProjectDetailPage projectId={selectedProjectId} onBack={() => {
+            setSelectedProjectId(null);
+            setActiveTab('project');
+          }} />
+        ) : (
+          <div className="text-center pt-16">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">No Project Selected</h2>
+            <p className="text-gray-600 mb-8">Please select a project from the Projects tab.</p>
+            <button
+              onClick={() => setActiveTab('project')}
+              className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 flex items-center space-x-2 mx-auto"
+            >
+              <ArrowLeft className="h-5 w-5" />
+              <span>Back to Projects</span>
+            </button>
+          </div>
+        );
       default: return <Marketplace walletAddress={walletAddress} setActiveTab={setActiveTab} />;
     }
   };
@@ -336,8 +351,8 @@ function App() {
                 </div>
               </div>
             ) : (
-              <button 
-                onClick={() => handleConnect('MetaMask')} 
+              <button
+                onClick={() => handleConnect('MetaMask')}
                 disabled={isConnecting}
                 className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-2 rounded-xl font-medium hover:shadow-lg transition-all duration-200 flex items-center space-x-2 disabled:opacity-50"
               >
@@ -356,10 +371,9 @@ function App() {
               {displayedTabs.map((tab) => {
                 const Icon = tab.icon;
                 return (
-                  <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center space-x-2 px-4 py-3 rounded-xl transition-all duration-200 whitespace-nowrap ${
-                      activeTab === tab.id
-                        ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg shadow-green-600/20'
-                        : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
+                  <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center space-x-2 px-4 py-3 rounded-xl transition-all duration-200 whitespace-nowrap ${activeTab === tab.id
+                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg shadow-green-600/20'
+                    : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
                     }`}>
                     <Icon className="h-4 w-4" />
                     <span className="font-medium text-sm">{tab.name}</span>
