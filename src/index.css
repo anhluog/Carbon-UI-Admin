@@ -1,3 +1,33 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Typing indicator animation */
+@layer utilities {
+  @keyframes typing-blink {
+    0% {
+      opacity: 0.2;
+    }
+    20% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0.2;
+    }
+  }
+
+  .animate-typing-1 {
+    animation: typing-blink 1.4s infinite both;
+    animation-delay: 0s;
+  }
+
+  .animate-typing-2 {
+    animation: typing-blink 1.4s infinite both;
+    animation-delay: 0.2s;
+  }
+
+  .animate-typing-3 {
+    animation: typing-blink 1.4s infinite both;
+    animation-delay: 0.4s;
+  }
+}
