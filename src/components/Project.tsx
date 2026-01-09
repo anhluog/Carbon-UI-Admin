@@ -1,159 +1,212 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Award, Calendar, MapPin, Leaf, TrendingUp, Filter, Download, Share2, Eye, BarChart3, Globe, Users, CheckCircle } from 'lucide-react';
 
 interface ProjectsProps {
   walletAddress: string;
 }
 
+// API Service
+const API_BASE_URL = 'http://localhost:8080/api/projects';
+
+const projectApi = {
+  // Get all projects
+  getAllProjects: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/allProject`);
+      if (!response.ok) throw new Error('Failed to fetch projects');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      throw error;
+    }
+  },
+
+  // Save a new project
+  saveProject: async (project: any) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(project),
+      });
+      if (!response.ok) throw new Error('Failed to save project');
+      return await response.json();
+    } catch (error) {
+      console.error('Error saving project:', error);
+      throw error;
+    }
+  },
+
+  // Verify a project
+  verifyProject: async (id: string, verifyData: any) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/${id}/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(verifyData),
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || 'Failed to verify project');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error verifying project:', error);
+      throw error;
+    }
+  },
+
+  // Approve a project
+  approveProject: async (id: string, approveData: any) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/${id}/approved`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(approveData),
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || 'Failed to approve project');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error approving project:', error);
+      throw error;
+    }
+  },
+};
+
 const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
   const [activeFilter, setActiveFilter] = useState('all');
   const [timeFilter, setTimeFilter] = useState('all-time');
   const [selectedProject, setSelectedProject] = useState<any>(null);
+  const [retiredProjects, setRetiredProjects] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const retiredProjects = [
-    {
-      id: 1,
-      projectName: 'Amazon Rainforest Conservation',
-      projectType: 'Forest Protection',
-      location: 'Brazil',
-      methodology: 'VCS',
-      vintage: 2024,
-      retiredAmount: 50.5,
-      retiredDate: '2024-01-15',
-      retiredPrice: 2.31,
-      totalValue: 116.66,
-      certificateId: 'VCS-2024-001-BR-50.5',
-      retirementReason: 'Corporate Carbon Neutrality Program',
-      beneficiary: 'Green Future Solutions',
-      serialNumbers: 'BR-VCS-2024-001-001 to BR-VCS-2024-001-050',
-      projectDescription: 'Protection of 10,000 hectares of Amazon rainforest from deforestation through community-based conservation programs.',
-      projectDeveloper: 'Amazon Conservation Alliance',
-      verificationStandard: 'Verified Carbon Standard (VCS)',
-      additionalCertifications: ['CCBS', 'SD VISta'],
-      environmentalBenefits: [
-        'Biodiversity conservation',
-        'Watershed protection',
-        'Soil conservation',
-        'Air quality improvement'
-      ],
-      socialBenefits: [
-        'Local community employment',
-        'Indigenous rights protection',
-        'Education programs',
-        'Healthcare access'
-      ],
-      images: [
-        'https://images.pexels.com/photos/975771/pexels-photo-975771.jpeg',
-        'https://images.pexels.com/photos/1632790/pexels-photo-1632790.jpeg'
-      ]
-    },
-    {
-      id: 2,
-      projectName: 'Solar Energy Farm Thailand',
-      projectType: 'Renewable Energy',
-      location: 'Thailand',
-      methodology: 'CDM',
-      vintage: 2024,
-      retiredAmount: 25.0,
-      retiredDate: '2024-01-10',
-      retiredPrice: 2.45,
-      totalValue: 61.25,
-      certificateId: 'CDM-2024-002-TH-25.0',
-      retirementReason: 'Annual Carbon Offset Initiative',
-      beneficiary: 'EcoTech Corporation',
-      serialNumbers: 'TH-CDM-2024-002-001 to TH-CDM-2024-002-025',
-      projectDescription: '50MW solar photovoltaic power plant providing clean electricity to the national grid.',
-      projectDeveloper: 'Thai Solar Power Co.',
-      verificationStandard: 'Clean Development Mechanism (CDM)',
-      additionalCertifications: ['ISO 14001'],
-      environmentalBenefits: [
-        'GHG emissions reduction',
-        'Air pollution reduction',
-        'Renewable energy generation'
-      ],
-      socialBenefits: [
-        'Job creation',
-        'Technology transfer',
-        'Energy security'
-      ],
-      images: [
-        'https://images.pexels.com/photos/433308/pexels-photo-433308.jpeg'
-      ]
-    },
-    {
-      id: 3,
-      projectName: 'Wind Power Project Mexico',
-      projectType: 'Renewable Energy',
-      location: 'Mexico',
-      methodology: 'GS',
-      vintage: 2023,
-      retiredAmount: 75.2,
-      retiredDate: '2023-12-20',
-      retiredPrice: 2.28,
-      totalValue: 171.46,
-      certificateId: 'GS-2023-003-MX-75.2',
-      retirementReason: 'Supply Chain Carbon Neutrality',
-      beneficiary: 'Manufacturing Corp Ltd',
-      serialNumbers: 'MX-GS-2023-003-001 to MX-GS-2023-003-075',
-      projectDescription: '100MW wind farm generating clean electricity for 50,000 homes annually.',
-      projectDeveloper: 'Wind Energy Mexico',
-      verificationStandard: 'Gold Standard (GS)',
-      additionalCertifications: ['SD VISta'],
-      environmentalBenefits: [
-        'Clean energy generation',
-        'GHG emissions avoidance',
-        'Land use efficiency'
-      ],
-      socialBenefits: [
-        'Rural development',
-        'Local employment',
-        'Infrastructure development'
-      ],
-      images: [
-        'https://images.pexels.com/photos/414837/pexels-photo-414837.jpeg'
-      ]
-    },
-    {
-      id: 4,
-      projectName: 'Cookstove Efficiency Program',
-      projectType: 'Energy Efficiency',
-      location: 'India',
-      methodology: 'GS',
-      vintage: 2023,
-      retiredAmount: 30.8,
-      retiredDate: '2023-11-15',
-      retiredPrice: 1.85,
-      totalValue: 56.98,
-      certificateId: 'GS-2023-004-IN-30.8',
-      retirementReason: 'Event Carbon Neutrality',
-      beneficiary: 'Global Conference 2023',
-      serialNumbers: 'IN-GS-2023-004-001 to IN-GS-2023-004-030',
-      projectDescription: 'Distribution of efficient cookstoves to rural households reducing wood consumption and indoor air pollution.',
-      projectDeveloper: 'Clean Energy India',
-      verificationStandard: 'Gold Standard (GS)',
-      additionalCertifications: ['Women+ Standard'],
-      environmentalBenefits: [
-        'Deforestation reduction',
-        'Air quality improvement',
-        'Fuel efficiency'
-      ],
-      socialBenefits: [
-        'Women empowerment',
-        'Health improvement',
-        'Time savings',
-        'Cost reduction'
-      ],
-      images: [
-        'https://images.pexels.com/photos/6194401/pexels-photo-6194401.jpeg'
-      ]
+  // Fetch projects from API on component mount
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        setLoading(true);
+        const projects = await projectApi.getAllProjects();
+        setRetiredProjects(projects);
+      } catch (error) {
+        console.error('Failed to load projects:', error);
+        // Fallback to mock data if API fails
+        setRetiredProjects([
+          {
+            id: 1,
+            projectName: 'Amazon Rainforest Conservation',
+            projectType: 'Forest Protection',
+            location: 'Brazil',
+            methodology: 'VCS',
+            vintage: 2024,
+            retiredAmount: 50.5,
+            retiredDate: '2024-01-15',
+            retiredPrice: 2.31,
+            totalValue: 116.66,
+            certificateId: 'VCS-2024-001-BR-50.5',
+            retirementReason: 'Corporate Carbon Neutrality Program',
+            beneficiary: 'Green Future Solutions',
+            serialNumbers: 'BR-VCS-2024-001-001 to BR-VCS-2024-001-050',
+            projectDescription: 'Protection of 10,000 hectares of Amazon rainforest from deforestation through community-based conservation programs.',
+            projectDeveloper: 'Amazon Conservation Alliance',
+            verificationStandard: 'Verified Carbon Standard (VCS)',
+            additionalCertifications: ['CCBS', 'SD VISta'],
+            environmentalBenefits: [
+              'Biodiversity conservation',
+              'Watershed protection',
+              'Soil conservation',
+              'Air quality improvement'
+            ],
+            socialBenefits: [
+              'Local community employment',
+              'Indigenous rights protection',
+              'Education programs',
+              'Healthcare access'
+            ],
+            images: [
+              'https://images.pexels.com/photos/975771/pexels-photo-975771.jpeg',
+              'https://images.pexels.com/photos/1632790/pexels-photo-1632790.jpeg'
+            ]
+          },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProjects();
+  }, []);
+
+  // Function to create a new project
+  const handleCreateProject = async (projectData: any) => {
+    try {
+      const newProject = await projectApi.saveProject(projectData);
+      setRetiredProjects([...retiredProjects, newProject]);
+      console.log('Project created:', newProject);
+      return newProject;
+    } catch (error) {
+      console.error('Failed to create project:', error);
+      throw error;
     }
-  ];
+  };
+
+  // Function to verify a project
+  const handleVerifyProject = async (projectId: string) => {
+    try {
+      const verifyData = {
+        status: 'VERIFIED',
+        comment: 'Project verified successfully',
+      };
+      const result = await projectApi.verifyProject(projectId, verifyData);
+      // Update the project in state
+      setRetiredProjects(retiredProjects.map(p => 
+        p.id === projectId ? { ...p, ...result } : p
+      ));
+      console.log('Project verified:', result);
+      return result;
+    } catch (error) {
+      console.error('Failed to verify project:', error);
+      throw error;
+    }
+  };
+
+  // Function to approve a project
+  const handleApproveProject = async (projectId: string) => {
+    try {
+      const approveData = {
+        status: 'APPROVED',
+        comment: 'Project approved',
+      };
+      const result = await projectApi.approveProject(projectId, approveData);
+      // Update the project in state
+      setRetiredProjects(retiredProjects.map(p => 
+        p.id === projectId ? { ...p, ...result } : p
+      ));
+      console.log('Project approved:', result);
+      return result;
+    } catch (error) {
+      console.error('Failed to approve project:', error);
+      throw error;
+    }
+  };
 
   const totalStats = {
-    totalRetired: retiredProjects.reduce((sum, project) => sum + project.retiredAmount, 0),
-    totalValue: retiredProjects.reduce((sum, project) => sum + project.totalValue, 0),
+    totalRetired: retiredProjects.reduce((sum, project) => sum + (project.retiredAmount || 0), 0),
+    totalValue: retiredProjects.reduce((sum, project) => sum + (project.totalValue || 0), 0),
     totalProjects: retiredProjects.length,
-    averagePrice: retiredProjects.reduce((sum, project) => sum + project.retiredPrice, 0) / retiredProjects.length
+    averagePrice: retiredProjects.length > 0 
+      ? retiredProjects.reduce((sum, project) => sum + (project.retiredPrice || 0), 0) / retiredProjects.length 
+      : 0
   };
 
   const projectTypes = [
@@ -185,6 +238,17 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
     // Simulate sharing retirement
     console.log(`Sharing retirement for ${project.projectName}`);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading projects...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -275,7 +339,7 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-start space-x-4">
                   <img 
-                    src={project.images[0]} 
+                    src={project.images?.[0] || 'https://images.pexels.com/photos/975771/pexels-photo-975771.jpeg'} 
                     alt={project.projectName}
                     className="w-16 h-16 rounded-xl object-cover"
                   />
@@ -303,7 +367,7 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
                     <span className="text-sm font-medium text-green-600">Retired</span>
                   </div>
                   <p className="text-sm text-gray-500">
-                    {new Date(project.retiredDate).toLocaleDateString()}
+                    {project.retiredDate ? new Date(project.retiredDate).toLocaleDateString() : 'N/A'}
                   </p>
                 </div>
               </div>
@@ -311,34 +375,34 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                 <div>
                   <p className="text-sm text-gray-600">Amount Retired</p>
-                  <p className="font-semibold text-gray-900">{project.retiredAmount} tCO₂</p>
+                  <p className="font-semibold text-gray-900">{project.retiredAmount || 0} tCO₂</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Retirement Price</p>
-                  <p className="font-semibold text-gray-900">${project.retiredPrice}/tCO₂</p>
+                  <p className="font-semibold text-gray-900">${project.retiredPrice || 0}/tCO₂</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Total Value</p>
-                  <p className="font-semibold text-gray-900">${project.totalValue.toFixed(2)}</p>
+                  <p className="font-semibold text-gray-900">${(project.totalValue || 0).toFixed(2)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Certificate ID</p>
-                  <p className="font-semibold text-gray-900 text-xs">{project.certificateId}</p>
+                  <p className="font-semibold text-gray-900 text-xs">{project.certificateId || 'N/A'}</p>
                 </div>
               </div>
 
               <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
                 <h4 className="font-medium text-green-900 mb-2">Retirement Details</h4>
                 <div className="space-y-1 text-sm text-green-700">
-                  <p><span className="font-medium">Reason:</span> {project.retirementReason}</p>
-                  <p><span className="font-medium">Beneficiary:</span> {project.beneficiary}</p>
-                  <p><span className="font-medium">Serial Numbers:</span> {project.serialNumbers}</p>
+                  <p><span className="font-medium">Reason:</span> {project.retirementReason || 'N/A'}</p>
+                  <p><span className="font-medium">Beneficiary:</span> {project.beneficiary || 'N/A'}</p>
+                  <p><span className="font-medium">Serial Numbers:</span> {project.serialNumbers || 'N/A'}</p>
                 </div>
               </div>
 
               <div className="flex justify-between items-center">
                 <div className="flex items-center space-x-4">
-                  <span className="text-sm text-gray-600">Environmental Impact: {project.retiredAmount} tCO₂ offset</span>
+                  <span className="text-sm text-gray-600">Environmental Impact: {project.retiredAmount || 0} tCO₂ offset</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
@@ -413,13 +477,13 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 <div>
                   <img 
-                    src={selectedProject.images[0]} 
+                    src={selectedProject.images?.[0] || 'https://images.pexels.com/photos/975771/pexels-photo-975771.jpeg'} 
                     alt={selectedProject.projectName}
                     className="w-full h-64 rounded-xl object-cover mb-4"
                   />
                   <div className="bg-gray-50 rounded-xl p-4">
                     <h4 className="font-semibold text-gray-900 mb-2">Project Description</h4>
-                    <p className="text-sm text-gray-600">{selectedProject.projectDescription}</p>
+                    <p className="text-sm text-gray-600">{selectedProject.projectDescription || 'No description available'}</p>
                   </div>
                 </div>
 
@@ -429,21 +493,21 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-green-700">Amount Retired:</span>
-                        <span className="font-medium text-green-900">{selectedProject.retiredAmount} tCO₂</span>
+                        <span className="font-medium text-green-900">{selectedProject.retiredAmount || 0} tCO₂</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-green-700">Retirement Date:</span>
                         <span className="font-medium text-green-900">
-                          {new Date(selectedProject.retiredDate).toLocaleDateString()}
+                          {selectedProject.retiredDate ? new Date(selectedProject.retiredDate).toLocaleDateString() : 'N/A'}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-green-700">Total Value:</span>
-                        <span className="font-medium text-green-900">${selectedProject.totalValue.toFixed(2)}</span>
+                        <span className="font-medium text-green-900">${(selectedProject.totalValue || 0).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-green-700">Certificate ID:</span>
-                        <span className="font-medium text-green-900 text-xs">{selectedProject.certificateId}</span>
+                        <span className="font-medium text-green-900 text-xs">{selectedProject.certificateId || 'N/A'}</span>
                       </div>
                     </div>
                   </div>
@@ -453,15 +517,15 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-blue-700">Developer:</span>
-                        <span className="font-medium text-blue-900">{selectedProject.projectDeveloper}</span>
+                        <span className="font-medium text-blue-900">{selectedProject.projectDeveloper || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-blue-700">Standard:</span>
-                        <span className="font-medium text-blue-900">{selectedProject.verificationStandard}</span>
+                        <span className="font-medium text-blue-900">{selectedProject.verificationStandard || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-blue-700">Additional Certs:</span>
-                        <span className="font-medium text-blue-900">{selectedProject.additionalCertifications.join(', ')}</span>
+                        <span className="font-medium text-blue-900">{selectedProject.additionalCertifications?.join(', ') || 'N/A'}</span>
                       </div>
                     </div>
                   </div>
@@ -475,7 +539,7 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
                     <span>Environmental Benefits</span>
                   </h4>
                   <ul className="space-y-1 text-sm text-gray-600">
-                    {selectedProject.environmentalBenefits.map((benefit: string, index: number) => (
+                    {(selectedProject.environmentalBenefits || []).map((benefit: string, index: number) => (
                       <li key={index} className="flex items-center space-x-2">
                         <CheckCircle className="h-4 w-4 text-green-600" />
                         <span>{benefit}</span>
@@ -490,7 +554,7 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress }) => {
                     <span>Social Benefits</span>
                   </h4>
                   <ul className="space-y-1 text-sm text-gray-600">
-                    {selectedProject.socialBenefits.map((benefit: string, index: number) => (
+                    {(selectedProject.socialBenefits || []).map((benefit: string, index: number) => (
                       <li key={index} className="flex items-center space-x-2">
                         <CheckCircle className="h-4 w-4 text-blue-600" />
                         <span>{benefit}</span>
