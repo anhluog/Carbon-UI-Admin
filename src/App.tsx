@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Leaf, Wallet, Building2, Award, Plus, ShoppingCart, User as UserIcon, Users, CheckCircle, Shield, Edit3 } from 'lucide-react';
-import { ethers, id } from 'ethers';  // Import ethers cho provider/signer
+import { Leaf, Wallet, Building2, Award, Plus, ShoppingCart, User as UserIcon, Users, CheckCircle, Shield, Edit3, ArrowLeft } from 'lucide-react';
+import { ethers } from 'ethers';  // Import ethers cho provider/signer
 import axios from 'axios';  // Import axios cho API call
 import User from './components/User';
 import Profile from './components/UpdateProfile';  // Thêm import cho Profile component
@@ -12,7 +12,9 @@ import VerifyRole from './components/VerifyRole';
 import VerifyProject from './components/VerifyProject';
 import MyToken from './components/MyToken';
 import ApprovedProject from './components/ApprovedProject';
-
+import CryptoMarket from './components/CryptoMarket';
+import OrderBook from './components/OrderBook';
+import ProjectDetailPage from './components/ProjectDetail';  // Import mới cho full page detail
 
 function App() {
   const [activeTab, setActiveTab] = useState('marketplace');
@@ -22,6 +24,9 @@ function App() {
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Thêm state cho ProjectDetailPage (sử dụng projectId thay vì full project để fetch data tươi)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
   const onConnect = useCallback((address: string, role: string = 'user') => {
     setWalletAddress(address);
@@ -181,6 +186,7 @@ function App() {
     setActiveTab('marketplace');
     localStorage.removeItem('token');  // Clear token khi logout
     window.ethereum?.removeAllListeners();  // Clear listeners
+    setSelectedProjectId(null);  // Reset project khi logout
   }, []);
 
   const renderLogoutConfirmation = () => (
@@ -216,6 +222,12 @@ function App() {
     }
   }, [handleLogout]);
 
+  // Handlers cho ProjectDetailPage (sử dụng projectId để fetch data)
+  const openProjectDetail = useCallback((projectId: string) => {
+    setSelectedProjectId(projectId);
+    setActiveTab('projectDetail');  // Nhảy sang tab detail
+  }, []);
+
   const tabs = [
     { id: 'user', name: 'User', icon: UserIcon, roles: ['user', 'admin', 'superadmin', 'verifier','government'], restricted: true },
     { id: 'requestReview', name: 'Request Review', icon: Plus, roles: ['owner'], restricted: true },
@@ -226,6 +238,10 @@ function App() {
     { id: 'verifyProject', name: 'Verify Project', icon: Shield, roles: ['verifier','admin'], restricted: true },
     { id: 'updateProfile', name: 'Update Profile', icon: Edit3, roles: ['user'], restricted: true },
     { id: 'approvedProject', name: 'Approved Project', icon: CheckCircle, roles: ['government'], restricted: true },
+    { id: 'cryptomarket', name: 'Crypto Market', icon: ShoppingCart, roles: ['user','owner','verifier', 'admin','government'], restricted: false },
+    { id: 'orderbook', name: 'Order Book', icon: Building2, roles: ['user','owner','verifier', 'admin','government'], restricted: false },
+    { id: 'myToken', name: 'My Token', icon: Award, roles: ['user','owner'], restricted: true },
+    {id: 'projectDetail', name: 'Project Detail', icon: Award, roles: ['user','owner','verifier', 'admin','government'], restricted: false },
   ];
 
   const displayedTabs = isWalletConnected
@@ -259,11 +275,32 @@ function App() {
       case 'requestReview': return <RequestReview walletAddress={walletAddress} />;
       case 'requestRole': return <RequestRole walletAddress={walletAddress} />;
       case 'marketplace': return <Marketplace walletAddress={walletAddress} setActiveTab={setActiveTab} />;
-      case 'project': return <Projects walletAddress={walletAddress} />;
+      case 'project': return <Projects walletAddress={walletAddress} onOpenProjectDetail={openProjectDetail} />;  // Truyền handler để mở detail từ list (với projectId)
       case 'verifyRole': return <VerifyRole />;
       case 'verifyProject': return <VerifyProject />;
       case 'updateProfile': return <Profile walletAddress={walletAddress} setActiveTab={setActiveTab} />;
-      case 'approvedProject': return <ApprovedProject  />;
+      case 'approvedProject': return <ApprovedProject   />;
+      case 'cryptomarket': return <CryptoMarket  />;
+      case 'orderbook': return <OrderBook  />;
+      case 'projectDetail': 
+        return selectedProjectId ? (
+          <ProjectDetailPage projectId={selectedProjectId} onBack={() => { 
+            setSelectedProjectId(null); 
+            setActiveTab('project'); 
+          }} />
+        ) : (
+          <div className="text-center pt-16">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">No Project Selected</h2>
+            <p className="text-gray-600 mb-8">Please select a project from the Projects tab.</p>
+            <button 
+              onClick={() => setActiveTab('project')} 
+              className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 flex items-center space-x-2 mx-auto"
+            >
+              <ArrowLeft className="h-5 w-5" />
+              <span>Back to Projects</span>
+            </button>
+          </div>
+        );
       default: return <Marketplace walletAddress={walletAddress} setActiveTab={setActiveTab} />;
     }
   };

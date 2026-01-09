@@ -95,50 +95,76 @@ const ApprovedProject: React.FC = () => {
 
 
     const handleConfirmAccept = async (project: Project) => {
-        const userStr = localStorage.getItem('user');
-        if (!userStr) {
-            throw new Error('User not found in localStorage');
+    const userStr = localStorage.getItem('user');
+    if (!userStr) {
+        alert('User not found');
+        return;
+    }
+
+    const user = JSON.parse(userStr);
+
+    try {
+        const contractAddress = '0x7C96A93a6278308191b607BDd26fadE0efCc6809';
+
+        const provider = new ethers.BrowserProvider((window as any).ethereum);
+        const signer = await provider.getSigner();
+        const contract = new ethers.Contract(
+            contractAddress,
+            CarbonCreditEx.abi,
+            signer
+        );
+
+        // 🔹 Gọi smart contract
+        const tx = await contract.approveAndMintProject(
+            project.id,
+            project.ownerId,
+            project.verifiedBy,
+            user.id,
+            project.ipfsHash,
+            project.expectedCredits
+        );
+
+        console.log('Tx sent:', tx.hash);
+
+        const receipt = await tx.wait(1);
+        console.log('Tx confirmed:', receipt);
+
+        // 🔹 LẤY tokenId TỪ EVENT (chuẩn nhất)
+        const event = receipt.logs
+            .map((log: any) => {
+                try {
+                    return contract.interface.parseLog(log);
+                } catch {
+                    return null;
+                }
+            })
+            .find((e: any) => e?.name === 'ProjectApproved');
+
+        if (!event) {
+            throw new Error('ProjectApproved event not found');
         }
-        const user = JSON.parse(userStr);
-        console.log('User from localStorage:', user);
-        console.log('Approving project:', project);
-        let tx;
-        let txHash = '';
-        if (!user) {
-            alert('User not found in localStorage');
-            return;
-        }
 
-        try {
-            const contractAddress = '0x7C96A93a6278308191b607BDd26fadE0efCc6809';
-            console.log('🔑 CONTRACT ADDR:', contractAddress || '❌ UNDEFINED!');
-            if (!contractAddress || !ethers.isAddress(contractAddress)) {
-                throw new Error('Contract address not configured. Check ADDRESS_CARBONCREDIT in .env.');
-            }
+        const creditTokenId = event.args.creditTokenId;
+        const nftTokenId = event.args.nftTokenId;
 
-            const provider = new ethers.BrowserProvider((window as any).ethereum);
-            const signer = await provider.getSigner();
-            const contract = new ethers.Contract(contractAddress, CarbonCreditEx.abi, signer);
+        console.log('Credit Token ID:', creditTokenId.toString());
 
-            tx = await contract.approveAndMintProject(project.id, project.ownerId, project.verifiedBy, user.id, project.ipfsHash, project.expectedCredits);
-            console.log('Tx sent:', tx.hash);
-            const receipt = await tx.wait(1); // Wait 1 confirmation
-            txHash = tx.hash;
-            console.log('Tx confirmed:', receipt);
+        // 🔹 GỬI VỀ BE với field tokenId
+        await api.post(`/projects/${project.id}/approved`, {
+            approved: true,
+            nftTokenId: Number(nftTokenId),     // 👈 BẮT BUỘC
+            tokenId: Number(creditTokenId) // 👈 QUAN TRỌNG
+        });
 
-            await api.post(`/projects/${project.id}/approved`, {
-                approved: true,
-            });
+        fetchRequests();
+
+    } catch (err) {
+        console.error('Accept failed:', err);
+        alert('Accept project failed');
+    }
+};
 
 
-
-            // reload danh sách
-            fetchRequests();
-        } catch (err) {
-            console.error('Accept failed:', err);
-            alert('Accept project failed');
-        }
-    };
 
 
     const handleViewProject = (project: Project) => {

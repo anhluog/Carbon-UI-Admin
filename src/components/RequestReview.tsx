@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Leaf, Upload, Calendar, MapPin, Award, Plus, CheckCircle } from 'lucide-react';
 import { ethers } from "ethers";
 import axios from 'axios';
@@ -8,23 +8,57 @@ interface MintTokenProps {
   walletAddress: string;
 }
 
+interface Methodology {
+  id: string;
+  organizationName: string;
+  description: string;
+  version: number;
+}
+
 const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
   const [formData, setFormData] = useState({
     projectName: '',
     vintage: '',
-    receiver: '',
     type: '',
     location: '',
     methodology: '',
     description: '',
     carbonAmount: '',
-    imageFile: null as File | null,
-    docFile: null as File | null,
+    imageFiles: [] as File[],
+    docFiles: [] as File[],
+
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [metadataHash, setMetadataHash] = useState<string | null>(null);  // Thêm state cho metadataHash để dùng trong success UI
+  const [methodologies, setMethodologies] = useState<Methodology[]>([]);  // State cho danh sách methodologies từ API
+  const [loadingMethodologies, setLoadingMethodologies] = useState(true);  // Loading state cho methodologies
+
+  // Fetch methodologies từ API khi component mount
+  useEffect(() => {
+    const fetchMethodologies = async () => {
+      try {
+        setLoadingMethodologies(true);
+        // Sử dụng endpoint được cung cấp: /api/verifier-role/all (giả sử là cho methodologies)
+        const response = await api.get('/verifier-role/all');
+        setMethodologies(response.data);  // Trực tiếp sử dụng response.data là array Methodology
+      } catch (err: any) {
+        console.error('Lỗi fetch methodologies:', err);
+        // Fallback đến hardcoded nếu API fail
+        setMethodologies([
+          { id: 'VCS', organizationName: 'Verified Carbon Standard (VCS)', description: 'Standard description', version: 1 },
+          { id: 'CDM', organizationName: 'Clean Development Mechanism (CDM)', description: 'Standard description', version: 1 },
+          { id: 'GS', organizationName: 'Gold Standard (GS)', description: 'Standard description', version: 1 },
+          { id: 'CAR', organizationName: 'Climate Action Reserve (CAR)', description: 'Standard description', version: 1 }
+        ]);
+      } finally {
+        setLoadingMethodologies(false);
+      }
+    };
+
+    fetchMethodologies();
+  }, []);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -32,10 +66,14 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'imageFile' | 'docFile') => {
-    const file = e.target.files?.[0] || null;
-    setFormData({ ...formData, [field]: file });
+  const handleFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: 'imageFiles' | 'docFiles'
+  ) => {
+    const files = Array.from(e.target.files || []);
+    setFormData({ ...formData, [field]: files });
   };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,60 +92,80 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
       const signerAddress = await signer.getAddress();
       console.log("👤 Địa chỉ ví signer:", signerAddress);
 
-      // === Upload ảnh ===
-      let imageUrl = "";
-      if (formData.imageFile) {
-        console.log("📤 Bắt đầu upload ảnh lên IPFS...");
-        const imgForm = new FormData();
-        imgForm.append("file", formData.imageFile);
+
+      // === Upload nhiều ảnh ===
+      let imageUrls: string[] = [];
+
+      if (formData.imageFiles && formData.imageFiles.length > 0) {
+        console.log("📤 Bắt đầu upload nhiều ảnh lên IPFS...");
 
         try {
-          const imgRes = await axios.post(
-            "https://api.pinata.cloud/pinning/pinFileToIPFS",
-            imgForm,
-            {
-              headers: {
-                pinata_api_key: import.meta.env.VITE_PINATA_API_KEY,
-                pinata_secret_api_key: import.meta.env.VITE_PINATA_SECRET_API_KEY,
-              },
-            }
+          imageUrls = await Promise.all(
+            formData.imageFiles.map(async (file: File) => {
+              const imgForm = new FormData();
+              imgForm.append("file", file);
+
+              const imgRes = await axios.post(
+                "https://api.pinata.cloud/pinning/pinFileToIPFS",
+                imgForm,
+                {
+                  headers: {
+                    pinata_api_key: import.meta.env.VITE_PINATA_API_KEY,
+                    pinata_secret_api_key: import.meta.env.VITE_PINATA_SECRET_API_KEY,
+                  },
+                }
+              );
+
+              return `https://gateway.pinata.cloud/ipfs/${imgRes.data.IpfsHash}`;
+            })
           );
-          imageUrl = `https://gateway.pinata.cloud/ipfs/${imgRes.data.IpfsHash}`;
-          console.log("✅ Ảnh đã upload thành công:", imageUrl);
-        } catch (ipfsErr) {
-          console.error("❌ Lỗi upload ảnh:", ipfsErr);
+
+          console.log("✅ Upload ảnh thành công:", imageUrls);
+        } catch (err) {
+          console.error("❌ Lỗi upload ảnh:", err);
           throw new Error("Không thể upload ảnh lên IPFS!");
         }
       } else {
-        console.warn("⚠️ Không có file ảnh để upload.");
+        console.warn("⚠️ Không có ảnh để upload.");
       }
 
-      // === Upload tài liệu ===
-      let docUrl = "";
-      if (formData.docFile) {
-        console.log("📤 Bắt đầu upload tài liệu lên IPFS...");
-        const docForm = new FormData();
-        docForm.append("file", formData.docFile);
+
+      // === Upload nhiều tài liệu ===
+      let docUrls: string[] = [];
+
+      if (formData.docFiles && formData.docFiles.length > 0) {
+        console.log("📤 Bắt đầu upload nhiều tài liệu lên IPFS...");
+
         try {
-          const docRes = await axios.post(
-            "https://api.pinata.cloud/pinning/pinFileToIPFS",
-            docForm,
-            {
-              headers: {
-                pinata_api_key: import.meta.env.VITE_PINATA_API_KEY,
-                pinata_secret_api_key: import.meta.env.VITE_PINATA_SECRET_API_KEY,
-              },
-            }
+          docUrls = await Promise.all(
+            formData.docFiles.map(async (file: File) => {
+              const docForm = new FormData();
+              docForm.append("file", file);
+
+              const docRes = await axios.post(
+                "https://api.pinata.cloud/pinning/pinFileToIPFS",
+                docForm,
+                {
+                  headers: {
+                    pinata_api_key: import.meta.env.VITE_PINATA_API_KEY,
+                    pinata_secret_api_key: import.meta.env.VITE_PINATA_SECRET_API_KEY,
+                  },
+                }
+              );
+
+              return `https://gateway.pinata.cloud/ipfs/${docRes.data.IpfsHash}`;
+            })
           );
-          docUrl = `https://gateway.pinata.cloud/ipfs/${docRes.data.IpfsHash}`;
-          console.log("✅ Tài liệu đã upload thành công:", docUrl);
-        } catch (ipfsErr) {
-          console.error("❌ Lỗi upload tài liệu:", ipfsErr);
+
+          console.log("✅ Upload tài liệu thành công:", docUrls);
+        } catch (err) {
+          console.error("❌ Lỗi upload tài liệu:", err);
           throw new Error("Không thể upload tài liệu lên IPFS!");
         }
       } else {
-        console.warn("⚠️ Không có file tài liệu để upload.");
+        console.warn("⚠️ Không có tài liệu để upload.");
       }
+
 
       // === Upload metadata ===
       const metadata = {
@@ -117,9 +175,9 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
         location: formData.location,
         type: formData.type,
         methodology: formData.methodology,
-        receiver: formData.receiver,
-        image: imageUrl,
-        document: docUrl,
+        images: imageUrls,
+        documents: docUrls,
+
         timestamp: new Date().toISOString(),
       };
 
@@ -146,10 +204,11 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
         // Map keys để khớp columns DB (camelCase, Jackson tự map)
         name: formData.projectName,  // name (varchar(255), not null)
         vintage: parseInt(formData.vintage || '0'),  // vintage (int(11), not null)
-        ownerId: formData.receiver,  // owner_id (varchar(255), not null)
+        ownerId: walletAddress,  // owner_id (varchar(255), not null) - Sử dụng walletAddress từ props
         type: formData.type || 'OTHERS',  // type (varchar(255), not null)
         location: formData.location,  // location (varchar(255), not null)
-        description: formData.description,  // des (text, not null)
+        verifierRoleId: formData.methodology,  // verifier_role_id (varchar(255), not null) - Truyền methodology ID vào verifierRoleId
+        description: formData.description,  // des (text, not null) - Ghép verifier role ID vào description
         ipfsHash: metadataHash,  // ipfs_hash (varchar(255), not null)
         verifiedBy: null,  // verified_by (varchar(255), nullable, default NULL)
         approvedBy: null,  // approved_by (varchar(255), nullable, default NULL)
@@ -161,7 +220,7 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
       console.log("💾 Gửi dữ liệu lưu DB (mapped theo schema):", projectData.description);
       console.log("💾 Gửi dữ liệu lưu DB (mapped theo schema):", projectData);
 
-      
+
 
       const response = await api.post("projects/save", projectData);
       console.log("✅ Dữ liệu đã lưu vào backend thành công:", response.data);
@@ -181,13 +240,6 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
     }
   };
 
-  const methodologies = [
-    { value: 'VCS', label: 'Verified Carbon Standard (VCS)' },
-    { value: 'CDM', label: 'Clean Development Mechanism (CDM)' },
-    { value: 'GS', label: 'Gold Standard (GS)' },
-    { value: 'CAR', label: 'Climate Action Reserve (CAR)' }
-  ];
-
   const typeOptions = [
     { value: 'FOREST_AND_GREENRY', label: 'Forest and Greenery' },
     { value: 'RENEWABLE_ENERGY', label: 'Renewable Energy' },
@@ -204,7 +256,7 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Project Saved Successfully!</h2>
           <p className="text-gray-600 mb-6">
-            Your project data has been saved to backend. 
+            Your project data has been saved to backend.
             IPFS Hash: {metadataHash || 'N/A'}
           </p>
           <div className="bg-green-50 border border-green-200 rounded-xl p-4">
@@ -234,22 +286,6 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
         {/* Mint Form */}
         <div className="lg:col-span-2">
           <form onSubmit={handleSubmit} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100 space-y-6">
-            {/* Address Organization */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Address Organization *
-              </label>
-              <input
-                type="text"
-                name="receiver"
-                value={formData.receiver}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
-                placeholder="0xYourWalletAddress..."
-                required
-              />
-            </div>
-
             {/* Project Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -310,13 +346,16 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
                   name="methodology"
                   value={formData.methodology}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
+                  disabled={loadingMethodologies}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all disabled:opacity-50"
                   required
                 >
-                  <option value="">Select Methodology</option>
+                  <option value="">
+                    {loadingMethodologies ? 'Loading methodologies...' : 'Select Methodology'}
+                  </option>
                   {methodologies.map((method) => (
-                    <option key={method.value} value={method.value}>
-                      {method.label}
+                    <option key={method.id} value={method.id}>
+                      {method.organizationName}
                     </option>
                   ))}
                 </select>
@@ -380,51 +419,63 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
             {/* Project Image */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Project Image (Optional)
+                Project Images (Optional - Multiple)
               </label>
               <input
                 type="file"
+                multiple
                 accept="image/*"
-                onChange={(e) => handleFileChange(e, 'imageFile')}
+                onChange={(e) => handleFileChange(e, 'imageFiles')}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
               />
-              {formData.imageFile && <p className="text-sm text-gray-600 mt-1">Selected: {formData.imageFile.name}</p>}
+
+              {formData.imageFiles.length > 0 && (
+                <p className="text-sm text-gray-600 mt-1">
+                  Selected {formData.imageFiles.length} images
+                </p>
+              )}
             </div>
 
             {/* Verification Documents */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Verification Documents (Optional)
+                Verification Documents (Optional - Multiple PDFs/Docs)
               </label>
               <input
                 type="file"
+                multiple
                 accept=".pdf,.doc,.docx"
-                onChange={(e) => handleFileChange(e, 'docFile')}
+                onChange={(e) => handleFileChange(e, 'docFiles')}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
               />
-              {formData.docFile && <p className="text-sm text-gray-600 mt-1">Selected: {formData.docFile.name}</p>}
+
+              {formData.docFiles.length > 0 && (
+                <p className="text-sm text-gray-600 mt-1">
+                  Selected {formData.docFiles.length} documents
+                </p>
+              )}
             </div>
 
-            {/* Submit Button */}
-            <div className="mt-8 flex justify-end">
-              <button
-                type="submit"
-                disabled={isSubmitting || !formData.projectName || !formData.carbonAmount || !formData.receiver || !formData.location || !formData.vintage || !formData.description}
-                className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Saving...</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-5 w-5" />
-                    <span>Save Project</span>
-                  </>
-                )}
-              </button>
-            </div>
+              {/* Submit Button */}
+              <div className="mt-8 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !formData.projectName || !formData.carbonAmount || !formData.location || !formData.vintage || !formData.methodology || !formData.description}
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-5 w-5" />
+                      <span>Save Project</span>
+                    </>
+                  )}
+                </button>
+              </div>
           </form>
         </div>
 
