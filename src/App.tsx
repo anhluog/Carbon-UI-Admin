@@ -8,6 +8,7 @@ import RequestRole from './components/RequestRole';
 import VerifyRole from './components/VerifyRole';
 import VerifyProject from './components/VerifyProject';
 import MyToken from './components/MyToken';
+import Chatbot from './components/Chatbot';
 
 const ADMIN_ACCOUNTS = [
   '0x1234567890123456789012345678901234567890'.toLowerCase(),
@@ -198,6 +199,7 @@ function App() {
         </nav>
         {renderContent()}
       </div>
+      <Chatbot />
     </div>
   );
 }
