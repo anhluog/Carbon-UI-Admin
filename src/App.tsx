@@ -14,7 +14,8 @@ import MyToken from './components/MyToken';
 import ApprovedProject from './components/ApprovedProject';
 import CryptoMarket from './components/CryptoMarket';
 import OrderBook from './components/OrderBook';
-import ProjectDetailPage from './components/ProjectDetail';  // Import mới cho full page detail
+import ProjectDetailPage from './components/ProjectDetail';
+import UserManagement from './components/UserManagement';
 
 function App() {
   const [activeTab, setActiveTab] = useState('marketplace');
@@ -27,6 +28,8 @@ function App() {
 
   // Thêm state cho ProjectDetailPage (sử dụng projectId thay vì full project để fetch data tươi)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  // Thêm state để lưu tab trước khi mở detail (để back đúng tab)
+  const [previousTab, setPreviousTab] = useState<string>('project');
 
   const onConnect = useCallback((address: string, role: string = 'user') => {
     setWalletAddress(address);
@@ -187,6 +190,7 @@ function App() {
     localStorage.removeItem('token');  // Clear token khi logout
     window.ethereum?.removeAllListeners();  // Clear listeners
     setSelectedProjectId(null);  // Reset project khi logout
+    setPreviousTab('project');  // Reset previous tab
   }, []);
 
   const renderLogoutConfirmation = () => (
@@ -223,7 +227,8 @@ function App() {
   }, [handleLogout]);
 
   // Handlers cho ProjectDetailPage (sử dụng projectId để fetch data)
-  const openProjectDetail = useCallback((projectId: string) => {
+  const openProjectDetail = useCallback((projectId: string, fromTab: string = 'project') => {
+    setPreviousTab(fromTab);
     setSelectedProjectId(projectId);
     setActiveTab('projectDetail');  // Nhảy sang tab detail
   }, []);
@@ -242,6 +247,7 @@ function App() {
     { id: 'orderbook', name: 'Order Book', icon: Building2, roles: ['user','owner','verifier', 'admin','government'], restricted: false },
     { id: 'myToken', name: 'My Token', icon: Award, roles: ['user','owner'], restricted: true },
     {id: 'projectDetail', name: 'Project Detail', icon: Award, roles: ['user','owner','verifier', 'admin','government'], restricted: false },
+    {id: 'userManagement', name: 'User Management', icon: Users, roles: ['superadmin','admin'], restricted: true },
   ];
 
   const displayedTabs = isWalletConnected
@@ -277,23 +283,27 @@ function App() {
       case 'marketplace': return <Marketplace walletAddress={walletAddress} setActiveTab={setActiveTab} />;
       case 'project': return <Projects walletAddress={walletAddress} onOpenProjectDetail={openProjectDetail} />;  // Truyền handler để mở detail từ list (với projectId)
       case 'verifyRole': return <VerifyRole />;
-      case 'verifyProject': return <VerifyProject />;
+      case 'verifyProject': return <VerifyProject onOpenProjectDetail={openProjectDetail} />;  // Truyền handler cho VerifyProject
       case 'updateProfile': return <Profile walletAddress={walletAddress} setActiveTab={setActiveTab} />;
-      case 'approvedProject': return <ApprovedProject   />;
+      case 'approvedProject': return <ApprovedProject onOpenProjectDetail={openProjectDetail} />;  // Truyền handler cho ApprovedProject
       case 'cryptomarket': return <CryptoMarket  />;
       case 'orderbook': return <OrderBook  />;
+      case 'userManagement': return <UserManagement />;
       case 'projectDetail': 
         return selectedProjectId ? (
-          <ProjectDetailPage projectId={selectedProjectId} onBack={() => { 
-            setSelectedProjectId(null); 
-            setActiveTab('project'); 
-          }} />
+          <ProjectDetailPage 
+            projectId={selectedProjectId} 
+            onBack={() => { 
+              setSelectedProjectId(null); 
+              setActiveTab(previousTab); 
+            }} 
+          />
         ) : (
           <div className="text-center pt-16">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">No Project Selected</h2>
             <p className="text-gray-600 mb-8">Please select a project from the Projects tab.</p>
             <button 
-              onClick={() => setActiveTab('project')} 
+              onClick={() => setActiveTab(previousTab || 'project')} 
               className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 flex items-center space-x-2 mx-auto"
             >
               <ArrowLeft className="h-5 w-5" />

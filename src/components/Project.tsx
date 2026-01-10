@@ -1,5 +1,5 @@
 // components/Projects.tsx - Đã cập nhật để pass project.id thay vì toàn bộ project object
-import { Award, Calendar, MapPin, Leaf, TrendingUp, Filter, Share2, Eye, BarChart3, Globe, Users, CheckCircle, X, Clock, Plus } from 'lucide-react';
+import { Award, Calendar, MapPin, Leaf, TrendingUp, Filter, Share2, Eye, BarChart3, Globe, Users, CheckCircle, X, Clock, Plus, AlertCircle, Clock as ClockIcon } from 'lucide-react';
 import api from '../utils/axiosInstance';
 import React, { useEffect, useState } from 'react';
 import { ethers } from 'ethers';
@@ -58,12 +58,13 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
             vintage: p.vintage,
             expectedCredits: p.expectedCredits ?? 0,
             issuedAmount: p.issueAmount ?? 0,
-            availableToMint: (p.expectedCredits ?? 0) - (p.issueAmount ?? 0),
+            availableToMint: Math.max(0, (p.expectedCredits ?? 0) - (p.issueAmount ?? 0)), // Cập nhật: Đảm bảo >= 0 để tránh hiển thị số âm và ẩn nút mint khi =0
             date: p.createdAt,
             certificateId: p.onchainHash,
             projectDescription: p.description,
             images: [thumbnailUrl],  // Chỉ lưu thumbnail (ảnh đầu tiên) cho list view
             status: mapStatus(p.status),
+            
           };
         })
       );
@@ -105,6 +106,40 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
         return 'Issued';
       default:
         return 'Unknown';
+    }
+  };
+
+  // // Thêm hàm mapStatusDescription để cung cấp mô tả rõ ràng, dễ hiểu cho người dùng
+  // const mapStatusDescription = (status: string) => {
+  //   switch (status) {
+  //     case 'SUBMITTED':
+  //       return 'Your project has been submitted and is awaiting initial review by the verification team. This typically takes 3-5 business days.';
+  //     case 'VERIFIED':
+  //       return 'The project has passed verification and is now waiting for final government approval. Expected turnaround: 5-7 business days.';
+  //     case 'REJECTED_BY_VERIFY':
+  //       return 'Unfortunately, the project was rejected during verification. Please review the feedback and resubmit after corrections.';
+  //     case 'REJECTED_BY_GOVERNMENT':
+  //       return 'The project was rejected by government authorities. Check the details for required revisions and resubmit.';
+  //     case 'APPROVED':
+  //       return 'Congratulations! Your project is approved and issued. You can now mint carbon credits from the available amount.';
+  //     default:
+  //       return 'Project status is unclear. Please contact support for assistance.';
+  //   }
+  // };
+
+  // Hàm lấy màu và icon cho status badge
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case 'Waiting for Review':
+      case 'Waiting for Approval':
+        return { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: ClockIcon, iconColor: 'text-yellow-600' };
+      case 'Issued':
+        return { color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle, iconColor: 'text-green-600' };
+      case 'Rejected by Verifier':
+      case 'Rejected by Government':
+        return { color: 'bg-red-100 text-red-800 border-red-200', icon: X, iconColor: 'text-red-600' };
+      default:
+        return { color: 'bg-gray-100 text-gray-800 border-gray-200', icon: AlertCircle, iconColor: 'text-gray-600' };
     }
   };
 
@@ -294,65 +329,83 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
 
         {/* Project List */}
         <div className='grid gap-6'>
-          {filteredProjects.map((project) => (
-            <div key={project.id} className='group bg-white rounded-3xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-500'>
-              <div className='flex flex-col lg:flex-row'>
-                <div className="lg:w-80 h-64 lg:h-auto relative bg-gray-100 overflow-hidden">
-                  <img src={project.images[0]} alt={project.projectName} loading="lazy" onError={(e) => (e.target as HTMLImageElement).src = "https://via.placeholder.com/400x300?text=No+Image"} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
-                </div>
+          {filteredProjects.map((project) => {
+            const statusConfig = getStatusConfig(project.status);
+            return (
+              <div key={project.id} className='group bg-white rounded-3xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-500'>
+                <div className='flex flex-col lg:flex-row'>
+                  <div className="lg:w-80 h-64 lg:h-auto relative bg-gray-100 overflow-hidden">
+                    <img src={project.images[0]} alt={project.projectName} loading="lazy" onError={(e) => (e.target as HTMLImageElement).src = "https://via.placeholder.com/400x300?text=No+Image"} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+                  </div>
 
-                <div className='flex-1 p-8'>
-                  <div className='flex justify-between items-start mb-6'>
-                    <div>
-                      <h3 className='text-2xl font-bold text-gray-900 mb-3'>{project.projectName}</h3>
-                      <div className='flex flex-wrap gap-4 text-sm text-gray-600'>
-                        <span className='flex items-center space-x-2'><MapPin className='h-4 w-4 text-gray-400' /><span>{project.location}</span></span>
-                        <span className='flex items-center space-x-2'><Calendar className='h-4 w-4 text-gray-400' /><span>Vintage {project.vintage}</span></span>
-                        <span className='flex items-center space-x-2'><Leaf className='h-4 w-4 text-gray-400' /><span>{project.projectType}</span></span>
+                  <div className='flex-1 p-8'>
+                    <div className='flex justify-between items-start mb-4'>
+                      <div>
+                        <h3 className='text-2xl font-bold text-gray-900 mb-3'>{project.projectName}</h3>
+                        {/* Thêm status badge - FIXED */}
+                        <div className='flex items-center space-x-2 mb-3'>
+                          {React.createElement(statusConfig.icon, { 
+                            className: `h-4 w-4 ${statusConfig.iconColor}` 
+                          })}
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
+                            {project.status}
+                          </span>
+                        </div>
+                        {/* Tooltip cho mô tả trạng thái */}
+                        {/* <div className="group relative inline-block">
+                          <p className="text-xs text-gray-500 cursor-help" title={project.statusDescription}>
+                            {project.statusDescription.length > 100 ? `${project.statusDescription.substring(0, 100)}...` : project.statusDescription}
+                          </p>
+                        </div> */}
+                        <div className='flex flex-wrap gap-4 text-sm text-gray-600'>
+                          <span className='flex items-center space-x-2'><MapPin className='h-4 w-4 text-gray-400' /><span>{project.location}</span></span>
+                          <span className='flex items-center space-x-2'><Calendar className='h-4 w-4 text-gray-400' /><span>Vintage {project.vintage}</span></span>
+                          <span className='flex items-center space-x-2'><Leaf className='h-4 w-4 text-gray-400' /><span>{project.projectType}</span></span>
+                        </div>
+                      </div>
+                      <div className='text-right'>
+                        <p className='text-sm text-gray-500 font-medium'>
+                          {new Date(project.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
                       </div>
                     </div>
-                    <div className='text-right'>
-                      <p className='text-sm text-gray-500 font-medium'>
-                        {new Date(project.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </p>
-                    </div>
-                  </div>
 
-                  <div className='grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6'>
-                    <div className='bg-gray-50 rounded-2xl p-5'>
-                      <p className='text-sm text-gray-600 font-medium mb-2 uppercase tracking-wider'>Available to Mint</p>
-                      <p className='text-3xl font-bold text-gray-900'>{project.availableToMint} <span className='text-lg'>tCO₂</span></p>
+                    <div className='grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6'>
+                      <div className='bg-gray-50 rounded-2xl p-5'>
+                        <p className='text-sm text-gray-600 font-medium mb-2 uppercase tracking-wider'>Available to Mint</p>
+                        <p className='text-3xl font-bold text-gray-900'>{project.availableToMint} <span className='text-lg'>tCO₂</span></p>
+                      </div>
+                      <div className='bg-gray-50 rounded-2xl p-5'>
+                        <p className='text-sm text-gray-600 font-medium mb-2 uppercase tracking-wider'>Total Expected</p>
+                        <p className='text-3xl font-bold text-gray-900'>{project.expectedCredits} <span className='text-lg'>tCO₂</span></p>
+                      </div>
                     </div>
-                    <div className='bg-gray-50 rounded-2xl p-5'>
-                      <p className='text-sm text-gray-600 font-medium mb-2 uppercase tracking-wider'>Total Expected</p>
-                      <p className='text-3xl font-bold text-gray-900'>{project.expectedCredits} <span className='text-lg'>tCO₂</span></p>
-                    </div>
-                  </div>
 
-                  <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-6 border-t border-gray-100'>
-                    <div className='flex items-center space-x-2 text-sm text-gray-600'>
-                      <div className='h-2 w-2 bg-green-500 rounded-full' />
-                      <span className='font-medium'>Issued: <span className='text-green-700 font-semibold'>{project.issuedAmount} tCO₂</span></span>
-                    </div>
-                    <div className='flex items-center space-x-3 w-full sm:w-auto'>
-                      {project.nftTokenId && project.status === 'Issued' && project.availableToMint > 0 && (  // Chỉ mint nếu 'Issued'
-                        <button onClick={() => handleMint(project)} className="flex items-center space-x-2 px-4 py-2.5 border rounded-xl hover:bg-gray-50">
-                          <Share2 className="h-4 w-4" />
-                          <span>Mint</span>
+                    <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-6 border-t border-gray-100'>
+                      <div className='flex items-center space-x-2 text-sm text-gray-600'>
+                        <div className='h-2 w-2 bg-green-500 rounded-full' />
+                        <span className='font-medium'>Issued: <span className='text-green-700 font-semibold'>{project.issuedAmount} tCO₂</span></span>
+                      </div>
+                      <div className='flex items-center space-x-3 w-full sm:w-auto'>
+                        {project.nftTokenId !== null && project.status === 'Issued' && project.availableToMint > 0 && (  // Chỉ mint nếu 'Issued'
+                          <button onClick={() => handleMint(project)} className="flex items-center space-x-2 px-4 py-2.5 border rounded-xl hover:bg-gray-50">
+                            <Share2 className="h-4 w-4" />
+                            <span>Mint</span>
+                          </button>
+                        )}
+                        {/* Cập nhật: Pass project.id vào onOpenProjectDetail */}
+                        <button onClick={() => onOpenProjectDetail?.(project.id)} className='bg-green-500 text-white px-5 py-2.5 rounded-xl font-medium hover:bg-green-600 transition-all flex items-center justify-center space-x-2'>
+                          <Eye className='h-4 w-4' />
+                          <span>Details</span>
                         </button>
-                      )}
-                      {/* Cập nhật: Pass project.id vào onOpenProjectDetail */}
-                      <button onClick={() => onOpenProjectDetail?.(project.id)} className='bg-green-500 text-white px-5 py-2.5 rounded-xl font-medium hover:bg-green-600 transition-all flex items-center justify-center space-x-2'>
-                        <Eye className='h-4 w-4' />
-                        <span>Details</span>
-                      </button>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Empty State & Modals giữ nguyên như cũ, chỉ sửa nhỏ display amount */}

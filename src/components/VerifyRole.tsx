@@ -21,6 +21,9 @@ const VerifyRole: React.FC = () => {
   const [selectedRequest, setSelectedRequest] = useState<RoleRequest | null>(null);
   const [requestToVerify, setRequestToVerify] = useState<RoleRequest | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showAddMemberPopup, setShowAddMemberPopup] = useState(false);
+  const [newUserId, setNewUserId] = useState('');
+  const [newRoleName, setNewRoleName] = useState('');
 
   const fetchRequests = async () => {
     try {
@@ -72,6 +75,27 @@ const VerifyRole: React.FC = () => {
       alert('Rejected! Email sent.');
     } catch (err: any) {
       alert('Reject failed: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleAddMember = async () => {
+    const trimmedUserId = newUserId.trim();
+    if (!trimmedUserId || !newRoleName || !ethers.isAddress(trimmedUserId)) {
+      alert('Invalid wallet address or role selected.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.post('/role-request/add-role', { userId: trimmedUserId, roleName: newRoleName });
+      setShowAddMemberPopup(false);
+      setNewUserId('');
+      setNewRoleName('');
+      fetchRequests();
+      alert('Member added successfully!');
+    } catch (err: any) {
+      alert('Add failed: ' + (err.response?.data?.message || err.message));
     } finally {
       setSubmitting(false);
     }
@@ -164,10 +188,13 @@ const VerifyRole: React.FC = () => {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
           </button>
-          <button className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-200 flex items-center space-x-2">
+          {/* <button 
+            onClick={() => setShowAddMemberPopup(true)}
+            className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-200 flex items-center space-x-2"
+          >
             <Plus className="h-5 w-5" />
             <span>Add Member</span>
-          </button>
+          </button> */}
         </div>
       </div>
 
@@ -225,6 +252,59 @@ const VerifyRole: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Add Member Popup */}
+      {showAddMemberPopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">Add Member</h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Wallet Address</label>
+              <input
+                type="text"
+                value={newUserId}
+                onChange={(e) => setNewUserId(e.target.value)}
+                placeholder="0x..."
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+              <select
+                value={newRoleName}
+                onChange={(e) => setNewRoleName(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="">Select Role</option>
+                <option value="VERIFIER">Verifier</option>
+                <option value="GOVERNMENT">Government</option>
+                <option value="ADMIN">Admin</option>
+              </select>
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={handleAddMember}
+                disabled={!newUserId.trim() || !newRoleName || submitting}
+                className="px-6 py-2 rounded-lg bg-green-500 text-white hover:bg-green-600 disabled:bg-gray-400 flex items-center space-x-2"
+              >
+                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                <span>Add</span>
+              </button>
+              <button 
+                onClick={() => {
+                  setShowAddMemberPopup(false);
+                  setNewUserId('');
+                  setNewRoleName('');
+                }} 
+                disabled={submitting}
+                className="px-6 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
