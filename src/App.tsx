@@ -92,16 +92,16 @@ function App() {
       // Lấy signer từ provider (default to first account - no param to avoid type issue)
       const signer = await provider.getSigner();  // This returns JsonRpcSigner, but we use it for methods only
 
-      // Kiểm tra network (Polygon Amoy - chainId 80002 / 0x13882)
+      // Kiểm tra network (Localhost - chainId 31337 / 0x7a69)
       const network = await provider.getNetwork();
-      if (network.chainId !== 80002n) {
+      if (network.chainId !== 31337n) {
         try {
+          // Thử switch trước
           await window.ethereum.request({
             method: "wallet_switchEthereumChain",
-            params: [{ chainId: "0x13882" }],  // Polygon Amoy hex
+            params: [{ chainId: "0x7a69" }],
           });
         } catch (switchError: unknown) {
-          // Type guard to check if error has code property
           const isErrorWithCode = (err: unknown): err is { code: number } => {
             return (
               typeof err === 'object' &&
@@ -111,20 +111,30 @@ function App() {
             );
           };
 
+          // Nếu code 4902: Network chưa tồn tại, add nó
           if (isErrorWithCode(switchError) && switchError.code === 4902) {
-            // Network chưa add: Add Polygon Amoy
-            await window.ethereum.request({
-              method: "wallet_addEthereumChain",
-              params: [{
-                chainId: "0x13882",
-                chainName: "Polygon Amoy",
-                rpcUrls: ["https://polygon-amoy.infura.io/v3/9280fa3258a544b4a595e79e909d3f85"],
-                nativeCurrency: { name: "MATIC", symbol: "MATIC", decimals: 18 },
-                blockExplorerUrls: ["https://amoy.polygonscan.com/"],
-              }],
-            });
+            try {
+              await window.ethereum.request({
+                method: "wallet_addEthereumChain",
+                params: [{
+                  chainId: "0x7a69",
+                  chainName: "Hardhat Local",
+                  rpcUrls: ["http://127.0.0.1:8545"],
+                  nativeCurrency: {
+                    name: "ETH",
+                    symbol: "ETH",
+                    decimals: 18
+                  },
+                }],
+              });
+              console.log("✅ Hardhat Local network added successfully");
+            } catch (addError) {
+              console.error("❌ Failed to add network:", addError);
+              throw new Error("Không thể thêm mạng Hardhat Local. Vui lòng thêm thủ công!");
+            }
           } else {
-            throw new Error("Vui lòng chuyển sang mạng Polygon Amoy!");
+            // Lỗi khác khi switch
+            throw new Error("Vui lòng chuyển sang mạng Hardhat Local trong MetaMask!");
           }
         }
       }
