@@ -6,7 +6,7 @@ import CarbonCreditEx from '../abi/CarbonCreditExchange.json';
 
 interface RoleRequest {
   id: string;
-  userId: string;  
+  userId: string;
   requestedRole: string;
   reason?: string;
   status: string;
@@ -87,82 +87,124 @@ const VerifyRole: React.FC = () => {
       return;
     }
     setSubmitting(true);
+    let txHash = null;
     try {
+      // Validate env
+      // const contractAddress = import.meta.env.ADDRESS_CARBONCREDIT;
+      const contractAddress = '0x7C96A93a6278308191b607BDd26fadE0efCc6809';
+      console.log('🔑 CONTRACT ADDR:', contractAddress || '❌ UNDEFINED!');
+      if (!contractAddress || !ethers.isAddress(contractAddress)) {
+        throw new Error('Contract address not configured. Check ADDRESS_CARBONCREDIT in .env.');
+      }
+
+      const provider = new ethers.BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(contractAddress, CarbonCreditEx.abi, signer);
+
+      // Execute on-chain based on role
+      let tx;
+      if (newRoleName === 'VERIFIER') {
+        tx = await contract.verifyOrganization(trimmedUserId);
+      } else if (newRoleName === 'GOVERNMENT') {
+        tx = await contract.addGovernment(trimmedUserId);
+      } else if (newRoleName === 'ADMIN') {
+        tx = await contract.addAdmin(trimmedUserId);
+      } else {
+        throw new Error(`Unsupported role: ${newRoleName}`);
+      }
+
+      // Wait for confirmation (optional: add gas limit nếu cần)
+      console.log('Tx sent:', tx.hash);
+      const receipt = await tx.wait(1); // Wait 1 confirmation
+      txHash = tx.hash;
+      console.log('Tx confirmed:', receipt);
+
+      // Now call API to add role (only if on-chain success)
       await api.post('/role-request/add-role', { userId: trimmedUserId, roleName: newRoleName });
       setShowAddMemberPopup(false);
       setNewUserId('');
       setNewRoleName('');
       fetchRequests();
-      alert('Member added successfully!');
+      alert(`Member added successfully! Tx hash: ${txHash.slice(0, 10)}...`);
     } catch (err: any) {
-      alert('Add failed: ' + (err.response?.data?.message || err.message));
+      console.error('Add member error:', err);
+      if (err.code === 'INVALID_ARGUMENT') {
+        alert('Contract setup error: Invalid address. Check console.');
+      } else if (err.code === 'ACTION_REJECTED') {
+        alert('User rejected the transaction.');
+      } else if (err.reason || err.message) {
+        alert(`Blockchain failed: ${err.reason || err.message}`);
+      } else {
+        alert(`Add failed: ${err.message}`);
+      }
+      // Revert API if tx partial success (optional, tùy logic)
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleAccept = async (request: RoleRequest) => {
-  if (!request.userId) {
-    alert('Invalid user ID (wallet address).');
-    setSubmitting(false);
-    return;
-  }
-
-  setSubmitting(true);
-  let txHash = null;
-
-  try {
-    // Validate env
-    // const contractAddress = import.meta.env.ADDRESS_CARBONCREDIT;
-    const contractAddress = '0x7C96A93a6278308191b607BDd26fadE0efCc6809';
-    console.log('🔑 CONTRACT ADDR:', contractAddress || '❌ UNDEFINED!');
-    if (!contractAddress || !ethers.isAddress(contractAddress)) {
-      throw new Error('Contract address not configured. Check ADDRESS_CARBONCREDIT in .env.');
+    if (!request.userId) {
+      alert('Invalid user ID (wallet address).');
+      setSubmitting(false);
+      return;
     }
 
-    const provider = new ethers.BrowserProvider((window as any).ethereum);
-    const signer = await provider.getSigner();
-    const contract = new ethers.Contract(contractAddress, CarbonCreditEx.abi, signer);
+    setSubmitting(true);
+    let txHash = null;
 
-    // Execute on-chain based on role
-    let tx;
-    if (request.requestedRole === 'VERIFIER') {
-      tx = await contract.verifyOrganization(request.userId);
-    } else if (request.requestedRole === 'GOVERNMENT') {
-      tx = await contract.addGovernment(request.userId);
-    }else if (request.requestedRole === 'ADMIN') {
-      tx = await contract.addAdmin(request.userId);
-    }
-     else  {
-      throw new Error(`Unsupported role: ${request.requestedRole}`);
-    }
+    try {
+      // Validate env
+      // const contractAddress = import.meta.env.ADDRESS_CARBONCREDIT;
+      const contractAddress = '0x7C96A93a6278308191b607BDd26fadE0efCc6809';
+      console.log('🔑 CONTRACT ADDR:', contractAddress || '❌ UNDEFINED!');
+      if (!contractAddress || !ethers.isAddress(contractAddress)) {
+        throw new Error('Contract address not configured. Check ADDRESS_CARBONCREDIT in .env.');
+      }
 
-    // Wait for confirmation (optional: add gas limit nếu cần)
-    console.log('Tx sent:', tx.hash);
-    const receipt = await tx.wait(1); // Wait 1 confirmation
-    txHash = tx.hash;
-    console.log('Tx confirmed:', receipt);
+      const provider = new ethers.BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(contractAddress, CarbonCreditEx.abi, signer);
 
-    // Now call API to approve (only if on-chain success)
-    await api.put(`/role-request/approve/${request.id}`);
-    setRequests(prev => prev.filter(r => r.id !== request.id));
-    alert(`Approved! Tx hash: ${txHash.slice(0, 10)}... | Email sent.`);
-  } catch (err: any) {
-    console.error('Accept error:', err);
-    if (err.code === 'INVALID_ARGUMENT') {
-      alert('Contract setup error: Invalid address. Check console.');
-    } else if (err.code === 'ACTION_REJECTED') {
-      alert('User rejected the transaction.');
-    } else if (err.reason || err.message) {
-      alert(`Blockchain failed: ${err.reason || err.message}`);
-    } else {
-      alert(`Accept failed: ${err.message}`);
+      // Execute on-chain based on role
+      let tx;
+      if (request.requestedRole === 'VERIFIER') {
+        tx = await contract.verifyOrganization(request.userId);
+      } else if (request.requestedRole === 'GOVERNMENT') {
+        tx = await contract.addGovernment(request.userId);
+      } else if (request.requestedRole === 'ADMIN') {
+        tx = await contract.addAdmin(request.userId);
+      }
+      else {
+        throw new Error(`Unsupported role: ${request.requestedRole}`);
+      }
+
+      // Wait for confirmation (optional: add gas limit nếu cần)
+      console.log('Tx sent:', tx.hash);
+      const receipt = await tx.wait(1); // Wait 1 confirmation
+      txHash = tx.hash;
+      console.log('Tx confirmed:', receipt);
+
+      // Now call API to approve (only if on-chain success)
+      await api.put(`/role-request/approve/${request.id}`);
+      setRequests(prev => prev.filter(r => r.id !== request.id));
+      alert(`Approved! Tx hash: ${txHash.slice(0, 10)}... | Email sent.`);
+    } catch (err: any) {
+      console.error('Accept error:', err);
+      if (err.code === 'INVALID_ARGUMENT') {
+        alert('Contract setup error: Invalid address. Check console.');
+      } else if (err.code === 'ACTION_REJECTED') {
+        alert('User rejected the transaction.');
+      } else if (err.reason || err.message) {
+        alert(`Blockchain failed: ${err.reason || err.message}`);
+      } else {
+        alert(`Accept failed: ${err.message}`);
+      }
+      // Revert API if tx partial success (optional, tùy logic)
+    } finally {
+      setSubmitting(false);
     }
-    // Revert API if tx partial success (optional, tùy logic)
-  } finally {
-    setSubmitting(false);
-  }
-};
+  };
 
   const handleViewRequest = (request: RoleRequest) => {
     setSelectedRequest(request);
@@ -292,12 +334,12 @@ const VerifyRole: React.FC = () => {
                 {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                 <span>Add</span>
               </button>
-              <button 
+              <button
                 onClick={() => {
                   setShowAddMemberPopup(false);
                   setNewUserId('');
                   setNewRoleName('');
-                }} 
+                }}
                 disabled={submitting}
                 className="px-6 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
               >

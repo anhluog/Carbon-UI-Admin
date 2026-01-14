@@ -96,11 +96,11 @@ function App() {
 
       // Kiểm tra network (Polygon Amoy - chainId 80002 / 0x13882)
       const network = await provider.getNetwork();
-      if (network.chainId !== 80002n) {
+      if (network.chainId !== 31337n) {
         try {
           await window.ethereum.request({
             method: "wallet_switchEthereumChain",
-            params: [{ chainId: "0x13882" }],  // Polygon Amoy hex
+            params: [{ chainId: "0x7a69" }],  // Polygon Amoy hex
           });
         } catch (switchError: any) {
           if (switchError.code === 4902) {
@@ -108,11 +108,11 @@ function App() {
             await window.ethereum.request({
               method: "wallet_addEthereumChain",
               params: [{
-                chainId: "0x13882",
-                chainName: "Polygon Amoy",
-                rpcUrls: ["https://polygon-amoy.infura.io/v3/9280fa3258a544b4a595e79e909d3f85"],
+                chainId: "0x7a69",
+                chainName: "Hardhat Localhost",
+                rpcUrls: ["http://127.0.0.1:8545"],
                 nativeCurrency: { name: "MATIC", symbol: "MATIC", decimals: 18 },
-                blockExplorerUrls: ["https://amoy.polygonscan.com/"],
+                blockExplorerUrls: [],
               }],
             });
           } else {

@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
+import api from '../utils/axiosInstance';
+import { ethers } from 'ethers';
+import CarbonCreditEx from '../abi/CarbonCreditExchange.json';
 
 const MyToken: React.FC = () => {
   const [projects, setProjects] = useState([
@@ -39,11 +42,78 @@ const MyToken: React.FC = () => {
     setShowSummaryPopup(false);
   };
 
-  const handleAcceptRetirement = () => {
-    // Implement actual retirement logic here
-    console.log('Retirement accepted');
+  const handleAcceptRetirement = async () => {
+  try {
+    // 1️⃣ Lấy danh sách token cần retire
+    const selected = projects.filter(
+      p => p.confirmRetire && Number(p.retireAmount) > 0
+    );
+
+    if (selected.length === 0) {
+      alert("No tokens selected");
+      return;
+    }
+
+    // mapping theo smart contract
+    const creditTokenIds = selected.map(p => Number(p.id)); // id = creditTokenId
+    const amounts = selected.map(p => Number(p.retireAmount));
+
+    // 2️⃣ Connect wallet
+    if (!window.ethereum) throw new Error("Metamask not found");
+
+    const provider = new BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+
+    const contract = new Contract(
+      CONTRACT_ADDRESS,
+      CONTRACT_ABI,
+      signer
+    );
+
+    // 3️⃣ Gọi smart contract
+    const tx = await contract.retireCreditBatch(
+      creditTokenIds,
+      amounts
+    );
+
+    const receipt = await tx.wait();
+
+    // 4️⃣ Parse event lấy certificateId
+    let certificateId: string | null = null;
+
+    for (const log of receipt.logs) {
+      try {
+        const parsed = contract.interface.parseLog(log);
+        if (parsed.name === "BatchCertificateRetired") {
+          certificateId = parsed.args.certificateId.toString();
+        }
+      } catch {}
+    }
+
+    if (!certificateId) {
+      throw new Error("CertificateId not found in tx logs");
+    }
+
+    // 5️⃣ Gửi sang backend lưu DB
+    await axios.post("/certificates/retire", {
+      reason: "User initiated retirement",
+      txHash: receipt.hash,
+      nftTokenId: certificateId,
+      records: selected.map(p => ({
+        tokenId: p.id.toString(),
+        amount: Number(p.retireAmount)
+      }))
+    });
+
+    alert("Retirement successful 🎉");
     handleCloseSummary();
-  };
+
+  } catch (err: any) {
+    console.error(err);
+    alert(err.message || "Retirement failed");
+  }
+};
+
 
   const retirementSummary = projects.filter(p => p.confirmRetire && p.retireAmount);
 

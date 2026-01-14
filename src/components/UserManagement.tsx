@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Users, Plus, Eye, Loader2, AlertTriangle, RefreshCw, Shield } from 'lucide-react';
 import api from '../utils/axiosInstance';
 import { ethers } from 'ethers';
+import CarbonCreditEx from '../abi/CarbonCreditExchange.json';
+
 
 interface User {
   id: string;
@@ -150,42 +152,68 @@ const UserManagement: React.FC = () => {
     }
   }, [currentUser]);
 
-  const handleAddMember = async () => {
-    const trimmedUserId = newUserId.trim();
-    if (!trimmedUserId || !newRoleName || !ethers.isAddress(trimmedUserId)) {
-      alert('Invalid wallet address or role selected.');
-      return;
-    }
-
-    // Validate verifier role nếu chọn VERIFIER
-    if (newRoleName === 'VERIFIER' && !selectedVerifierRole) {
-      alert('Please select a verifier role.');
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      // Payload cơ bản
-      const payload = { userId: trimmedUserId, roleName: newRoleName };
-      
-      // Thêm verifierRoleId nếu là VERIFIER
-      if (newRoleName === 'VERIFIER') {
-        payload.verifierRoleId = selectedVerifierRole;  // Giả định backend nhận field này
+   const handleAddMember = async () => {
+      const trimmedUserId = newUserId.trim();
+      if (!trimmedUserId || !newRoleName || !ethers.isAddress(trimmedUserId)) {
+        alert('Invalid wallet address or role selected.');
+        return;
       }
-
-      await api.put('/role-request/add-role', payload);
-      setShowAddMemberPopup(false);
-      setNewUserId('');
-      setNewRoleName('');
-      setSelectedVerifierRole('');  // Reset verifier role
-      fetchUsers();  // Refresh tất cả tabs
-      alert('Member added successfully!');
-    } catch (err: any) {
-      alert('Add failed: ' + (err.response?.data?.message || err.message));
-    } finally {
-      setSubmitting(false);
-    }
-  };
+      setSubmitting(true);
+      let txHash = null;
+      try {
+        // Validate env
+        // const contractAddress = import.meta.env.ADDRESS_CARBONCREDIT;
+        const contractAddress = '0x7C96A93a6278308191b607BDd26fadE0efCc6809';
+        console.log('🔑 CONTRACT ADDR:', contractAddress || '❌ UNDEFINED!');
+        if (!contractAddress || !ethers.isAddress(contractAddress)) {
+          throw new Error('Contract address not configured. Check ADDRESS_CARBONCREDIT in .env.');
+        }
+  
+        const provider = new ethers.BrowserProvider((window as any).ethereum);
+        const signer = await provider.getSigner();
+        const contract = new ethers.Contract(contractAddress, CarbonCreditEx.abi, signer);
+  
+        // Execute on-chain based on role
+        let tx;
+        if (newRoleName === 'VERIFIER') {
+          tx = await contract.verifyOrganization(trimmedUserId);
+        } else if (newRoleName === 'GOVERNMENT') {
+          tx = await contract.addGovernment(trimmedUserId);
+        } else if (newRoleName === 'ADMIN') {
+          tx = await contract.addAdmin(trimmedUserId);
+        } else {
+          throw new Error(`Unsupported role: ${newRoleName}`);
+        }
+  
+        // Wait for confirmation (optional: add gas limit nếu cần)
+        console.log('Tx sent:', tx.hash);
+        const receipt = await tx.wait(1); // Wait 1 confirmation
+        txHash = tx.hash;
+        console.log('Tx confirmed:', receipt);
+  
+        // Now call API to add role (only if on-chain success)
+        await api.post('/role-request/add-role', { userId: trimmedUserId, roleName: newRoleName });
+        setShowAddMemberPopup(false);
+        setNewUserId('');
+        setNewRoleName('');
+        fetchVerifierRoles();
+        alert(`Member added successfully! Tx hash: ${txHash.slice(0, 10)}...`);
+      } catch (err: any) {
+        console.error('Add member error:', err);
+        if (err.code === 'INVALID_ARGUMENT') {
+          alert('Contract setup error: Invalid address. Check console.');
+        } else if (err.code === 'ACTION_REJECTED') {
+          alert('User rejected the transaction.');
+        } else if (err.reason || err.message) {
+          alert(`Blockchain failed: ${err.reason || err.message}`);
+        } else {
+          alert(`Add failed: ${err.message}`);
+        }
+        // Revert API if tx partial success (optional, tùy logic)
+      } finally {
+        setSubmitting(false);
+      }
+    };
 
   // Reset verifier role khi thay đổi newRoleName
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
