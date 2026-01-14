@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Plus, Edit3, Eye, CheckCircle, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import api from '../utils/axiosInstance';
 import { ethers } from 'ethers';
-import CarbonCreditEx from '../abi/CarbonCreditExchange.json';
+import CarbonCreditEx from '../abi/CarbonCredit.json';
 
 interface RoleRequest {
   id: string;
@@ -21,6 +21,9 @@ const VerifyRole: React.FC = () => {
   const [selectedRequest, setSelectedRequest] = useState<RoleRequest | null>(null);
   const [requestToVerify, setRequestToVerify] = useState<RoleRequest | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showAddMemberPopup, setShowAddMemberPopup] = useState(false);
+  const [newUserId, setNewUserId] = useState('');
+  const [newRoleName, setNewRoleName] = useState('');
 
   const fetchRequests = async () => {
     try {
@@ -77,7 +80,28 @@ const VerifyRole: React.FC = () => {
     }
   };
 
-  const handleAccept = async (request: RoleRequest) => {
+  const handleAddMember = async () => {
+    const trimmedUserId = newUserId.trim();
+    if (!trimmedUserId || !newRoleName || !ethers.isAddress(trimmedUserId)) {
+      alert('Invalid wallet address or role selected.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.post('/role-request/add-role', { userId: trimmedUserId, roleName: newRoleName });
+      setShowAddMemberPopup(false);
+      setNewUserId('');
+      setNewRoleName('');
+      fetchRequests();
+      alert('Member added successfully!');
+    } catch (err: any) {
+      alert('Add failed: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+ const handleAccept = async (request: RoleRequest) => {
   if (!request.userId) {
     alert('Invalid user ID (wallet address).');
     setSubmitting(false);
@@ -88,12 +112,21 @@ const VerifyRole: React.FC = () => {
   let txHash = null;
 
   try {
-    // Validate env
-    // const contractAddress = import.meta.env.ADDRESS_CARBONCREDIT;
-    const contractAddress = '0x7C96A93a6278308191b607BDd26fadE0efCc6809';
+    // Nếu role là OWNER, chỉ cần approve qua API (không cần blockchain)
+    if (request.requestedRole === 'OWNER') {
+      console.log('📝 Approving OWNER role via API only (no blockchain call)');
+      await api.put(`/role-request/approve/${request.id}`);
+      setRequests(prev => prev.filter(r => r.id !== request.id));
+      alert('✅ OWNER role approved! Email sent.');
+      setSubmitting(false);
+      return;
+    }
+
+    // Validate env cho các role khác
+    const contractAddress = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
     console.log('🔑 CONTRACT ADDR:', contractAddress || '❌ UNDEFINED!');
     if (!contractAddress || !ethers.isAddress(contractAddress)) {
-      throw new Error('Contract address not configured. Check ADDRESS_CARBONCREDIT in .env.');
+      throw new Error('Contract address not configured. Check VITE_CCT_CONTRACT_ADDRESS in .env.');
     }
 
     const provider = new ethers.BrowserProvider((window as any).ethereum);
@@ -102,39 +135,45 @@ const VerifyRole: React.FC = () => {
 
     // Execute on-chain based on role
     let tx;
+    console.log(`🔗 Calling blockchain for role: ${request.requestedRole}`);
+    
     if (request.requestedRole === 'VERIFIER') {
       tx = await contract.verifyOrganization(request.userId);
     } else if (request.requestedRole === 'GOVERNMENT') {
       tx = await contract.addGovernment(request.userId);
-    }else if (request.requestedRole === 'ADMIN') {
+    } else if (request.requestedRole === 'ADMIN') {
       tx = await contract.addAdmin(request.userId);
-    }
-     else  {
-      throw new Error(`Unsupported role: ${request.requestedRole}`);
+    } else {
+      throw new Error(`Unsupported blockchain role: ${request.requestedRole}`);
     }
 
-    // Wait for confirmation (optional: add gas limit nếu cần)
-    console.log('Tx sent:', tx.hash);
+    // Wait for confirmation
+    console.log('⏳ Tx sent:', tx.hash);
     const receipt = await tx.wait(1); // Wait 1 confirmation
     txHash = tx.hash;
-    console.log('Tx confirmed:', receipt);
+    console.log('✅ Tx confirmed:', receipt);
 
     // Now call API to approve (only if on-chain success)
     await api.put(`/role-request/approve/${request.id}`);
     setRequests(prev => prev.filter(r => r.id !== request.id));
-    alert(`Approved! Tx hash: ${txHash.slice(0, 10)}... | Email sent.`);
+    alert(`✅ Approved!\n\nRole: ${request.requestedRole}\nTx: ${txHash.slice(0, 10)}...\nEmail sent.`);
+    
   } catch (err: any) {
-    console.error('Accept error:', err);
+    console.error('❌ Accept error:', err);
+    
     if (err.code === 'INVALID_ARGUMENT') {
-      alert('Contract setup error: Invalid address. Check console.');
-    } else if (err.code === 'ACTION_REJECTED') {
-      alert('User rejected the transaction.');
-    } else if (err.reason || err.message) {
-      alert(`Blockchain failed: ${err.reason || err.message}`);
+      alert('❌ Contract setup error: Invalid address. Check console.');
+    } else if (err.code === 'ACTION_REJECTED' || err.code === 4001) {
+      alert('❌ User rejected the transaction.');
+    } else if (err.reason) {
+      alert(`❌ Blockchain failed: ${err.reason}`);
+    } else if (err.message?.includes('Contract address not configured')) {
+      alert(`❌ ${err.message}`);
+    } else if (err.message) {
+      alert(`❌ Accept failed: ${err.message}`);
     } else {
-      alert(`Accept failed: ${err.message}`);
+      alert('❌ Unknown error occurred');
     }
-    // Revert API if tx partial success (optional, tùy logic)
   } finally {
     setSubmitting(false);
   }
@@ -164,10 +203,13 @@ const VerifyRole: React.FC = () => {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
           </button>
-          <button className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-200 flex items-center space-x-2">
+          {/* <button 
+            onClick={() => setShowAddMemberPopup(true)}
+            className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-200 flex items-center space-x-2"
+          >
             <Plus className="h-5 w-5" />
             <span>Add Member</span>
-          </button>
+          </button> */}
         </div>
       </div>
 
@@ -225,6 +267,59 @@ const VerifyRole: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Add Member Popup */}
+      {showAddMemberPopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">Add Member</h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Wallet Address</label>
+              <input
+                type="text"
+                value={newUserId}
+                onChange={(e) => setNewUserId(e.target.value)}
+                placeholder="0x..."
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+              <select
+                value={newRoleName}
+                onChange={(e) => setNewRoleName(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="">Select Role</option>
+                <option value="VERIFIER">Verifier</option>
+                <option value="GOVERNMENT">Government</option>
+                <option value="ADMIN">Admin</option>
+              </select>
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={handleAddMember}
+                disabled={!newUserId.trim() || !newRoleName || submitting}
+                className="px-6 py-2 rounded-lg bg-green-500 text-white hover:bg-green-600 disabled:bg-gray-400 flex items-center space-x-2"
+              >
+                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                <span>Add</span>
+              </button>
+              <button 
+                onClick={() => {
+                  setShowAddMemberPopup(false);
+                  setNewUserId('');
+                  setNewRoleName('');
+                }} 
+                disabled={submitting}
+                className="px-6 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

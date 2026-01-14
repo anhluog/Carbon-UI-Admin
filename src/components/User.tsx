@@ -1,8 +1,16 @@
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { TrendingUp, TrendingDown, DollarSign, Leaf, Award, Activity, X, Bell, Calendar } from 'lucide-react';
+import { 
+    TrendingUp, DollarSign, Leaf, Award, 
+    X, Bell, Wallet, History, 
+    ArrowRightLeft, Search, CheckCircle
+} from 'lucide-react';
 import CarbonCredit from '../abi/CarbonCredit.json';
 import CarbonCreditExchange from '../abi/CarbonCreditExchange.json';
+import api from '../utils/axiosInstance';
+
+const EXCHANGE_CONTRACT_ADDRESS = import.meta.env.VITE_EXCHANGE_CONTRACT_ADDRESS;
+const CCT_CONTRACT_ADDRESS = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
 
 interface UserProps {
     walletAddress: string;
@@ -15,6 +23,7 @@ interface RetiredEntry {
 }
 
 const User: React.FC<UserProps> = ({ walletAddress }) => {
+    // --- STATE GIỮ NGUYÊN ---
     const [cctBalance, setCctBalance] = useState('0');
     const [portfolioValue, setPortfolioValue] = useState('0');
     const [creditsOffset] = useState('0');
@@ -29,41 +38,55 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
     const [rechargeAmount, setRechargeAmount] = useState('');
     const [isDepositing, setIsDepositing] = useState(false);
 
-    // Đọc trực tiếp từ .env
-    const CCT_CONTRACT_ADDRESS = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
-    const EXCHANGE_CONTRACT_ADDRESS = import.meta.env.VITE_EXCHANGE_CONTRACT_ADDRESS;
+    const [tokenId, setTokenId] = useState('');
+    const [tokenAmount, setTokenAmount] = useState('');
 
+    const [ownedTokens, setOwnedTokens] = useState<Array<{
+        tokenId: number;
+        nftTokenId: number;
+        balance: number;
+        projectName: string;
+    }>>([]);
+    const [selectedTokenId, setSelectedTokenId] = useState<number | null>(null);
+
+    const [withdrawalAmount, setWithdrawalAmount] = useState('');
+    const [selectedWithdrawTokenId, setSelectedWithdrawTokenId] = useState<number | null>(null);
+    const [isWithdrawing, setIsWithdrawing] = useState(false);
+
+    const [exchangeNativeBalance, setExchangeNativeBalance] = useState('0');
+    const [exchangeCreditBalances, setExchangeCreditBalances] = useState<Array<{
+        creditId: string;
+        tokenId: number;
+        projectId: string;
+        availableBalance: string;
+        projectName: string;
+    }>>([]);
+
+    const [myTokens, setMyTokens] = useState<Array<{
+        tokenId: number;
+        projectId: string;
+        projectName: string;
+        balance: number;
+        vintage: number;
+        type: string;
+    }>>([]);
+
+    // --- LOGIC FUNCTIONS (GIỮ NGUYÊN) ---
     const fetchData = async () => {
         try {
             if (!window.ethereum || !walletAddress) return;
-
-            // Validate contract address
-            if (!CCT_CONTRACT_ADDRESS) {
-                console.error('❌ VITE_CCT_CONTRACT_ADDRESS chưa được cấu hình trong .env');
-                setCctBalance('0');
-                setPortfolioValue('0');
-                return;
-            }
+            if (!CCT_CONTRACT_ADDRESS || !EXCHANGE_CONTRACT_ADDRESS) return;
 
             const provider = new ethers.BrowserProvider(window.ethereum);
             const signer = await provider.getSigner();
 
-            // Kiểm tra xem contract có tồn tại không
-            const code = await provider.getCode(CCT_CONTRACT_ADDRESS);
-            if (code === '0x') {
-                console.error('❌ Contract CarbonCredit chưa được deploy tại:', CCT_CONTRACT_ADDRESS);
-                setCctBalance('0');
-                setPortfolioValue('0');
-                return;
-            }
+            const cctCode = await provider.getCode(CCT_CONTRACT_ADDRESS);
+            const exchangeCode = await provider.getCode(EXCHANGE_CONTRACT_ADDRESS);
 
-            const cctContract = new ethers.Contract(
-                CCT_CONTRACT_ADDRESS,
-                CarbonCredit.abi,
-                signer
-            );
+            if (cctCode === '0x' || exchangeCode === '0x') return;
 
-            const balance = await cctContract.balanceOf(walletAddress);
+            const exchangeContract = new ethers.Contract(EXCHANGE_CONTRACT_ADDRESS, CarbonCreditExchange.abi, signer);
+            const balance = await exchangeContract.getUserBalance(walletAddress);
             const formattedBalance = ethers.formatUnits(balance, 18);
             setCctBalance(formattedBalance);
 
@@ -71,541 +94,601 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
             const value = parseFloat(formattedBalance) * price;
             setPortfolioValue(value.toFixed(2));
         } catch (error) {
-            console.error('Error fetching data:', error);
-            setCctBalance('0');
-            setPortfolioValue('0');
+            console.error('❌ Error fetching data:', error);
         }
     };
 
-    useEffect(() => {
-        fetchData();
-    }, [walletAddress]);
+    const fetchOwnedTokens = async () => {
+        if (!walletAddress || !CCT_CONTRACT_ADDRESS) return;
+        try {
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const cctContract = new ethers.Contract(CCT_CONTRACT_ADDRESS, CarbonCredit.abi, provider);
+            const res = await api.get('/projects/MyProject');
+            const mintedProjects = res.data.filter((p: any) => p.nftTokenId !== null && p.issueAmount > 0);
+
+            if (mintedProjects.length === 0) {
+                setOwnedTokens([]);
+                return;
+            }
+
+            const tokens = await Promise.all(
+                mintedProjects.map(async (p: any) => {
+                    try {
+                        const projectInfo = await cctContract.projectsByUUID(p.id);
+                        const balance = await cctContract.balanceOf(walletAddress, projectInfo.creditTokenId);
+                        return {
+                            tokenId: Number(projectInfo.creditTokenId),
+                            nftTokenId: Number(projectInfo.nftTokenId),
+                            balance: Number(balance),
+                            projectName: p.name
+                        };
+                    } catch (err) {
+                        return { tokenId: 0, nftTokenId: 0, balance: 0, projectName: p.name };
+                    }
+                })
+            );
+            setOwnedTokens(tokens.filter(t => t.balance > 0));
+        } catch (error) {
+            setOwnedTokens([]);
+        }
+    };
+
+    const fetchExchangeNativeBalance = async () => {
+        try {
+            const response = await api.get('/wallet/my-natives');
+            setExchangeNativeBalance(response.data.nativeBalance || '0');
+        } catch (error) {
+            setExchangeNativeBalance('0');
+        }
+    };
+
+    const fetchExchangeCreditBalances = async () => {
+        try {
+            const response = await api.get('/wallet/my-credits');
+            const credits = response.data || [];
+            const creditsWithNames = await Promise.all(
+                credits.map(async (credit: any) => {
+                    try {
+                        const projectRes = await api.get(`/projects/${credit.projectId}`);
+                        return { ...credit, projectName: projectRes.data.name || 'Unknown Project' };
+                    } catch {
+                        return { ...credit, projectName: 'Unknown Project' };
+                    }
+                })
+            );
+            setExchangeCreditBalances(creditsWithNames);
+        } catch (error) {
+            setExchangeCreditBalances([]);
+        }
+    };
+
+    const fetchMyTokens = async () => {
+        try {
+            if (!walletAddress || !CCT_CONTRACT_ADDRESS) return;
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const cctContract = new ethers.Contract(CCT_CONTRACT_ADDRESS, CarbonCredit.abi, provider);
+            const res = await api.get('/projects/MyProject');
+            const mintedProjects = res.data.filter((p: any) => p.nftTokenId !== null);
+
+            if (mintedProjects.length === 0) {
+                setMyTokens([]);
+                return;
+            }
+
+            const tokens = await Promise.all(
+                mintedProjects.map(async (p: any) => {
+                    try {
+                        const projectInfo = await cctContract.projectsByUUID(p.id);
+                        const creditTokenId = Number(projectInfo.creditTokenId);
+                        const balance = await cctContract.balanceOf(walletAddress, creditTokenId);
+                        return {
+                            tokenId: creditTokenId,
+                            projectId: p.id,
+                            projectName: p.name,
+                            balance: Number(balance),
+                            vintage: p.vintage || 2024,
+                            type: p.type || 'Renewable Energy'
+                        };
+                    } catch (err) {
+                        return null;
+                    }
+                })
+            );
+            setMyTokens(tokens.filter(t => t !== null) as any);
+        } catch (error) {
+            setMyTokens([]);
+        }
+    };
 
     const handleDepositNative = async () => {
-        if (!rechargeAmount || parseFloat(rechargeAmount) <= 0) {
-            alert('Vui lòng nhập số tiền hợp lệ');
-            return;
-        }
-
+        if (!rechargeAmount || parseFloat(rechargeAmount) <= 0) { alert('Vui lòng nhập số tiền hợp lệ'); return; }
         try {
             setIsDepositing(true);
-
-            if (!window.ethereum) {
-                alert('Vui lòng cài đặt MetaMask!');
-                return;
-            }
-
-            if (!EXCHANGE_CONTRACT_ADDRESS) {
-                alert('❌ VITE_EXCHANGE_CONTRACT_ADDRESS chưa được cấu hình trong .env');
-                return;
-            }
+            if (!window.ethereum) { alert('Vui lòng cài đặt MetaMask!'); return; }
+            if (!EXCHANGE_CONTRACT_ADDRESS) { alert('❌ Thiếu config contract'); return; }
 
             const provider = new ethers.BrowserProvider(window.ethereum);
             const signer = await provider.getSigner();
-
-            const exchangeCode = await provider.getCode(EXCHANGE_CONTRACT_ADDRESS);
-            if (exchangeCode === '0x') {
-                alert('❌ Contract Exchange chưa được deploy tại: ' + EXCHANGE_CONTRACT_ADDRESS);
-                return;
-            }
-
             const amountInWei = ethers.parseEther(rechargeAmount);
-
-            console.log('📝 Transaction details:', {
-                from: walletAddress,
-                to: EXCHANGE_CONTRACT_ADDRESS,
-                value: amountInWei.toString(),
-                amount: rechargeAmount + ' ETH'
-            });
-
-            // Interface để encode function call
-            const depositInterface = new ethers.Interface([
-                "function depositNative() payable"
-            ]);
             
+            const depositInterface = new ethers.Interface(["function depositNative() payable"]);
             const data = depositInterface.encodeFunctionData("depositNative", []);
-            console.log('📝 Encoded data:', data);
-
-            // ⚠️ THAY ĐỔI: Lấy nonce từ 'pending' thay vì 'latest'
-            const nonce = await provider.getTransactionCount(walletAddress, 'pending');
-            console.log('📝 Nonce (pending):', nonce);
-
-            // Estimate gas
+            
             let gasLimit;
             try {
-                gasLimit = await provider.estimateGas({
-                    from: walletAddress,
-                    to: EXCHANGE_CONTRACT_ADDRESS,
-                    value: amountInWei,
-                    data: data
-                });
-                console.log('✅ Gas estimate:', gasLimit.toString());
-                gasLimit = gasLimit + BigInt(20000); // Tăng buffer lên 20k
-            } catch (gasError: any) {
-                console.error('❌ Gas estimation failed:', gasError);
-                gasLimit = BigInt(150000); // Tăng fallback gas
-                console.log('⚠️ Using fallback gas:', gasLimit.toString());
-            }
+                gasLimit = await provider.estimateGas({ from: walletAddress, to: EXCHANGE_CONTRACT_ADDRESS, value: amountInWei, data: data });
+                gasLimit = gasLimit + BigInt(20000);
+            } catch (e) { gasLimit = BigInt(150000); }
 
-            // Lấy gas price
+            const txRequest: any = { to: EXCHANGE_CONTRACT_ADDRESS, value: amountInWei, data: data, gasLimit: gasLimit };
             const feeData = await provider.getFeeData();
-            console.log('📝 Fee data:', {
-                gasPrice: feeData.gasPrice?.toString(),
-                maxFeePerGas: feeData.maxFeePerGas?.toString(),
-                maxPriorityFeePerGas: feeData.maxPriorityFeePerGas?.toString()
-            });
-
-            // Tạo transaction object - KHÔNG include nonce và chainId
-            const txRequest: any = {
-                to: EXCHANGE_CONTRACT_ADDRESS,
-                value: amountInWei,
-                data: data,
-                gasLimit: gasLimit,
-            };
-
-            // Thêm gas price
-            if (feeData.maxFeePerGas && feeData.maxPriorityFeePerGas) {
+            if (feeData.maxFeePerGas) {
                 txRequest.maxFeePerGas = feeData.maxFeePerGas;
                 txRequest.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas;
-                console.log('Using EIP-1559 gas pricing');
             } else if (feeData.gasPrice) {
                 txRequest.gasPrice = feeData.gasPrice;
-                console.log('Using legacy gas pricing');
             }
 
-            console.log('📝 Final transaction request:', {
-                to: txRequest.to,
-                value: txRequest.value.toString(),
-                gasLimit: txRequest.gasLimit.toString(),
-                maxFeePerGas: txRequest.maxFeePerGas?.toString(),
-                maxPriorityFeePerGas: txRequest.maxPriorityFeePerGas?.toString()
-            });
-
-            // Send transaction - để MetaMask tự quản lý nonce
-            console.log('⏳ Sending transaction via signer (MetaMask manages nonce)...');
             const tx = await signer.sendTransaction(txRequest);
-
-            console.log('✅ Transaction sent:', tx.hash);
             alert('⏳ Đang xử lý giao dịch...\n\nHash: ' + tx.hash);
-
-            // Đợi confirmation với timeout
-            const receipt = await Promise.race([
-                tx.wait(),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Transaction timeout after 2 minutes')), 120000)
-                )
-            ]) as ethers.TransactionReceipt;
-
-            console.log('✅ Transaction confirmed!', {
-                blockNumber: receipt?.blockNumber,
-                gasUsed: receipt?.gasUsed.toString(),
-                status: receipt?.status
-            });
-
+            const receipt = await tx.wait();
             alert('✅ Nạp tiền thành công!\n\nBlock: ' + receipt?.blockNumber);
 
             setRechargeAmount('');
             setShowRechargePopup(false);
             await fetchData();
-
         } catch (error: any) {
-            console.error('❌ Full error object:', error);
-            console.error('❌ Error code:', error.code);
-            console.error('❌ Error message:', error.message);
-
-            let errorMessage = 'Unknown error';
-
-            if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
-                errorMessage = 'Bạn đã từ chối giao dịch';
-            } else if (error.message?.includes('timeout')) {
-                errorMessage = 'Giao dịch quá lâu. Vui lòng kiểm tra lại trên explorer';
-            } else if (error.message?.includes('insufficient funds')) {
-                errorMessage = 'Số dư không đủ (bao gồm gas fee)';
-            } else if (error.message?.includes('nonce too low') || error.message?.includes('nonce')) {
-                errorMessage = 'Lỗi nonce!\n\n📋 Hướng dẫn fix:\n\n1. Mở MetaMask\n2. Settings → Advanced\n3. Click "Clear activity tab data"\n4. Hoặc "Reset Account"\n5. Thử lại';
-            } else if (error.message?.includes('replacement fee too low')) {
-                errorMessage = 'Transaction đang pending. Đợi vài phút hoặc tăng gas fee';
-            } else if (error.reason) {
-                errorMessage = error.reason;
-            } else if (error.message) {
-                errorMessage = error.message;
-            }
-
-            alert('❌ Lỗi: ' + errorMessage);
+            alert('❌ Lỗi: ' + (error.reason || error.message));
         } finally {
             setIsDepositing(false);
         }
     };
 
-    const tokenHistory = [
-        { type: 'Increase', amount: '100 CCT', date: '2023-05-20' },
-        { type: 'Decrease', amount: '25 CCT', date: '2023-05-19' },
-        { type: 'Increase', amount: '50 CCT', date: '2023-05-18' },
-        { type: 'Decrease', amount: '10 CCT', date: '2023-05-17' },
-    ];
+    const handleDepositToken = async () => {
+        if (!selectedTokenId || !tokenAmount || parseFloat(tokenAmount) <= 0) { alert('Vui lòng chọn token và nhập số lượng'); return; }
+        try {
+            setIsDepositing(true);
+            if (!window.ethereum) return;
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const signer = await provider.getSigner();
+            const cctContract = new ethers.Contract(CCT_CONTRACT_ADDRESS, CarbonCredit.abi, signer);
+            const exchangeContract = new ethers.Contract(EXCHANGE_CONTRACT_ADDRESS, CarbonCreditExchange.abi, signer);
+            const amountBigInt = BigInt(tokenAmount);
 
-    const trades = [
-        { id: 1, type: 'Buy', amount: 25.5, price: 2.31, time: '2024-05-20 10:15:45' },
-        { id: 2, type: 'Sell', amount: 10.0, price: 2.38, time: '2024-05-19 18:30:12' },
-    ];
+            const balance = await cctContract.balanceOf(walletAddress, selectedTokenId);
+            if (balance < amountBigInt) { alert('❌ Số dư không đủ!'); return; }
 
-    const notifications = [
-        { id: 1, type: 'Trade', message: 'Your buy order for 50 CCT has been matched.', time: '2 hours ago', status: 'Completed' },
-        { id: 2, type: 'Approval', message: 'Your request for 1000 CCT issuance has been approved.', time: '1 day ago', status: 'Approved' },
-        { id: 3, type: 'Alert', message: 'CCT price has increased by 5% in the last 24 hours.', time: '2 days ago', status: 'Alert' },
-    ];
+            const isApproved = await cctContract.isApprovedForAll(walletAddress, EXCHANGE_CONTRACT_ADDRESS);
+            if (!isApproved) {
+                alert('⏳ Bước 1/2: Approve contract...');
+                const approveTx = await cctContract.setApprovalForAll(EXCHANGE_CONTRACT_ADDRESS, true);
+                await approveTx.wait();
+                alert('✅ Approval thành công!');
+            }
 
-    const retiredEntries: RetiredEntry[] = [
-        {
-            amount: '10.00',
-            dateOfIssue: '2024-05-21 10:30:00',
-            equivalentTrees: '165'
-        },
-        {
-            amount: '5.50',
-            dateOfIssue: '2024-04-15 14:00:00',
-            equivalentTrees: '90'
-        },
-        {
-            amount: '12.75',
-            dateOfIssue: '2024-03-28 18:45:00',
-            equivalentTrees: '210'
+            alert('⏳ Bước 2/2: Deposit token...');
+            const depositTx = await exchangeContract.depositCredit(selectedTokenId, amountBigInt);
+            await depositTx.wait();
+            alert('✅ Deposit thành công!');
+
+            setSelectedTokenId(null);
+            setTokenAmount('');
+            setShowRechargePopup(false);
+            await fetchData();
+        } catch (error: any) {
+            alert('❌ Lỗi: ' + (error.reason || error.message));
+        } finally {
+            setIsDepositing(false);
         }
-    ];
+    };
+
+    const handleWithdrawNative = async () => {
+        if (!withdrawalAmount || parseFloat(withdrawalAmount) <= 0) { alert('Nhập số tiền hợp lệ'); return; }
+        try {
+            setIsWithdrawing(true);
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const signer = await provider.getSigner();
+            const exchangeContract = new ethers.Contract(EXCHANGE_CONTRACT_ADDRESS, CarbonCreditExchange.abi, signer);
+            const amountInWei = ethers.parseEther(withdrawalAmount);
+            
+            const balance = await exchangeContract.nativeBalances(walletAddress);
+            if (balance < amountInWei) { alert('❌ Số dư không đủ!'); return; }
+
+            alert('⏳ Đang rút tiền...');
+            const tx = await exchangeContract.withdrawNative(amountInWei);
+            await tx.wait();
+            alert('✅ Rút tiền thành công!');
+
+            setWithdrawalAmount('');
+            setShowWithdrawalPopup(false);
+            await fetchData();
+            await fetchExchangeNativeBalance();
+        } catch (error: any) {
+            alert('❌ Lỗi: ' + (error.reason || error.message));
+        } finally {
+            setIsWithdrawing(false);
+        }
+    };
+
+    const handleWithdrawToken = async () => {
+        if (!selectedWithdrawTokenId || !tokenAmount || parseFloat(tokenAmount) <= 0) { alert('Check input'); return; }
+        try {
+            setIsWithdrawing(true);
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const signer = await provider.getSigner();
+            const exchangeContract = new ethers.Contract(EXCHANGE_CONTRACT_ADDRESS, CarbonCreditExchange.abi, signer);
+            const amountBigInt = BigInt(tokenAmount);
+
+            const balance = await exchangeContract.creditBalances(selectedWithdrawTokenId, walletAddress);
+            if (balance < amountBigInt) { alert('❌ Số dư không đủ!'); return; }
+
+            alert('⏳ Đang rút token...');
+            const tx = await exchangeContract.withdrawCredit(selectedWithdrawTokenId, amountBigInt);
+            await tx.wait();
+            alert('✅ Rút token thành công!');
+
+            setSelectedWithdrawTokenId(null);
+            setTokenAmount('');
+            setShowWithdrawalPopup(false);
+            await fetchData();
+            await fetchExchangeCreditBalances();
+            await fetchOwnedTokens();
+        } catch (error: any) {
+            alert('❌ Lỗi: ' + (error.reason || error.message));
+        } finally {
+            setIsWithdrawing(false);
+        }
+    };
+
+    // --- DATA THẬT (MẢNG RỖNG CHỜ API) ---
+    const tokenHistory: any[] = []; 
+    const notifications: any[] = []; 
+    const retiredEntries: RetiredEntry[] = []; 
 
     const stats = [
         {
-            name: 'Recharge',
-            value: cctBalance,
-            change: '+12.5%',
-            changeType: 'increase',
-            icon: Leaf,
-            color: 'from-green-500 to-emerald-500',
+            name: 'Deposit',
+            value: exchangeNativeBalance,
+            unit: 'ETH (Exch)',
+            icon: Wallet,
             action: () => setShowRechargePopup(true),
         },
         {
-            name: 'Withdrawal',
-            value: `${creditsOffset} tCO₂`,
-            change: '+15.3%',
-            changeType: 'increase',
-            icon: Award,
-            color: 'from-purple-500 to-pink-500',
+            name: 'Withdraw',
+            value: exchangeNativeBalance,
+            unit: 'tCO₂',
+            icon: Leaf,
             action: () => setShowWithdrawalPopup(true),
         },
         {
-            name: 'Total Token',
+            name: 'Portfolio Value',
             value: `$${portfolioValue}`,
-            change: '+8.2%',
-            changeType: 'increase',
+            unit: 'Total Assets',
             icon: DollarSign,
-            color: 'from-blue-500 to-cyan-500',
             action: () => setShowTokenHistoryPopup(true),
         },
         {
-            name: 'Certificate',
+            name: 'Certificates',
             value: 'View',
-            change: '',
-            changeType: 'increase',
-            icon: Activity,
-            color: 'from-orange-500 to-red-500',
+            unit: 'My Offset',
+            icon: Award,
             action: () => setShowCertificatePopup(true),
         }
     ];
 
+    useEffect(() => {
+        fetchData();
+        fetchExchangeNativeBalance();
+    }, [walletAddress]);
+
+    useEffect(() => { if (showRechargePopup) fetchOwnedTokens(); }, [showRechargePopup, walletAddress]);
+    useEffect(() => { 
+        if (showWithdrawalPopup) {
+            fetchExchangeNativeBalance();
+            fetchExchangeCreditBalances();
+        }
+    }, [showWithdrawalPopup, walletAddress]);
+    useEffect(() => { if (showTokenHistoryPopup) fetchMyTokens(); }, [showTokenHistoryPopup, walletAddress]);
+
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 animate-in fade-in duration-500">
+            {/* --- STATS DASHBOARD --- */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {stats.map((stat) => {
+                {stats.map((stat, idx) => {
                     const Icon = stat.icon;
                     return (
-                        <div key={stat.name} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100 hover:shadow-lg transition-all duration-200 cursor-pointer" onClick={stat.action}>
-                            <div className="flex items-center justify-between mb-4">
-                                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center shadow-lg`}>
-                                    <Icon className="h-6 w-6 text-white" />
+                        <div key={idx} 
+                            onClick={stat.action}
+                            className="group relative bg-white rounded-2xl p-6 border border-green-100 shadow-sm hover:shadow-lg hover:border-green-300 transition-all duration-300 cursor-pointer overflow-hidden"
+                        >
+                            <div className="flex items-center justify-between mb-4 relative z-10">
+                                <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center group-hover:bg-green-100 transition-colors">
+                                    <Icon className="h-6 w-6 text-green-600" />
                                 </div>
-                                <div className={`flex items-center space-x-1 text-sm font-medium ${stat.changeType === 'increase' ? 'text-green-600' : 'text-red-600'
-                                    }`}>
-                                    {stat.changeType === 'increase' ? (
-                                        <TrendingUp className="h-4 w-4" />
-                                    ) : (
-                                        <TrendingDown className="h-4 w-4" />
-                                    )}
-                                    <span>{stat.change}</span>
-                                </div>
+                                <span className="text-xs font-medium px-2 py-1 rounded-full bg-green-50 text-green-700 group-hover:bg-green-100 transition-colors">Action</span>
                             </div>
-                            <div>
-                                <h3 className="text-2xl font-bold text-gray-900 mb-1">{stat.value}</h3>
-                                <p className="text-sm text-gray-600">{stat.name}</p>
+                            
+                            <div className="relative z-10">
+                                <h3 className="text-2xl font-bold text-gray-900 tracking-tight">{stat.value}</h3>
+                                <div className="flex justify-between items-center mt-1">
+                                    <p className="text-sm font-medium text-gray-500">{stat.name}</p>
+                                    <p className="text-xs text-gray-400 font-mono">{stat.unit}</p>
+                                </div>
                             </div>
                         </div>
                     );
                 })}
             </div>
 
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-                <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center"><Bell className="h-6 w-6 mr-2" />Notifications</h3>
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Message</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {notifications.map((notification) => (
-                                <tr key={notification.id}>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{notification.type}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{notification.message}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{notification.time}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${notification.status === 'Completed' ? 'bg-green-100 text-green-800' : notification.status === 'Approved' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>{notification.status}</span></td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {showRechargePopup && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
-                        <div className="flex justify-between items-start mb-6">
-                            <h3 className="text-2xl font-bold text-gray-900">Recharge</h3>
-                            <button onClick={() => setShowRechargePopup(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                                <X className="h-6 w-6" />
-                            </button>
-                        </div>
-                        <div className="flex mb-4 border-b">
-                            <button onClick={() => setRechargeType('Money')} className={`flex-1 py-2 text-center font-semibold ${rechargeType === 'Money' ? 'text-green-600 border-b-2 border-green-600' : 'text-gray-500 hover:text-green-600'}`}>Money</button>
-                            <button onClick={() => setRechargeType('Token')} className={`flex-1 py-2 text-center font-semibold ${rechargeType === 'Token' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-blue-600'}`}>Token</button>
-                        </div>
-
-                        {rechargeType === 'Money' ? (
-                            <div className="space-y-4">
-                                <div>
-                                    <label htmlFor="amount" className="block text-sm font-medium text-gray-500">Số lượng (ETH)</label>
-                                    <input
-                                        type="number"
-                                        id="amount"
-                                        placeholder="0.00"
-                                        value={rechargeAmount}
-                                        onChange={(e) => setRechargeAmount(e.target.value)}
-                                        step="0.001"
-                                        min="0"
-                                        disabled={isDepositing}
-                                        className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                    />
-                                    <p className="text-xs text-gray-500 mt-1">Số dư ví: {cctBalance} CCT</p>
-                                </div>
-                                <button
-                                    onClick={handleDepositNative}
-                                    disabled={isDepositing}
-                                    className={`w-full text-white px-4 py-3 rounded-lg font-semibold text-lg ${isDepositing
-                                            ? 'bg-gray-400 cursor-not-allowed'
-                                            : 'bg-green-600 hover:bg-green-700'
-                                        }`}
-                                >
-                                    {isDepositing ? 'Đang xử lý...' : 'Nạp tiền'}
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                <div>
-                                    <label htmlFor="amount" className="block text-sm font-medium text-gray-500">Amount (NVQ)</label>
-                                    <input type="text" id="amount" placeholder="0.00" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500" />
-                                </div>
-                                <button className={`w-full text-white px-4 py-3 rounded-lg font-semibold text-lg bg-blue-600 hover:bg-blue-700'}`}>
-                                    Deposit Token
-                                </button>
-                            </div>
-                        )}
+            {/* --- NOTIFICATIONS (REAL DATA) --- */}
+            <div className="bg-white rounded-3xl p-6 border border-green-100 shadow-sm">
+                <div className="flex items-center mb-6">
+                    <div className="p-2 bg-green-50 rounded-lg mr-3">
+                        <Bell className="h-5 w-5 text-green-600" />
                     </div>
+                    <h3 className="text-lg font-bold text-gray-900">Notifications</h3>
                 </div>
-            )}
-
-            {showWithdrawalPopup && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
-                        <div className="flex justify-between items-start mb-6">
-                            <h3 className="text-2xl font-bold text-gray-900">Withdrawal</h3>
-                            <button onClick={() => setShowWithdrawalPopup(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                                <X className="h-6 w-6" />
-                            </button>
+                
+                {notifications.length === 0 ? (
+                    <div className="text-center py-10 text-gray-400 bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
+                        <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm">
+                            <Bell className="h-6 w-6 text-gray-300" />
                         </div>
-                        <div className="flex mb-4 border-b">
-                            <button onClick={() => setWithdrawalType('Money')} className={`flex-1 py-2 text-center font-semibold ${withdrawalType === 'Money' ? 'text-purple-600 border-b-2 border-purple-600' : 'text-gray-500 hover:text-purple-600'}`}>Money</button>
-                            <button onClick={() => setWithdrawalType('Token')} className={`flex-1 py-2 text-center font-semibold ${withdrawalType === 'Token' ? 'text-pink-600 border-b-2 border-pink-600' : 'text-gray-500 hover:text-pink-600'}`}>Token</button>
-                        </div>
-
-                        {withdrawalType === 'Money' ? (
-                            <div className="space-y-4">
-                                <div>
-                                    <label htmlFor="amount" className="block text-sm font-medium text-gray-500">Amount (USD)</label>
-                                    <input type="text" id="amount" placeholder="0.00" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500" />
-                                </div>
-                                <button className={`w-full text-white px-4 py-3 rounded-lg font-semibold text-lg bg-purple-600 hover:bg-purple-700'}`}>
-                                    Withdraw Money
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                <div>
-                                    <label htmlFor="amount" className="block text-sm font-medium text-gray-500">Amount (NVQ)</label>
-                                    <input type="text" id="amount" placeholder="0.00" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500" />
-                                </div>
-                                <button className={`w-full text-white px-4 py-3 rounded-lg font-semibold text-lg bg-pink-600 hover:bg-pink-700'}`}>
-                                    Withdraw Token
-                                </button>
-                            </div>
-                        )}
+                        <p className="text-sm font-medium text-gray-500">No new notifications</p>
                     </div>
-                </div>
-            )}
-
-            {showTokenHistoryPopup && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6">
-                        <div className="flex justify-between items-start mb-6">
-                            <h3 className="text-2xl font-bold text-gray-900">Total Token History</h3>
-                            <button onClick={() => setShowTokenHistoryPopup(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                                <X className="h-6 w-6" />
-                            </button>
-                        </div>
-                        <div className="text-center mb-6">
-                            <p className="text-lg text-gray-600">Total Token Value</p>
-                            <p className="text-4xl font-bold text-gray-900">$${portfolioValue}</p>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="p-4 border border-green-200 rounded-lg">
-                                <h4 className="font-semibold text-lg text-green-600 mb-2 text-center">Increase</h4>
-                                <table className="w-full text-sm">
-                                    <thead className="text-left text-xs text-gray-500">
-                                        <tr><th>Amount</th><th>Date</th></tr>
-                                    </thead>
-                                    <tbody>
-                                        {tokenHistory.filter(t => t.type === 'Increase').map((item, index) => (
-                                            <tr key={index} className="text-left font-medium">
-                                                <td className="text-green-600">{item.amount}</td>
-                                                <td className="text-gray-500">{item.date}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div className="p-4 border border-red-200 rounded-lg">
-                                <h4 className="font-semibold text-lg text-red-600 mb-2 text-center">Decrease</h4>
-                                <table className="w-full text-sm">
-                                    <thead className="text-left text-xs text-gray-500">
-                                        <tr><th>Amount</th><th>Date</th></tr>
-                                    </thead>
-                                    <tbody>
-                                        {tokenHistory.filter(t => t.type === 'Decrease').map((item, index) => (
-                                            <tr key={index} className="text-left font-medium">
-                                                <td className="text-red-600">{item.amount}</td>
-                                                <td className="text-gray-500">{item.date}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {showTradesPopup && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
-                        <div className="flex justify-between items-start mb-6">
-                            <h3 className="text-2xl font-bold text-gray-900">Active Trades</h3>
-                            <button onClick={() => setShowTradesPopup(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                                <X className="h-6 w-6" />
-                            </button>
-                        </div>
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="text-left text-xs text-gray-500">
-                                    <th>Type</th>
-                                    <th>Amount (NVQ)</th>
-                                    <th>Price (USD)</th>
-                                    <th>Time</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {trades.map((trade) => (
-                                    <tr key={trade.id} className="text-left font-medium">
-                                        <td className={trade.type === 'Buy' ? 'text-green-600' : 'text-red-600'}>{trade.type}</td>
-                                        <td>{trade.amount}</td>
-                                        <td>{trade.price}</td>
-                                        <td className="text-gray-500 text-xs">{trade.time}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
+                ) : (
+                    <div className="overflow-hidden rounded-xl border border-gray-100">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            {/* Render data here when available */}
                         </table>
                     </div>
+                )}
+            </div>
+
+            {/* --- POPUP: RECHARGE --- */}
+            {showRechargePopup && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
+                    <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="bg-gradient-to-r from-green-500 to-green-600 p-6 flex justify-between items-center text-white">
+                            <div>
+                                <h3 className="text-xl font-bold">Deposit Assets</h3>
+                                <p className="text-green-50 text-sm opacity-90">Add funds to Exchange</p>
+                            </div>
+                            <button onClick={() => setShowRechargePopup(false)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        
+                        <div className="p-6">
+                            <div className="flex bg-gray-50 p-1 rounded-lg mb-6">
+                                <button onClick={() => setRechargeType('Money')} className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${rechargeType === 'Money' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Native (ETH)</button>
+                                <button onClick={() => setRechargeType('Token')} className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${rechargeType === 'Token' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Credit Token</button>
+                            </div>
+
+                            {rechargeType === 'Money' ? (
+                                <div className="space-y-5">
+                                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex justify-between items-center">
+                                        <span className="text-gray-600 text-sm font-medium">Available to Withdraw</span>
+                                        <span className="text-xl font-bold text-gray-900 font-mono">{exchangeNativeBalance} <span className="text-sm font-normal text-gray-500">ETH</span></span>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-700">Amount to Deposit (ETH)</label>
+                                        <div className="relative">
+                                            <input type="number" placeholder="0.00" value={rechargeAmount} onChange={(e) => setRechargeAmount(e.target.value)} disabled={isDepositing} className="w-full pl-4 pr-12 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all font-mono" />
+                                            <span className="absolute right-4 top-3.5 text-gray-400 font-medium text-xs">ETH</span>
+                                        </div>
+                                    </div>
+                                    <button onClick={handleDepositNative} disabled={isDepositing} className={`w-full py-3.5 rounded-xl font-bold text-white shadow-md transition-all ${isDepositing ? 'bg-gray-300 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600 hover:shadow-lg'}`}>
+                                        {isDepositing ? 'Processing...' : 'Confirm Deposit'}
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="space-y-5">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-700">Select Token</label>
+                                        <select value={selectedTokenId ?? ''} onChange={(e) => setSelectedTokenId(Number(e.target.value))} disabled={isDepositing} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none">
+                                            <option value="">-- Choose from Wallet --</option>
+                                            {ownedTokens.map(token => (
+                                                <option key={token.tokenId} value={token.tokenId}>{token.projectName} (Bal: {token.balance})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-700">Amount (tCO₂)</label>
+                                        <input type="number" placeholder="Enter amount" value={tokenAmount} onChange={(e) => setTokenAmount(e.target.value)} disabled={!selectedTokenId || isDepositing} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none font-mono" />
+                                    </div>
+                                    <button onClick={handleDepositToken} disabled={!selectedTokenId || !tokenAmount || isDepositing} className={`w-full py-3.5 rounded-xl font-bold text-white shadow-md transition-all ${isDepositing || !selectedTokenId ? 'bg-gray-300 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600'}`}>
+                                        {isDepositing ? 'Processing...' : 'Deposit Token'}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
-            {showCertificatePopup && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6">
-                        <div className="flex justify-between items-start mb-6">
-                            <h3 className="text-2xl font-bold text-gray-900">
-                                {selectedCertificate ? 'Carbon Credit Certificate' : 'Carbon Credit Certificates'}
-                            </h3>
-                            <button onClick={() => {
-                                setShowCertificatePopup(false);
-                                setSelectedCertificate(null);
-                            }} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                                <X className="h-6 w-6" />
+
+            {/* --- POPUP: WITHDRAWAL --- */}
+            {showWithdrawalPopup && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
+                    <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="bg-gradient-to-r from-green-600 to-green-700 p-6 flex justify-between items-center text-white">
+                            <div>
+                                <h3 className="text-xl font-bold">Withdraw Assets</h3>
+                                <p className="text-green-100 text-sm">Retrieve funds to Personal Wallet</p>
+                            </div>
+                            <button onClick={() => setShowWithdrawalPopup(false)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <div className="flex bg-gray-50 p-1 rounded-lg mb-6">
+                                <button onClick={() => setWithdrawalType('Money')} className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${withdrawalType === 'Money' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Withdraw ETH</button>
+                                <button onClick={() => setWithdrawalType('Token')} className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${withdrawalType === 'Token' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Withdraw Token</button>
+                            </div>
+
+                            {withdrawalType === 'Money' ? (
+                                <div className="space-y-5">
+                                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex justify-between items-center">
+                                        <span className="text-gray-600 text-sm font-medium">Available to Withdraw</span>
+                                        <span className="text-xl font-bold text-gray-900 font-mono">{exchangeNativeBalance} <span className="text-sm font-normal text-gray-500">ETH</span></span>
+                                    </div>
+                                    <input type="number" value={withdrawalAmount} onChange={(e) => setWithdrawalAmount(e.target.value)} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none font-mono" placeholder="0.00" />
+                                    <button onClick={handleWithdrawNative} disabled={isWithdrawing} className={`w-full py-3.5 rounded-xl font-bold text-white shadow-md ${isWithdrawing ? 'bg-gray-300 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}>
+                                        {isWithdrawing ? 'Processing...' : 'Withdraw ETH'}
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="space-y-5">
+                                    <select value={selectedWithdrawTokenId ?? ''} onChange={(e) => setSelectedWithdrawTokenId(Number(e.target.value))} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none">
+                                        <option value="">-- Select Token from Exchange --</option>
+                                        {exchangeCreditBalances.map(c => <option key={c.tokenId} value={c.tokenId}>{c.projectName} (Avail: {c.availableBalance})</option>)}
+                                    </select>
+                                    <input type="number" placeholder="Amount" value={tokenAmount} onChange={(e) => setTokenAmount(e.target.value)} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none font-mono" />
+                                    <button onClick={handleWithdrawToken} disabled={isWithdrawing} className={`w-full py-3.5 rounded-xl font-bold text-white shadow-md ${isWithdrawing ? 'bg-gray-300 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}>
+                                        {isWithdrawing ? 'Processing...' : 'Withdraw Token'}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- POPUP: TOKEN HISTORY & PORTFOLIO --- */}
+            {showTokenHistoryPopup && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl animate-in zoom-in-95 duration-300">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900">Your Portfolio</h3>
+                                <p className="text-gray-500 text-sm">Manage your carbon credits</p>
+                            </div>
+                            <div className="text-right mr-4 hidden md:block">
+                                <p className="text-xs text-gray-400 uppercase tracking-wider">Est. Value</p>
+                                <p className="text-2xl font-bold text-green-600 font-mono">${portfolioValue}</p>
+                            </div>
+                            <button onClick={() => setShowTokenHistoryPopup(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                                <X className="h-6 w-6 text-gray-400" />
                             </button>
                         </div>
 
-                        {selectedCertificate ? (
-                            <div>
-                                <button onClick={() => setSelectedCertificate(null)} className="mb-4 text-sm text-gray-600 hover:text-gray-900">
-                                    &larr; Back to list
-                                </button>
-                                <div className="border-2 border-green-600 p-8 rounded-lg bg-green-50/50 text-center relative">
-                                    <div className="absolute top-4 left-4 text-green-600">
-                                        <Leaf className="w-12 h-12" />
-                                    </div>
-                                    <div className="absolute top-4 right-4 text-green-600">
-                                        <Award className="w-12 h-12" />
-                                    </div>
-                                    <h1 className="text-4xl font-bold text-green-800 mb-2">Certificate of Carbon Offset</h1>
-                                    <p className="text-lg text-gray-600 mb-6">This certificate is awarded to</p>
-                                    <p className="text-2xl font-semibold text-gray-800 mb-4">{walletAddress}</p>
-                                    <p className="text-lg text-gray-600 mb-6">for offsetting</p>
-                                    <p className="text-5xl font-bold text-green-600 mb-4">{selectedCertificate.amount} tCO₂</p>
-                                    <p className="text-sm text-gray-500 mb-8">Equivalent to planting {selectedCertificate.equivalentTrees} trees</p>
-                                    <div className="grid grid-cols-1 gap-4 text-left">
-                                        <div>
-                                            <p className="text-xs text-gray-500 flex items-center"><Calendar className="w-4 h-4 mr-1" /> Date of Issue</p>
-                                            <p className="font-semibold text-gray-700">{selectedCertificate.dateOfIssue}</p>
-                                        </div>
-                                    </div>
+                        <div className="flex-1 overflow-y-auto p-6 bg-gray-50/30">
+                            {/* Stats Cards */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                                    <p className="text-gray-500 text-sm font-medium mb-1">Total Credits Owned</p>
+                                    <p className="text-3xl font-bold text-green-600">{myTokens.reduce((sum, t) => sum + t.balance, 0)} <span className="text-sm font-normal text-gray-400">tCO₂</span></p>
+                                </div>
+                                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                                    <p className="text-gray-500 text-sm font-medium mb-1">Projects Invested</p>
+                                    <p className="text-3xl font-bold text-gray-900">{myTokens.length}</p>
+                                </div>
+                                <div className="bg-green-500 p-5 rounded-xl border border-green-600 shadow-sm text-white">
+                                    <p className="text-green-100 text-sm font-medium mb-1">Impact Status</p>
+                                    <p className="text-3xl font-bold">Active</p>
                                 </div>
                             </div>
-                        ) : (
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Retired Amount</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {retiredEntries.map((entry, index) => (
-                                        <tr key={index} onClick={() => setSelectedCertificate(entry)} className="cursor-pointer hover:bg-gray-50">
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.amount} tCO₂</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.dateOfIssue}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        )}
+
+                            {/* Holdings Table */}
+                            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-8">
+                                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-white">
+                                    <h4 className="font-bold text-gray-800 flex items-center"><Leaf className="w-4 h-4 mr-2 text-green-500"/> My Holdings</h4>
+                                </div>
+                                
+                                {myTokens.length === 0 ? (
+                                    <div className="text-center py-16">
+                                        <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3">
+                                            <Search className="h-8 w-8 text-gray-300" />
+                                        </div>
+                                        <p className="text-gray-900 font-medium">No assets found</p>
+                                        <p className="text-gray-500 text-sm">Buy credits from the marketplace to get started.</p>
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-gray-100">
+                                            <thead className="bg-gray-50">
+                                                <tr>
+                                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ID</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Project</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Balance</th>
+                                                    <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-white divide-y divide-gray-100">
+                                                {myTokens.map((token) => (
+                                                    <tr key={token.tokenId} className="hover:bg-green-50 transition-colors">
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">#{token.tokenId}</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <div className="text-sm font-bold text-gray-900">{token.projectName}</div>
+                                                            <div className="text-xs text-gray-500">Vintage: {token.vintage}</div>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                                {token.type}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600">{token.balance} tCO₂</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                                                            <button onClick={() => alert('Coming soon')} className="text-green-600 hover:text-green-800 font-medium hover:underline">Manage</button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            {/* History Section (Real data only) */}
+                            {tokenHistory.length > 0 && (
+                                <div>
+                                    <h4 className="text-lg font-bold text-gray-800 mb-4">Past Activity</h4>
+                                    {/* Map real history here */}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- POPUP: CERTIFICATE --- */}
+            {showCertificatePopup && (
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 duration-300 relative">
+                        <button onClick={() => { setShowCertificatePopup(false); setSelectedCertificate(null); }} className="absolute top-4 right-4 p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors z-10"><X className="h-5 w-5 text-gray-500" /></button>
+
+                        <div className="p-8">
+                            {selectedCertificate ? (
+                                <div className="relative border-[10px] border-double border-green-600 p-12 text-center bg-green-50/20 shadow-inner">
+                                    <p>Certificate Display Logic Here</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-6">
+                                    <div className="text-center mb-10">
+                                        <div className="inline-block p-4 rounded-full bg-green-100 mb-4">
+                                            <Award className="h-10 w-10 text-green-600" />
+                                        </div>
+                                        <h3 className="text-2xl font-bold text-gray-900">My Certificates</h3>
+                                        <p className="text-gray-500 mt-1">Verified proof of your environmental impact</p>
+                                    </div>
+
+                                    {retiredEntries.length === 0 ? (
+                                        <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+                                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm">
+                                                <TrendingUp className="h-6 w-6 text-gray-300" />
+                                            </div>
+                                            <p className="text-gray-500 font-medium">No certificates found.</p>
+                                            <p className="text-sm text-gray-400 mt-1">Retire your carbon credits to earn certificates.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                            {/* Map real retiredEntries here */}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

@@ -14,7 +14,8 @@ import MyToken from './components/MyToken';
 import ApprovedProject from './components/ApprovedProject';
 import CryptoMarket from './components/CryptoMarket';
 import OrderBook from './components/OrderBook';
-import ProjectDetailPage from './components/ProjectDetail';  // Import mới cho full page detail
+import ProjectDetailPage from './components/ProjectDetail';
+import UserManagement from './components/UserManagement';
 
 function App() {
   const [activeTab, setActiveTab] = useState('marketplace');
@@ -27,6 +28,8 @@ function App() {
 
   // Thêm state cho ProjectDetailPage (sử dụng projectId thay vì full project để fetch data tươi)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  // Thêm state để lưu tab trước khi mở detail (để back đúng tab)
+  const [previousTab, setPreviousTab] = useState<string>('project');
 
   const onConnect = useCallback((address: string, role: string = 'user') => {
     setWalletAddress(address);
@@ -94,12 +97,12 @@ function App() {
 
       // Kiểm tra network (Localhost - chainId 31337 / 0x7a69)
       const network = await provider.getNetwork();
-      if (network.chainId !== 31337n) {
+      if (network.chainId !== BigInt(import.meta.env.VITE_CHAIN_ID_DECIMAL)) {
         try {
           // Thử switch trước
           await window.ethereum.request({
             method: "wallet_switchEthereumChain",
-            params: [{ chainId: "0x7a69" }],
+            params: [{ chainId: import.meta.env.VITE_CHAIN_ID }],
           });
         } catch (switchError: unknown) {
           const isErrorWithCode = (err: unknown): err is { code: number } => {
@@ -117,13 +120,13 @@ function App() {
               await window.ethereum.request({
                 method: "wallet_addEthereumChain",
                 params: [{
-                  chainId: "0x7a69",
-                  chainName: "Hardhat Local",
-                  rpcUrls: ["http://127.0.0.1:8545"],
+                  chainId: import.meta.env.VITE_CHAIN_ID,
+                  chainName: import.meta.env.VITE_CHAIN_NAME,
+                  rpcUrls: [import.meta.env.VITE_RPC_URL],
                   nativeCurrency: {
-                    name: "ETH",
-                    symbol: "ETH",
-                    decimals: 18
+                    name: import.meta.env.VITE_NATIVE_CURRENCY_NAME,
+                    symbol: import.meta.env.VITE_NATIVE_CURRENCY_SYMBOL,
+                    decimals: Number(import.meta.env.VITE_NATIVE_CURRENCY_DECIMALS),
                   },
                 }],
               });
@@ -208,6 +211,7 @@ function App() {
     localStorage.removeItem('token');  // Clear token khi logout
     window.ethereum?.removeAllListeners();  // Clear listeners
     setSelectedProjectId(null);  // Reset project khi logout
+    setPreviousTab('project');  // Reset previous tab
   }, []);
 
   const renderLogoutConfirmation = () => (
@@ -247,13 +251,14 @@ function App() {
   }, [handleLogout]);
 
   // Handlers cho ProjectDetailPage (sử dụng projectId để fetch data)
-  const openProjectDetail = useCallback((projectId: string) => {
+  const openProjectDetail = useCallback((projectId: string, fromTab: string = 'project') => {
+    setPreviousTab(fromTab);
     setSelectedProjectId(projectId);
     setActiveTab('projectDetail');  // Nhảy sang tab detail
   }, []);
 
   const tabs = [
-    { id: 'user', name: 'User', icon: UserIcon, roles: ['user', 'admin', 'superadmin', 'verifier', 'government'], restricted: true },
+    { id: 'user', name: 'User', icon: UserIcon, roles: ['user', 'admin', 'superadmin', 'verifier', 'government', 'owner'], restricted: true },
     { id: 'requestReview', name: 'Request Review', icon: Plus, roles: ['owner'], restricted: true },
     { id: 'requestRole', name: 'Request Role', icon: Users, roles: ['user',], restricted: true },
     { id: 'marketplace', name: 'Marketplace', icon: ShoppingCart, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
@@ -266,6 +271,7 @@ function App() {
     { id: 'orderbook', name: 'Order Book', icon: Building2, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
     { id: 'myToken', name: 'My Token', icon: Award, roles: ['user', 'owner'], restricted: true },
     { id: 'projectDetail', name: 'Project Detail', icon: Award, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
+    { id: 'userManagement', name: 'User Management', icon: Users, roles: ['superadmin', 'admin'], restricted: true },
   ];
 
   const displayedTabs = isWalletConnected
@@ -298,26 +304,40 @@ function App() {
       case 'myToken': return <MyToken />;
       case 'requestReview': return <RequestReview walletAddress={walletAddress} />;
       case 'requestRole': return <RequestRole walletAddress={walletAddress} />;
-      case 'marketplace': return <Marketplace walletAddress={walletAddress} setActiveTab={setActiveTab} />;
-      case 'project': return <Projects walletAddress={walletAddress} onOpenProjectDetail={openProjectDetail} />;  // Truyền handler để mở detail từ list (với projectId)
+
+      // ✅ SỬA: Thêm onOpenProjectDetail cho Marketplace
+      case 'marketplace':
+        return (
+          <Marketplace
+            walletAddress={walletAddress}
+            setActiveTab={setActiveTab}
+            onOpenProjectDetail={(projectId) => openProjectDetail(projectId, 'marketplace')} // ✅ PHẢI CÓ dòng này
+          />
+        );
+
+      case 'project': return <Projects walletAddress={walletAddress} onOpenProjectDetail={openProjectDetail} />;
       case 'verifyRole': return <VerifyRole />;
-      case 'verifyProject': return <VerifyProject />;
+      case 'verifyProject': return <VerifyProject onOpenProjectDetail={openProjectDetail} />;
       case 'updateProfile': return <Profile walletAddress={walletAddress} setActiveTab={setActiveTab} />;
-      case 'approvedProject': return <ApprovedProject />;
+      case 'approvedProject': return <ApprovedProject onOpenProjectDetail={openProjectDetail} />;
       case 'cryptomarket': return <CryptoMarket />;
       case 'orderbook': return <OrderBook />;
+      case 'userManagement': return <UserManagement />;
       case 'projectDetail':
         return selectedProjectId ? (
-          <ProjectDetailPage projectId={selectedProjectId} onBack={() => {
-            setSelectedProjectId(null);
-            setActiveTab('project');
-          }} />
+          <ProjectDetailPage
+            projectId={selectedProjectId}
+            onBack={() => {
+              setSelectedProjectId(null);
+              setActiveTab(previousTab);
+            }}
+          />
         ) : (
           <div className="text-center pt-16">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">No Project Selected</h2>
             <p className="text-gray-600 mb-8">Please select a project from the Projects tab.</p>
             <button
-              onClick={() => setActiveTab('project')}
+              onClick={() => setActiveTab(previousTab || 'project')}
               className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 flex items-center space-x-2 mx-auto"
             >
               <ArrowLeft className="h-5 w-5" />
@@ -325,7 +345,14 @@ function App() {
             </button>
           </div>
         );
-      default: return <Marketplace walletAddress={walletAddress} setActiveTab={setActiveTab} />;
+      default:
+        return (
+          <Marketplace
+            walletAddress={walletAddress}
+            setActiveTab={setActiveTab}
+            onOpenProjectDetail={(projectId) => openProjectDetail(projectId, 'marketplace')}
+          />
+        );
     }
   };
 

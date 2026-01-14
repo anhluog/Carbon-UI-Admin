@@ -200,8 +200,9 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
 
   const roleOptions = [
     { value: 'OWNER', label: 'Owner', icon: Award, description: 'Full access to manage projects and credits.' },
-    { value: 'VERIFIER', label: 'Verifier', icon: Shield, description: 'Can verify and approve carbon projects.' },
-    { value: 'GOVERNMENT', label: 'Government', icon: Building2, description: 'Regulatory oversight and compliance checks.' }
+    // { value: 'VERIFIER', label: 'Verifier', icon: Shield, description: 'Can verify and approve carbon projects.' },
+    // { value: 'GOVERNMENT', label: 'Government', icon: Building2, description: 'Regulatory oversight and compliance checks.' },
+    // { value: 'ADMIN', label: 'Admin', icon: Users, description: 'Administrative access to manage users and system settings.' }
   ];
 
   const getRoleLabel = (role: string) => {
@@ -410,7 +411,7 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
                     </>
                   )}
 
-                  {/* Form cho OWNER, GOVERNMENT: Upload (optional) + reason */}
+                  {/* Form cho OWNER, GOVERNMENT, ADMIN: Upload (optional) + reason */}
                   {selectedRole !== 'VERIFIER' && (
                     <>
                       {/* Upload section cho non-VERIFIER (optional) */}
