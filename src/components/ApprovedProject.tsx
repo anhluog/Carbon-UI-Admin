@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit3, Eye, MapPin, CheckCircle, Calendar, X, Clock, TrendingUp, BarChart3, Filter, Leaf } from 'lucide-react';
 import api from '../utils/axiosInstance';  // Import axios instance từ utils
 import { ethers } from 'ethers';
-import CarbonCreditEx from '../abi/CarbonCreditExchange.json';
+import CarbonCreditEx from '../abi/CarbonCredit.json';
 
 interface Project {
     id: string;
@@ -89,7 +89,7 @@ const ApprovedProject: React.FC<ApprovedProjectProps> = ({ onOpenProjectDetail }
             }
             const metadata = await response.json();
             const imageUrl = metadata.image; // Sử dụng trực tiếp URL từ metadata (thường là full URL từ Pinata)
-            
+
             if (imageUrl) {
                 // Kiểm tra xem image có load được không (optional, để tránh broken image)
                 const imgTest = new Image();
@@ -180,7 +180,7 @@ const ApprovedProject: React.FC<ApprovedProjectProps> = ({ onOpenProjectDetail }
     // Filter dựa trên tab active và các filter khác
     const filteredProjects = currentProjects.filter(project => {
         const mappedStatus = mapStatus(project.status);
-        const matchesTab = activeTab === 'processing' 
+        const matchesTab = activeTab === 'processing'
             ? mappedStatus === 'Waiting for Approval'
             : (mappedStatus === 'Issued' || mappedStatus === 'Rejected by Government');
 
@@ -237,7 +237,7 @@ const ApprovedProject: React.FC<ApprovedProjectProps> = ({ onOpenProjectDetail }
         const user = JSON.parse(userStr);
 
         try {
-            const contractAddress = '0x7C96A93a6278308191b607BDd26fadE0efCc6809';
+            const contractAddress = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
 
             const provider = new ethers.BrowserProvider((window as any).ethereum);
             const signer = await provider.getSigner();
@@ -246,6 +246,17 @@ const ApprovedProject: React.FC<ApprovedProjectProps> = ({ onOpenProjectDetail }
                 CarbonCreditEx.abi,
                 signer
             );
+
+            console.log('📝 Approving project:', {
+                projectId: project.id,
+                ownerId: project.ownerId,
+                verifierId: project.verifiedBy,
+                governmentId: user.id,
+                expectedCredits: project.expectedCredits
+            });
+
+            const code = await provider.getCode(project.ownerId);
+            console.log("CODE at Owner Address:", code);
 
             // 🔹 Gọi smart contract
             const tx = await contract.approveAndMintProject(
@@ -494,7 +505,7 @@ const ApprovedProject: React.FC<ApprovedProjectProps> = ({ onOpenProjectDetail }
                                                     }}
                                                 />
                                             ) : null}
-                                            <div 
+                                            <div
                                                 className={`w-full h-full flex items-center justify-center bg-gradient-to-br from-green-100 to-emerald-100 transition-opacity duration-300 ${imageUrl ? 'absolute inset-0 opacity-0 hover:opacity-100' : ''}`}
                                                 style={{ display: imageUrl ? 'none' : 'flex' }}
                                             >

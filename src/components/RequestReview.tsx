@@ -456,26 +456,26 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
               )}
             </div>
 
-              {/* Submit Button */}
-              <div className="mt-8 flex justify-end">
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !formData.projectName || !formData.carbonAmount || !formData.location || !formData.vintage || !formData.methodology || !formData.description}
-                  className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Saving...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="h-5 w-5" />
-                      <span>Save Project</span>
-                    </>
-                  )}
-                </button>
-              </div>
+            {/* Submit Button */}
+            <div className="mt-8 flex justify-end">
+              <button
+                type="submit"
+                disabled={isSubmitting || !formData.projectName || !formData.carbonAmount || !formData.location || !formData.vintage || !formData.methodology || !formData.description}
+                className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-5 w-5" />
+                    <span>Save Project</span>
+                  </>
+                )}
+              </button>
+            </div>
           </form>
         </div>
 

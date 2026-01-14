@@ -1,54 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import OrderBook from './OrderBook';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, LineChart } from 'recharts';
+import api from '../utils/axiosInstance';
+import { DollarSign, Package, AlertCircle } from 'lucide-react';
+
+interface CryptoMarketProps {
+  walletAddress: string;
+  creditId?: string;
+}
+
+interface Order {
+  id: string;
+  creditId: string;
+  userId: string;
+  orderType: string;
+  orderCondition: string;
+  price: number;
+  amount: number;
+  filledAmount: number;
+  remainingAmount: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 // Component for recent trades
-const RecentTrades: React.FC = () => {
-  const trades = [
-    { time: '10:25:31', price: 2.33, amount: 50, type: 'buy' },
-    { time: '10:25:28', price: 2.34, amount: 20, type: 'sell' },
-    { time: '10:25:25', price: 2.33, amount: 100, type: 'buy' },
-    { time: '10:25:22', price: 2.35, amount: 70, type: 'sell' },
-    { time: '10:25:19', price: 2.32, amount: 30, type: 'buy' },
-  ];
+const RecentTrades: React.FC<{ creditId: string }> = ({ creditId }) => {
+  const [trades, setTrades] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadRecentTrades();
+    const interval = setInterval(loadRecentTrades, 3000);
+    return () => clearInterval(interval);
+  }, [creditId]);
+
+  const loadRecentTrades = async () => {
+    if (!creditId) return;
+    
+    try {
+      setLoading(true);
+      // TODO: Implement /api/trades/recent/{creditId} endpoint
+      // const response = await axios.get(`http://localhost:8080/api/trades/recent/${creditId}`);
+      // setTrades(response.data);
+      setLoading(false);
+    } catch (error) {
+      console.error('Failed to load recent trades:', error);
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-green-100">
       <h3 className="text-lg font-bold text-gray-900 mb-4">Recent Trades</h3>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-xs text-gray-500">
-            <th>Price (USD)</th>
-            <th>Amount</th>
-            <th>Time</th>
-          </tr>
-        </thead>
-        <tbody>
-          {trades.map((trade, index) => (
-            <tr key={index} className={`text-left font-medium`}>
-              <td className={trade.type === 'buy' ? 'text-green-600' : 'text-red-600'}>{trade.price.toFixed(2)}</td>
-              <td>{trade.amount}</td>
-              <td>{trade.time}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-};
-
-const SuccessfulTrades: React.FC = () => {
-    const trades = [
-      { time: '10:20:01', price: 2.30, amount: 75, type: 'buy' },
-      { time: '10:19:45', price: 2.31, amount: 40, type: 'sell' },
-      { time: '10:18:11', price: 2.29, amount: 90, type: 'buy' },
-      { time: '10:17:54', price: 2.32, amount: 60, type: 'sell' },
-      { time: '10:15:03', price: 2.28, amount: 25, type: 'buy' },
-    ];
-
-    return (
-      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-green-100">
-        <h3 className="text-lg font-bold text-gray-900 mb-4">Successful Trading</h3>
+      {trades.length > 0 ? (
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs text-gray-500">
@@ -59,357 +64,439 @@ const SuccessfulTrades: React.FC = () => {
           </thead>
           <tbody>
             {trades.map((trade, index) => (
-              <tr key={index} className={`text-left font-medium`}>
-                <td className={trade.type === 'buy' ? 'text-green-600' : 'text-red-600'}>{trade.price.toFixed(2)}</td>
+              <tr key={index} className="text-left font-medium">
+                <td className={trade.type === 'buy' ? 'text-green-600' : 'text-red-600'}>
+                  ${trade.price.toFixed(2)}
+                </td>
                 <td>{trade.amount}</td>
-                <td>{trade.time}</td>
+                <td className="text-xs text-gray-500">{trade.time}</td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
-    );
+      ) : (
+        <p className="text-center text-gray-400 text-sm py-8">No recent trades</p>
+      )}
+    </div>
+  );
+};
+
+// Trade History Component
+const TradeHistory: React.FC<{ creditId: string }> = ({ creditId }) => {
+  const [filter, setFilter] = useState<'BUY' | 'SELL'>('BUY');
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(false);
+
+
+  useEffect(() => {
+    loadOrders();
+  }, [filter, creditId]);
+
+  const loadOrders = async () => {
+    if (!creditId) return;
+
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('authToken');
+      
+      const response = await api.get(`/orders/my-orders`, {
+        params: {
+          creditId: creditId
+        },
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const filtered = response.data.filter((order: Order) => 
+        order.orderType === filter
+      );
+      
+      setOrders(filtered);
+      setLoading(false);
+    } catch (error) {
+      console.error('Failed to load orders:', error);
+      setLoading(false);
+    }
   };
 
-// Enhanced component for trade history with filtering
-const TradeHistory: React.FC = () => {
-  const [historyFilter, setHistoryFilter] = useState<'Buys' | 'Sells'>('Buys');
-  const [allHistory, setAllHistory] = useState([
-    { id: 1, type: 'Buy', amount: 25.5, price: 2.31, time: '2024-05-20 10:15:45' },
-    { id: 2, type: 'Sell', amount: 10.0, price: 2.38, time: '2024-05-19 18:30:12' },
-    { id: 3, type: 'Buy', amount: 50.2, price: 2.25, time: '2024-05-18 09:45:33' },
-    { id: 4, type: 'Sell', amount: 15.8, price: 2.32, time: '2024-05-17 14:22:01' },
-    { id: 5, type: 'Buy', amount: 100.0, price: 2.15, time: '2024-05-16 21:10:59' },
-  ]);
+  const cancelOrder = async (orderId: string) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      
+      await api.delete(`/orders/${orderId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
 
-  const filteredHistory = allHistory.filter(trade => {
-    if (historyFilter === 'Buys') return trade.type === 'Buy';
-    if (historyFilter === 'Sells') return trade.type === 'Sell';
-    return false;
-  });
-
-  const cancelTrade = (id: number) => {
-    setAllHistory(allHistory.filter(trade => trade.id !== id));
+      alert('✅ Order cancelled successfully');
+      loadOrders();
+    } catch (error: any) {
+      console.error('Failed to cancel order:', error);
+      alert(`❌ ${error.response?.data?.message || 'Failed to cancel order'}`);
+    }
   };
 
   return (
     <div>
-        <div className="flex mb-4 border-b">
-            <button onClick={() => setHistoryFilter('Buys')} className={`flex-1 py-2 text-center font-semibold ${historyFilter === 'Buys' ? 'text-green-600 border-b-2 border-green-600' : 'text-gray-500'}`}>Buys</button>
-            <button onClick={() => setHistoryFilter('Sells')} className={`flex-1 py-2 text-center font-semibold ${historyFilter === 'Sells' ? 'text-red-600 border-b-2 border-red-600' : 'text-gray-500'}`}>Sells</button>
-        </div>
-        <div className="h-72 overflow-y-auto">
-            <table className="w-full text-sm">
-                <thead>
-                    <tr className="text-left text-xs text-gray-500">
-                        <th>Type</th>
-                        <th>Amount (NVQ)</th>
-                        <th>Price (USD)</th>
-                        <th>Time</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {filteredHistory.map((trade) => (
-                        <tr key={trade.id} className="text-left font-medium">
-                            <td className={trade.type === 'Buy' ? 'text-green-600' : 'text-red-600'}>{trade.type}</td>
-                            <td>{trade.amount}</td>
-                            <td>{trade.price}</td>
-                            <td className="text-gray-500 text-xs">{trade.time}</td>
-                            <td><button onClick={() => cancelTrade(trade.id)} className='text-red-500'>Cancel</button></td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
+      <div className="flex mb-4 border-b">
+        <button 
+          onClick={() => setFilter('BUY')} 
+          className={`flex-1 py-2 text-center font-semibold ${
+            filter === 'BUY' 
+              ? 'text-green-600 border-b-2 border-green-600' 
+              : 'text-gray-500'
+          }`}
+        >
+          Buy Orders
+        </button>
+        <button 
+          onClick={() => setFilter('SELL')} 
+          className={`flex-1 py-2 text-center font-semibold ${
+            filter === 'SELL' 
+              ? 'text-red-600 border-b-2 border-red-600' 
+              : 'text-gray-500'
+          }`}
+        >
+          Sell Orders
+        </button>
+      </div>
+
+      <div className="h-72 overflow-y-auto">
+        {loading ? (
+          <p className="text-center text-gray-400 py-8">Loading...</p>
+        ) : orders.length > 0 ? (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-gray-500">
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Price</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((order) => (
+                <tr key={order.id} className="text-left font-medium">
+                  <td className={order.orderType === 'BUY' ? 'text-green-600' : 'text-red-600'}>
+                    {order.orderType}
+                  </td>
+                  <td>{order.amount}</td>
+                  <td>${order.price.toFixed(2)}</td>
+                  <td>
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      order.status === 'OPEN' ? 'bg-blue-100 text-blue-800' :
+                      order.status === 'FILLED' ? 'bg-green-100 text-green-800' :
+                      order.status === 'CANCELLED' ? 'bg-gray-100 text-gray-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {order.status}
+                    </span>
+                  </td>
+                  <td>
+                    {(order.status === 'OPEN' || order.status === 'PENDING') && (
+                      <button 
+                        onClick={() => cancelOrder(order.id)} 
+                        className="text-red-500 hover:text-red-700 text-xs"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="text-center text-gray-400 py-8">No {filter.toLowerCase()} orders</p>
+        )}
+      </div>
     </div>
-  )
+  );
 };
 
-const projectData = [
-  { type: 'Forestry', count: 120 },
-  { type: 'Renewable Energy', count: 250 },
-  { type: 'Methane Capture', count: 80 },
-  { type: 'Energy Efficiency', count: 150 },
-];
-
-const ProjectDistributionChart: React.FC = () => (
-  <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-    <h3 className="text-lg font-bold text-gray-900 mb-4">Projects by Type</h3>
-    <ResponsiveContainer width="100%" height={300}>
-      <BarChart data={projectData}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="type" />
-        <YAxis />
-        <Tooltip />
-        <Legend />
-        <Bar dataKey="count" fill="#8884d8" name="Number of Projects" />
-      </BarChart>
-    </ResponsiveContainer>
-  </div>
-);
-
-const creditData = [
-  { month: 'Jan', issued: 4000, used: 2400 },
-  { month: 'Feb', issued: 3000, used: 1398 },
-  { month: 'Mar', issued: 2000, used: 9800 },
-  { month: 'Apr', issued: 2780, used: 3908 },
-  { month: 'May', issued: 1890, used: 4800 },
-  { month: 'Jun', issued: 2390, used: 3800 },
-];
-
-const IssuedCreditsChart: React.FC = () => (
-  <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-    <h3 className="text-lg font-bold text-gray-900 mb-4">Issued vs. Used Credits</h3>
-    <ResponsiveContainer width="100%" height={300}>
-      <BarChart data={creditData}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="month" />
-        <YAxis />
-        <Tooltip />
-        <Legend />
-        <Bar dataKey="issued" fill="#82ca9d" name="Issued" />
-        <Bar dataKey="used" fill="#d88484" name="Used" />
-      </BarChart>
-    </ResponsiveContainer>
-  </div>
-);
-
-const transactionData = [
-  { date: '2024-05-01', transactions: 150, volume: 12000 },
-  { date: '2024-05-02', transactions: 200, volume: 15000 },
-  { date: '2024-05-03', transactions: 180, volume: 13000 },
-  { date: '2024-05-04', transactions: 220, volume: 18000 },
-  { date: '2024-05-05', transactions: 250, volume: 20000 },
-];
-
-const TransactionVolumeChart: React.FC = () => (
-  <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-    <h3 className="text-lg font-bold text-gray-900 mb-4">Transaction Volume</h3>
-    <ResponsiveContainer width="100%" height={300}>
-      <ComposedChart data={transactionData}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="date" />
-        <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
-        <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
-        <Tooltip />
-        <Legend />
-        <Bar yAxisId="left" dataKey="transactions" fill="#8884d8" name="Transactions" />
-        <Line yAxisId="right" type="monotone" dataKey="volume" stroke="#82ca9d" name="Credits Traded" />
-      </ComposedChart>
-    </ResponsiveContainer>
-  </div>
-);
-
-const creditsOverTimeData = [
-  { date: '2024-01', credits: 5000 },
-  { date: '2024-02', credits: 5200 },
-  { date: '2024-03', credits: 6000 },
-  { date: '2024-04', credits: 5800 },
-  { date: '2024-05', credits: 6500 },
-];
-
-const CreditsOverTimeChart: React.FC = () => (
-  <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-    <h3 className="text-lg font-bold text-gray-900 mb-4">Credits Over Time</h3>
-    <ResponsiveContainer width="100%" height={300}>
-      <LineChart data={creditsOverTimeData}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="date" />
-        <YAxis />
-        <Tooltip />
-        <Legend />
-        <Line type="monotone" dataKey="credits" stroke="#8884d8" name="Total Credits" />
-      </LineChart>
-    </ResponsiveContainer>
-  </div>
-);
-
-const priceByProjectData = [
-  { date: 'Jan', Forestry: 2.5, 'Renewable Energy': 3.0, 'Methane Capture': 1.8 },
-  { date: 'Feb', Forestry: 2.6, 'Renewable Energy': 3.2, 'Methane Capture': 1.9 },
-  { date: 'Mar', Forestry: 2.8, 'Renewable Energy': 3.1, 'Methane Capture': 2.0 },
-  { date: 'Apr', Forestry: 2.7, 'Renewable Energy': 3.3, 'Methane Capture': 2.1 },
-  { date: 'May', Forestry: 2.9, 'Renewable Energy': 3.4, 'Methane Capture': 2.2 },
-];
-
-const PriceByProjectTypeChart: React.FC = () => (
-  <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-    <h3 className="text-lg font-bold text-gray-900 mb-4">Price by Project Type</h3>
-    <ResponsiveContainer width="100%" height={300}>
-      <LineChart data={priceByProjectData}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="date" />
-        <YAxis />
-        <Tooltip />
-        <Legend />
-        <Line type="monotone" dataKey="Forestry" stroke="#8884d8" />
-        <Line type="monotone" dataKey="Renewable Energy" stroke="#82ca9d" />
-        <Line type="monotone" dataKey="Methane Capture" stroke="#ffc658" />
-      </LineChart>
-    </ResponsiveContainer>
-  </div>
-);
-
-const topProjectsData = [
-  { name: 'Amazon Rainforest Conservation', reduction: 50000 },
-  { name: 'Gobi Desert Solar Farm', reduction: 45000 },
-  { name: 'Midwest Wind Turbines', reduction: 40000 },
-  { name: 'Siberian Permafrost Methane Capture', reduction: 35000 },
-  { name: 'Appalachian Coal Mine Reforestation', reduction: 30000 },
-];
-
-const TopProjectsChart: React.FC = () => (
-  <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-    <h3 className="text-lg font-bold text-gray-900 mb-4">Top Emission Reduction Projects</h3>
-    <ResponsiveContainer width="100%" height={300}>
-      <BarChart layout="vertical" data={topProjectsData}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis type="number" />
-        <YAxis dataKey="name" type="category" width={150} />
-        <Tooltip />
-        <Legend />
-        <Bar dataKey="reduction" fill="#82ca9d" name="CO2 Reduction (tons)" />
-      </BarChart>
-    </ResponsiveContainer>
-  </div>
-);
-
-
-const CryptoMarket: React.FC = () => {
+// Main CryptoMarket Component
+const CryptoMarket: React.FC<CryptoMarketProps> = ({ walletAddress, creditId }) => {
   const [tradeType, setTradeType] = useState<'Buy' | 'Sell' | 'History'>('Buy');
-  const [activeChartTab, setActiveChartTab] = useState('project');
+  const [selectedCreditId, setSelectedCreditId] = useState<string>(creditId || '');
+  
+  // Order form state
+  const [price, setPrice] = useState('');
+  const [amount, setAmount] = useState('');
+  const [orderCondition, setOrderCondition] = useState<'LIMIT' | 'MARKET'>('LIMIT');
+  const [sliderValue, setSliderValue] = useState(0);
+  const [loading, setLoading] = useState(false);
 
-  const chartData = [
-    { time: '10:00', price: 2.30, volume: 1200 },
-    { time: '10:05', price: 2.32, volume: 1500 },
-    { time: '10:10', price: 2.31, volume: 1100 },
-    { time: '10:15', price: 2.34, volume: 1800 },
-    { time: '10:20', price: 2.35, volume: 1600 },
-    { time: '10:25', price: 2.33, volume: 1400 },
-  ];
 
-  const renderCharts = () => {
-    switch (activeChartTab) {
-      case 'project':
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <ProjectDistributionChart />
-            <TopProjectsChart />
-          </div>
-        );
-      case 'credits':
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <IssuedCreditsChart />
-            <CreditsOverTimeChart />
-          </div>
-        );
-      case 'market':
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <TransactionVolumeChart />
-            <PriceByProjectTypeChart />
-          </div>
-        );
-      default:
-        return null;
+  useEffect(() => {
+    if (creditId) {
+      setSelectedCreditId(creditId);
+    }
+  }, [creditId]);
+
+  const handleSliderChange = (value: number) => {
+    setSliderValue(value);
+    // TODO: Calculate amount based on wallet balance and slider value
+    // const maxAmount = walletBalance / price;
+    // setAmount(((maxAmount * value) / 100).toFixed(2));
+  };
+
+  const calculateTotal = () => {
+    const p = parseFloat(price) || 0;
+    const a = parseFloat(amount) || 0;
+    return (p * a).toFixed(2);
+  };
+
+  const handlePlaceOrder = async () => {
+    if (!selectedCreditId) {
+      alert('⚠️ Please select a carbon credit');
+      return;
+    }
+
+    if (!price || !amount) {
+      alert('⚠️ Please enter price and amount');
+      return;
+    }
+
+    console.log('Placing order with:', { price, amount });
+
+    const priceNum = parseFloat(price);
+    const amountNum = parseFloat(amount);
+
+    if (isNaN(priceNum) || priceNum <= 0) {
+      alert('⚠️ Please enter a valid price');
+      return;
+    }
+
+    if (isNaN(amountNum) || amountNum <= 0) {
+      alert('⚠️ Please enter a valid amount');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        alert('⚠️ Please login to place orders');
+        setLoading(false);
+        return;
+      }
+      
+      console.log(priceNum);
+
+      const response = await api.post(
+        `/orders/place`,
+        {
+          creditId: selectedCreditId,
+          orderType: tradeType === 'Buy' ? 'BUY' : 'SELL',
+          orderCondition: orderCondition,
+          price: priceNum,
+          amount: amountNum
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      alert(`✅ ${tradeType} order placed successfully!`);
+      
+      // Reset form
+      setPrice('');
+      setAmount('');
+      setSliderValue(0);
+      setLoading(false);
+
+      // Switch to history tab to see the order
+      setTradeType('History');
+
+    } catch (error: any) {
+      console.error('Failed to place order:', error);
+      const errorMsg = error.response?.data?.message || 'Failed to place order';
+      alert(`❌ ${errorMsg}`);
+      setLoading(false);
     }
   };
+
+  if (!selectedCreditId || selectedCreditId === 'undefined') {
+    return (
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-red-100">
+        <div className="text-center py-12">
+          <AlertCircle className="h-16 w-16 text-red-400 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-gray-900 mb-2">No Credit Selected</h3>
+          <p className="text-gray-600">Please select a carbon credit from the marketplace to start trading.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
       {/* Center Column: Chart and Trade Form */}
       <div className="lg:col-span-9 space-y-4">
-        {/* Main Chart Area */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-          <div className="flex items-center mb-4">
-            <h3 className="text-2xl font-bold text-gray-900">NVQ/USD</h3>
-            <span className="text-2xl font-bold text-green-600 ml-4">2.35</span>
-            <div className="ml-4 text-sm">
-                <p className="text-gray-500">24h Change</p>
-                <p className="text-green-600 font-semibold">+0.05 (2.17%)</p>
+        {/* Credit Info */}
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-4 border border-green-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Trading Token</p>
+              <p className="text-2xl font-bold text-gray-900">Credit #{selectedCreditId}</p>
             </div>
-          </div>
-          <div className="h-96">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false}/>
-                <XAxis dataKey="time" />
-                <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
-                <YAxis yAxisId="left" orientation="left" stroke="#413ea0" domain={[0, 'dataMax + 500']}/>
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="volume" yAxisId="left" barSize={20} fill="#413ea0" name="Volume" />
-                <Line type="monotone" dataKey="price" yAxisId="right" stroke="#82ca9d" strokeWidth={2} dot={false} name="Price"/>
-              </ComposedChart>
-            </ResponsiveContainer>
+            <div className="text-right">
+              <p className="text-sm text-gray-600">Wallet</p>
+              <p className="text-lg font-semibold text-gray-900">{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}</p>
+            </div>
           </div>
         </div>
 
         {/* Trading Form */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
           <div className="flex mb-4 border-b">
-            <button onClick={() => setTradeType('Buy')} className={`flex-1 py-2 text-center font-semibold ${tradeType === 'Buy' ? 'text-green-600 border-b-2 border-green-600' : 'text-gray-500 hover:text-green-600'}`}>Buy</button>
-            <button onClick={() => setTradeType('Sell')} className={`flex-1 py-2 text-center font-semibold ${tradeType === 'Sell' ? 'text-red-600 border-b-2 border-red-600' : 'text-gray-500 hover:text-red-600'}`}>Sell</button>
-            <button onClick={() => setTradeType('History')} className={`flex-1 py-2 text-center font-semibold ${tradeType === 'History' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-blue-600'}`}>History</button>
+            <button 
+              onClick={() => setTradeType('Buy')} 
+              className={`flex-1 py-2 text-center font-semibold ${
+                tradeType === 'Buy' 
+                  ? 'text-green-600 border-b-2 border-green-600' 
+                  : 'text-gray-500 hover:text-green-600'
+              }`}
+            >
+              Buy
+            </button>
+            <button 
+              onClick={() => setTradeType('Sell')} 
+              className={`flex-1 py-2 text-center font-semibold ${
+                tradeType === 'Sell' 
+                  ? 'text-red-600 border-b-2 border-red-600' 
+                  : 'text-gray-500 hover:text-red-600'
+              }`}
+            >
+              Sell
+            </button>
+            <button 
+              onClick={() => setTradeType('History')} 
+              className={`flex-1 py-2 text-center font-semibold ${
+                tradeType === 'History' 
+                  ? 'text-blue-600 border-b-2 border-blue-600' 
+                  : 'text-gray-500 hover:text-blue-600'
+              }`}
+            >
+              My Orders
+            </button>
           </div>
 
           {tradeType === 'History' ? (
-            <TradeHistory />
+            <TradeHistory creditId={selectedCreditId} />
           ) : (
             <>
               <div className="flex justify-between items-center mb-4">
-                  <div className="flex text-sm">
-                    <button className="py-1 px-3 bg-gray-200 text-gray-800 rounded-md">Limit</button>
-                    <button className="py-1 px-3 text-gray-500 ml-2">Market</button>
-                  </div>
-                  <p className="text-sm text-gray-500">Wallet: $1,250.00</p>
+                <div className="flex text-sm space-x-2">
+                  <button 
+                    onClick={() => setOrderCondition('LIMIT')}
+                    className={`py-1 px-3 rounded-md ${
+                      orderCondition === 'LIMIT'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-200 text-gray-800'
+                    }`}
+                  >
+                    Limit
+                  </button>
+                  <button 
+                    onClick={() => setOrderCondition('MARKET')}
+                    className={`py-1 px-3 rounded-md ${
+                      orderCondition === 'MARKET'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-200 text-gray-800'
+                    }`}
+                  >
+                    Market
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-4">
+                {orderCondition === 'LIMIT' && (
+                  <div>
+                    <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-2">
+                      <DollarSign className="inline h-4 w-4 mr-1" />
+                      Price (USD)
+                    </label>
+                    <input 
+                      type="number" 
+                      id="price"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      placeholder="0.00"
+                      step="0.01"
+                      min="0"
+                      className="mt-1 block w-full px-4 py-3 bg-white border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                    />
+                  </div>
+                )}
+
                 <div>
-                  <label htmlFor="price" className="block text-sm font-medium text-gray-500">Price (USD)</label>
-                  <input type="text" id="price" defaultValue="2.35" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500" />
+                  <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-2">
+                    <Package className="inline h-4 w-4 mr-1" />
+                    Amount (Credits)
+                  </label>
+                  <input 
+                    type="number" 
+                    id="amount"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0"
+                    step="1"
+                    min="1"
+                    className="mt-1 block w-full px-4 py-3 bg-white border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500" 
+                  />
                 </div>
-                <div>
-                  <label htmlFor="amount" className="block text-sm font-medium text-gray-500">Amount (NVQ)</label>
-                  <input type="text" id="amount" placeholder="0.00" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500" />
-                </div>
+
                 <div className="space-y-2 pt-1">
-                    <input id="amount-slider" type="range" min="0" max="100" defaultValue="0" step="25" className="w-full h-1 bg-gray-300 rounded-lg appearance-none cursor-pointer range-sm" />
-                    <ul className="flex justify-between w-full px-1 text-xs text-gray-500">
-                        <li>0%</li><li>25%</li><li>50%</li><li>75%</li><li>100%</li>
-                    </ul>
+                  <input 
+                    id="amount-slider" 
+                    type="range" 
+                    min="0" 
+                    max="100"
+                    value={sliderValue}
+                    onChange={(e) => handleSliderChange(Number(e.target.value))}
+                    step="25" 
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600" 
+                  />
+                  <ul className="flex justify-between w-full px-1 text-xs text-gray-500">
+                    <li>0%</li><li>25%</li><li>50%</li><li>75%</li><li>100%</li>
+                  </ul>
                 </div>
 
-                <div className="flex justify-between text-sm text-gray-500">
-                    <span>Total</span>
-                    <span>0.00 USD</span>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Total</span>
+                    <span className="font-bold text-gray-900">${calculateTotal()} USD</span>
+                  </div>
                 </div>
 
-                <button className={`w-full text-white px-4 py-3 rounded-lg font-semibold text-lg ${tradeType === 'Buy' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}>
-                  {tradeType} NVQ
+                <button 
+                  onClick={handlePlaceOrder}
+                  disabled={loading || !price || !amount}
+                  className={`w-full text-white px-4 py-4 rounded-xl font-semibold text-lg transition-all duration-200 ${
+                    tradeType === 'Buy' 
+                      ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:shadow-lg disabled:from-gray-400 disabled:to-gray-500' 
+                      : 'bg-gradient-to-r from-red-600 to-rose-600 hover:shadow-lg disabled:from-gray-400 disabled:to-gray-500'
+                  } disabled:cursor-not-allowed`}
+                >
+                  {loading ? 'Placing Order...' : `${tradeType} Credits`}
                 </button>
               </div>
             </>
           )}
         </div>
-         <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-          <div className="flex mb-4 border-b">
-            <button onClick={() => setActiveChartTab('project')} className={`flex-1 py-2 text-center font-semibold ${activeChartTab === 'project' ? 'text-green-600 border-b-2 border-green-600' : 'text-gray-500 hover:text-green-600'}`}>Project Analysis</button>
-            <button onClick={() => setActiveChartTab('credits')} className={`flex-1 py-2 text-center font-semibold ${activeChartTab === 'credits' ? 'text-green-600 border-b-2 border-green-600' : 'text-gray-500 hover:text-green-600'}`}>Credit Lifecycle</button>
-            <button onClick={() => setActiveChartTab('market')} className={`flex-1 py-2 text-center font-semibold ${activeChartTab === 'market' ? 'text-green-600 border-b-2 border-green-600' : 'text-gray-500 hover:text-green-600'}`}>Market Data</button>
-          </div>
-          {renderCharts()}
-        </div>
       </div>
 
       {/* Right Column: Order Book and Recent Trades */}
       <div className="lg:col-span-3 space-y-4">
-        <OrderBook />
-        <RecentTrades />
-        <SuccessfulTrades />
+        <OrderBook creditId={selectedCreditId} />
+        <RecentTrades creditId={selectedCreditId} />
       </div>
     </div>
   );

@@ -5,269 +5,375 @@ import {
   Calendar,
   Award,
   X,
-  Leaf,
-  Users,
+  TrendingUp,
+  AlertCircle,
   CheckCircle,
-  Download,
-  Info
 } from "lucide-react";
 import CryptoMarket from "./CryptoMarket";
+import api from "../utils/axiosInstance";
 
 interface MarketplaceProps {
   walletAddress: string;
   setActiveTab: (tab: string) => void;
+  onOpenProjectDetail: (projectId: string) => void; // ✅ THÊM prop này
 }
 
-const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }) => {
-  const [projects, setProjects] = useState<any[]>([]);
+interface Project {
+  id: string;
+  name: string;
+  type: string;
+  location: string;
+  vintage: number;
+  ownerId: string;
+  description: string;
+  ipfsHash: string;
+  status: string;
+  createdAt: string;
+}
+
+interface TradingStatus {
+  isMinted: boolean;           // ✅ THÊM
+  tokenId: number | null;
+  availableAmount: number;     // ✅ THÊM
+  issueAmount: number;         // ✅ THÊM
+  projectName: string;         // ✅ THÊM
+  projectId: string;           // ✅ THÊM
+  hasOrderBook: boolean;
+  canTrade: boolean;
+  hasCredit?: boolean;         // ✅ DEPRECATED - keep for backward compatibility
+}
+
+const Marketplace: React.FC<MarketplaceProps> = ({
+  walletAddress,
+  setActiveTab,
+  onOpenProjectDetail // ✅ THÊM prop này
+}) => {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [tradingStatuses, setTradingStatuses] = useState<Map<string, TradingStatus>>(new Map());
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedProject, setSelectedProject] = useState<any | null>(null);
   const [showCryptoMarket, setShowCryptoMarket] = useState(false);
+  const [selectedTokenId, setSelectedTokenId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
 
   useEffect(() => {
-    const loadProjects = async () => {
-        const mockProjects = [
-            {
-              id: 1,
-              projectName: 'Amazon Rainforest Conservation',
-              projectType: 'Forest Protection',
-              location: 'Brazil',
-              methodology: 'VCS',
-              vintage: 2024,
-              date: '2024-01-15',
-              price: 2.31,
-              totalValue: 116.66,
-              certificateId: 'VCS-2024-001-BR-50.5',
-              reason: 'Corporate Carbon Neutrality Program',
-              beneficiary: 'Green Future Solutions',
-              serialNumbers: 'BR-VCS-2024-001-001 to BR-VCS-2024-001-050',
-              projectDescription: 'Protection of 10,000 hectares of Amazon rainforest from deforestation through community-based conservation programs.',
-              projectDeveloper: 'Amazon Conservation Alliance',
-              verificationStandard: 'Verified Carbon Standard (VCS)',
-              additionalCertifications: ['CCBS', 'SD VISta'],
-              environmentalBenefits: [
-                'Biodiversity conservation',
-                'Watershed protection',
-                'Soil conservation',
-                'Air quality improvement'
-              ],
-              socialBenefits: [
-                'Local community employment',
-                'Indigenous rights protection',
-                'Education programs',
-                'Healthcare access'
-              ],
-              images: [
-                'https://images.pexels.com/photos/975771/pexels-photo-975771.jpeg',
-                'https://images.pexels.com/photos/1632790/pexels-photo-1632790.jpeg'
-              ],
-              ipfsUrl: 'https://gateway.pinata.cloud/ipfs/QmHash1'
-            },
-            {
-                id: 2,
-                projectName: 'African Wind Energy',
-                projectType: 'Renewable Energy',
-                location: 'Kenya',
-                methodology: 'Gold Standard',
-                vintage: 2023,
-                date: '2024-02-20',
-                price: 3.10,
-                totalValue: 372.00,
-                certificateId: 'GS-2023-002-KE-120',
-                reason: 'Offsetting Travel Emissions',
-                beneficiary: 'Eco-Warriors Inc.',
-                serialNumbers: 'KE-GS-2023-002-001 to KE-GS-2023-002-120',
-                projectDescription: 'A 50 MW wind farm providing clean energy to the national grid and reducing reliance on fossil fuels.',
-                projectDeveloper: 'WindPower Africa',
-                verificationStandard: 'Gold Standard',
-                additionalCertifications: ['Fair Trade'],
-                environmentalBenefits: ['Reduced GHG emissions', 'Improved air quality'],
-                socialBenefits: ['Job creation', 'Energy independence'],
-                images: ['https://images.pexels.com/photos/220326/pexels-photo-220326.jpeg', 'https://images.pexels.com/photos/414837/pexels-photo-414837.jpeg'],
-                ipfsUrl: 'https://gateway.pinata.cloud/ipfs/QmHash2'
-            },
-            {
-                id: 3,
-                projectName: 'Community Reforestation Initiative',
-                projectType: 'Afforestation',
-                location: 'India',
-                methodology: 'Plan Vivo',
-                vintage: 2023,
-                date: '2024-03-10',
-                price: 1.85,
-                totalValue: 138.75,
-                certificateId: 'PV-2023-003-IN-75',
-                reason: 'Personal Carbon Footprint Offset',
-                beneficiary: 'Jane Doe',
-                serialNumbers: 'IN-PV-2023-003-001 to IN-PV-2023-003-075',
-                projectDescription: 'Reforestation of degraded lands by local communities, promoting biodiversity and creating sustainable livelihoods.',
-                projectDeveloper: 'Green India Project',
-                verificationStandard: 'Plan Vivo',
-                additionalCertifications: [],
-                environmentalBenefits: ['Carbon sequestration', 'Habitat restoration'],
-                socialBenefits: ['Poverty alleviation', 'Community empowerment'],
-                images: ['https://images.pexels.com/photos/957024/pexels-photo-957024.jpeg', 'https://images.pexels.com/photos/142497/pexels-photo-142497.jpeg'],
-                ipfsUrl: 'https://gateway.pinata.cloud/ipfs/QmHash3'
-            },
-            {
-                id: 4,
-                projectName: 'Efficient Cookstoves Program',
-                projectType: 'Energy Efficiency',
-                location: 'Guatemala',
-                methodology: 'VCS',
-                vintage: 2024,
-                date: '2024-04-05',
-                price: 2.50,
-                totalValue: 75.00,
-                certificateId: 'VCS-2024-004-GT-30',
-                reason: 'Corporate Social Responsibility',
-                beneficiary: 'Global Tech Corp',
-                serialNumbers: 'GT-VCS-2024-004-001 to GT-VCS-2024-004-030',
-                projectDescription: 'Distribution of high-efficiency cookstoves to rural households, reducing fuelwood consumption and indoor air pollution.',
-                projectDeveloper: 'CleanAir Solutions',
-                verificationStandard: 'Verified Carbon Standard (VCS)',
-                additionalCertifications: ['SD VISta'],
-                environmentalBenefits: ['Reduced deforestation', 'Lower black carbon emissions'],
-                socialBenefits: ['Improved health outcomes', 'Reduced fuel costs for families'],
-                images: ['https://images.pexels.com/photos/326874/pexels-photo-326874.jpeg', 'https://images.pexels.com/photos/207455/pexels-photo-207455.jpeg'],
-                ipfsUrl: 'https://gateway.pinata.cloud/ipfs/QmHash4'
-            }
-        ];
-      setProjects(mockProjects);
-    };
-
-    loadProjects();
+    loadMarketplaceProjects();
   }, []);
 
+  const loadMarketplaceProjects = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Get APPROVED projects
+      const response = await api.get(`/projects/marketplace`);
+      const approvedProjects = response.data;
+
+      console.log('📝 Loading marketplace projects:', approvedProjects.length);
+
+      // Load trading status for each project
+      const statusMap = new Map<string, TradingStatus>();
+
+      await Promise.all(
+        approvedProjects.map(async (project: Project) => {
+          try {
+            const statusResponse = await api.get(
+              `/projects/${project.id}/trading-status`
+            );
+
+            console.log(`✅ Status loaded for ${project.name}:`, statusResponse.data);
+
+            statusMap.set(project.id, statusResponse.data);
+          } catch (err) {
+            console.error(`❌ Failed to load status for ${project.id}:`, err);
+            // ✅ Set default fallback status
+            statusMap.set(project.id, {
+              isMinted: false,
+              tokenId: null,
+              availableAmount: 0,
+              issueAmount: 0,
+              projectName: project.name,
+              projectId: project.id,
+              hasOrderBook: false,
+              canTrade: false,
+              hasCredit: false
+            });
+          }
+        })
+      );
+
+      console.log('✅ All statuses loaded:', statusMap.size);
+
+      setProjects(approvedProjects);
+      setTradingStatuses(statusMap);
+      setLoading(false);
+    } catch (error: any) {
+      console.error("❌ Failed to load marketplace projects:", error);
+      setError("Failed to load projects. Please try again.");
+      setLoading(false);
+    }
+  };
+
+  // ✅ SỬA: Handler để mở ProjectDetail
+  const handleOpenProjectDetail = (project: Project) => {
+    console.log('📝 Opening project detail:', project.id, project.name);
+
+    if (onOpenProjectDetail) {
+      // ✅ ĐÚNG: Dùng callback từ App.tsx
+      onOpenProjectDetail(project.id);
+    } else {
+      // ❌ FALLBACK: Dùng event (nên tránh)
+      console.warn('⚠️ onOpenProjectDetail prop not provided, using event fallback');
+      setActiveTab('projectDetail');
+      window.dispatchEvent(
+        new CustomEvent('openProjectDetail', {
+          detail: { projectId: project.id }
+        })
+      );
+    }
+  };
+
+  const handleOpenTrading = (project: Project) => {
+    const status = tradingStatuses.get(project.id);
+
+    if (!status?.canTrade) {
+      alert("⚠️ This project doesn't have carbon credits yet");
+      return;
+    }
+
+    if (!status.tokenId) {
+      alert("⚠️ Token ID not found");
+      return;
+    }
+
+    console.log("📝 Opening trading for project:", {
+      projectId: project.id,
+      projectName: project.name,
+      tokenId: status.tokenId
+    });
+
+    setSelectedTokenId(status.tokenId);
+    setShowCryptoMarket(true);
+  };
   const filteredProjects = projects.filter((project) => {
+    const status = tradingStatuses.get(project.id);
+
     const matchesFilter =
       activeFilter === "all" ||
-      (activeFilter === "forest" && project.projectType === "Forest Protection") ||
-      (activeFilter === "renewable" && project.projectType === "Renewable Energy") ||
-      (activeFilter === "afforestation" && project.projectType === "Afforestation") ||
-      (activeFilter === "efficiency" && project.projectType === "Energy Efficiency");
+      (activeFilter === "trading" && status?.hasOrderBook) ||
+      (activeFilter === "available" && status?.canTrade && !status?.hasOrderBook) ||
+      project.type?.toLowerCase().includes(activeFilter.toLowerCase());
 
     const matchesSearch =
-      project.projectName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.beneficiary?.toLowerCase().includes(searchTerm.toLowerCase());
+      project.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      project.location?.toLowerCase().includes(searchTerm.toLowerCase());
 
     return matchesFilter && matchesSearch;
   });
 
-  const handleViewProjectDetails = (project: any) => {
-    setSelectedProject(project);
-  };
+  const getTradingBadge = (projectId: string) => {
+    const status = tradingStatuses.get(projectId);
 
-  const handleNavigateToCryptoMarket = () => {
-    setShowCryptoMarket(true);
-  };
-
-  const handleDownloadCertificate = (project: any) => {
-    console.log(`Downloading certificate for ${project.projectName}`);
-  };
-
-  const handleViewInformation = (project: any) => {
-    if (project.ipfsUrl) {
-      window.open(project.ipfsUrl, '_blank');
+    if (!status) {
+      return (
+        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+          ⏳ Loading...
+        </span>
+      );
     }
-  };
 
+    if (status.hasOrderBook) {
+      return (
+        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 flex items-center gap-1">
+          🟢 Active Trading
+          <span className="text-[10px]">({status.availableAmount} tCO₂)</span>
+        </span>
+      );
+    }
+
+    if (status.canTrade && status.isMinted) {
+      return (
+        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 flex items-center gap-1">
+          🔵 Ready to Trade
+          <span className="text-[10px]">({status.availableAmount} tCO₂)</span>
+        </span>
+      );
+    }
+
+    return (
+      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+        ⚠️ No Credits
+      </span>
+    );
+  };
 
   return (
     <div className="space-y-8">
-        {showCryptoMarket && (
+      {/* Crypto Market Modal */}
+      {showCryptoMarket && selectedTokenId && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-100 rounded-2xl max-w-7xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-gray-100 rounded-2xl max-w-7xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-                <div className="flex justify-between items-start mb-6">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Crypto Market</h3>
-                    <button
-                    onClick={() => setShowCryptoMarket(false)}
-                    className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
-                    >
-                    <X className="h-6 w-6" />
-                    </button>
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900">Trading Exchange</h3>
+                  <p className="text-sm text-gray-600">Token ID: {selectedTokenId}</p>
                 </div>
-                <CryptoMarket projects={projects} />
+                <button
+                  onClick={() => {
+                    setShowCryptoMarket(false);
+                    setSelectedTokenId(null);
+                  }}
+                  className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+              {/* ✅ Pass tokenId as creditId */}
+              <CryptoMarket
+                walletAddress={walletAddress}
+                creditId={selectedTokenId.toString()}
+              />
             </div>
-            </div>
-      </div>
+          </div>
+        </div>
       )}
+
+      {/* Header */}
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-4">
           🌍 Carbon Credits Marketplace
         </h2>
         <p className="text-gray-600">
-          Browse and verify carbon credits from environmental projects.
+          Trade carbon credits from government-approved environmental projects.
         </p>
       </div>
 
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start space-x-3">
+          <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-red-900">Error</p>
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Info Banner */}
+      <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-100">
+        <div className="flex items-start space-x-3">
+          <CheckCircle className="h-6 w-6 text-green-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-bold text-gray-900 mb-2">Government Approved Projects</h3>
+            <p className="text-sm text-gray-700">
+              All projects listed here have been verified and approved by government authorities.
+              You can safely place buy or sell orders. OrderBook will be created automatically on the first trade.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Marketplace */}
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
         <div className="flex flex-col lg:flex-row gap-4 mb-6">
           <div className="flex-1 relative">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by project, location, or beneficiary..."
+              placeholder="Search projects..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
             />
           </div>
         </div>
+
         <div className="flex flex-wrap gap-2 mb-6">
-          <button onClick={() => setActiveFilter("all")} className={`px-4 py-2 rounded-lg text-sm ${activeFilter === 'all' ? 'bg-green-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>All Projects</button>
-          <button onClick={() => setActiveFilter("forest")} className={`px-4 py-2 rounded-lg text-sm ${activeFilter === 'forest' ? 'bg-green-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>Forest Protection</button>
-          <button onClick={() => setActiveFilter("renewable")} className={`px-4 py-2 rounded-lg text-sm ${activeFilter === 'renewable' ? 'bg-green-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>Renewable Energy</button>
-          <button onClick={() => setActiveFilter("afforestation")} className={`px-4 py-2 rounded-lg text-sm ${activeFilter === 'afforestation' ? 'bg-green-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>Afforestation</button>
-          <button onClick={() => setActiveFilter("efficiency")} className={`px-4 py-2 rounded-lg text-sm ${activeFilter === 'efficiency' ? 'bg-green-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>Energy Efficiency</button>
+          <button
+            onClick={() => setActiveFilter("all")}
+            className={`px-4 py-2 rounded-lg text-sm transition-colors ${activeFilter === 'all'
+              ? 'bg-green-600 text-white'
+              : 'bg-gray-200 hover:bg-gray-300'
+              }`}
+          >
+            All Projects
+          </button>
+          <button
+            onClick={() => setActiveFilter("trading")}
+            className={`px-4 py-2 rounded-lg text-sm transition-colors ${activeFilter === 'trading'
+              ? 'bg-green-600 text-white'
+              : 'bg-gray-200 hover:bg-gray-300'
+              }`}
+          >
+            Active Trading
+          </button>
+          <button
+            onClick={() => setActiveFilter("available")}
+            className={`px-4 py-2 rounded-lg text-sm transition-colors ${activeFilter === 'available'
+              ? 'bg-green-600 text-white'
+              : 'bg-gray-200 hover:bg-gray-300'
+              }`}
+          >
+            Ready to Trade
+          </button>
         </div>
 
-        <h3 className="text-xl font-bold text-gray-900 mb-4">Projects</h3>
+        <h3 className="text-xl font-bold text-gray-900 mb-4">Approved Projects</h3>
         <div className="overflow-x-auto">
-          {filteredProjects.length > 0 ? (
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+              <p className="text-gray-500">Loading projects...</p>
+            </div>
+          ) : filteredProjects.length > 0 ? (
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Name</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Beneficiary</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vintage</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th scope="col" className="relative px-6 py-3">
-                    <span className="sr-only">Certificate</span>
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Project Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vintage</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredProjects.map((project) => (
-                  <tr key={project.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      <button onClick={() => handleViewProjectDetails(project)} className="text-left hover:text-green-600">
-                        {project.projectName}
+                  <tr key={project.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {/* ✅ Click vào tên → Mở ProjectDetail */}
+                      <button
+                        onClick={() => handleOpenProjectDetail(project)}
+                        className="text-left hover:text-green-600 font-medium transition-colors underline decoration-dotted"
+                      >
+                        {project.name}
                       </button>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{project.projectType}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {project.type}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex items-center">
                         <MapPin className="h-4 w-4 mr-1.5 text-gray-400" />
                         {project.location}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{project.beneficiary}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{project.vintage}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getTradingBadge(project.id)}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div className="flex items-center">
-                        <Calendar className="h-4 w-4 mr-1.5 text-gray-400" />
-                        {project.date}
-                      </div>
-                      </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button onClick={handleNavigateToCryptoMarket} className="text-green-600 hover:text-green-900">
-                        View Certificate
+                      {project.vintage}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                      <button
+                        onClick={() => handleOpenTrading(project)}
+                        disabled={!tradingStatuses.get(project.id)?.canTrade}
+                        className="text-green-600 hover:text-green-900 font-medium transition-colors disabled:text-gray-400 disabled:cursor-not-allowed"
+                      >
+                        Trade →
                       </button>
                     </td>
                   </tr>
@@ -278,147 +384,11 @@ const Marketplace: React.FC<MarketplaceProps> = ({ walletAddress, setActiveTab }
             <div className="text-center py-12">
               <Award className="h-16 w-16 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500 text-lg mb-2">No projects found</p>
-              <p className="text-gray-400">Try adjusting your filters to find what you're looking for.</p>
+              <p className="text-gray-400">Try adjusting your filters.</p>
             </div>
           )}
         </div>
       </div>
-
-      {selectedProject && (
-              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                  <div className="p-6">
-                    <div className="flex justify-between items-start mb-6">
-                      <div>
-                        <h3 className="text-2xl font-bold text-gray-900 mb-2">{selectedProject.projectName}</h3>
-                        <div className="flex items-center space-x-4 text-sm text-gray-600">
-                          <span className="flex items-center space-x-1">
-                            <MapPin className="h-4 w-4" />
-                            <span>{selectedProject.location}</span>
-                          </span>
-                          <span className="flex items-center space-x-1">
-                            <Calendar className="h-4 w-4" />
-                            <span>Vintage {selectedProject.vintage}</span>
-                          </span>
-                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
-                            {selectedProject.methodology}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setSelectedProject(null)}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                      >
-                        <X className="h-6 w-6" />
-                      </button>
-                    </div>
-      
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                      <div>
-                        <img 
-                          src={selectedProject.images[0]} 
-                          alt={selectedProject.projectName}
-                          className="w-full h-64 rounded-xl object-cover mb-4"
-                        />
-                        <div className="bg-gray-50 rounded-xl p-4">
-                          <h4 className="font-semibold text-gray-900 mb-2">Project Description</h4>
-                          <p className="text-sm text-gray-600">{selectedProject.projectDescription}</p>
-                        </div>
-                      </div>
-      
-                      <div className="space-y-4">
-                        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                          <h4 className="font-semibold text-green-900 mb-3">Summary</h4>
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-green-700">Date:</span>
-                              <span className="font-medium text-green-900">
-                                {new Date(selectedProject.date).toLocaleDateString()}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-green-700">Total Value:</span>
-                              <span className="font-medium text-green-900">${selectedProject.totalValue.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-green-700">Certificate ID:</span>
-                              <span className="font-medium text-green-900 text-xs">{selectedProject.certificateId}</span>
-                            </div>
-                          </div>
-                        </div>
-      
-                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                          <h4 className="font-semibold text-blue-900 mb-3">Project Details</h4>
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-blue-700">Developer:</span>
-                              <span className="font-medium text-blue-900">{selectedProject.projectDeveloper}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-blue-700">Standard:</span>
-                              <span className="font-medium text-blue-900">{selectedProject.verificationStandard}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-blue-700">Additional Certs:</span>
-                              <span className="font-medium text-blue-900">{selectedProject.additionalCertifications.join(', ')}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-      
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="bg-gray-50 rounded-xl p-4">
-                        <h4 className="font-semibold text-gray-900 mb-3 flex items-center space-x-2">
-                          <Leaf className="h-5 w-5 text-green-600" />
-                          <span>Environmental Benefits</span>
-                        </h4>
-                        <ul className="space-y-1 text-sm text-gray-600">
-                          {selectedProject.environmentalBenefits.map((benefit: string, index: number) => (
-                            <li key={index} className="flex items-center space-x-2">
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                              <span>{benefit}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-      
-                      <div className="bg-gray-50 rounded-xl p-4">
-                        <h4 className="font-semibold text-gray-900 mb-3 flex items-center space-x-2">
-                          <Users className="h-5 w-5 text-blue-600" />
-                          <span>Social Benefits</span>
-                        </h4>
-                        <ul className="space-y-1 text-sm text-gray-600">
-                          {selectedProject.socialBenefits.map((benefit: string, index: number) => (
-                            <li key={index} className="flex items-center space-x-2">
-                              <CheckCircle className="h-4 w-4 text-blue-600" />
-                              <span>{benefit}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-      
-                    <div className="flex justify-end space-x-4 mt-6 pt-6 border-t border-gray-200">
-                      <button
-                        onClick={() => handleViewInformation(selectedProject)}
-                        className="px-6 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors flex items-center space-x-2"
-                      >
-                        <Info className="h-4 w-4" />
-                        <span>Information</span>
-                      </button>
-                      <button
-                        onClick={() => handleDownloadCertificate(selectedProject)}
-                        className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-200 flex items-center space-x-2"
-                      >
-                        <Download className="h-4 w-4" />
-                        <span>Download Certificate</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
     </div>
   );
 };

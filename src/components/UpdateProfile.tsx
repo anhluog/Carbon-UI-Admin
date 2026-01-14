@@ -4,10 +4,10 @@ import api from '../utils/axiosInstance';  // Import axios instance từ utils
 
 interface ProfileProps {
   walletAddress: string;
-  setActiveTab: React.Dispatch<React.SetStateAction<string>>;
+  setActiveTab: (tab: string) => void;
 }
 
-const Profile: React.FC<ProfileProps> = ({ walletAddress, setActiveTab }) => {
+function Profile({ walletAddress }: ProfileProps) {
   const [user, setUser] = useState({
     id: '',
     name: '',
@@ -33,7 +33,7 @@ const Profile: React.FC<ProfileProps> = ({ walletAddress, setActiveTab }) => {
         } else {
           setError('Failed to load profile');
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         // Axios interceptor đã handle lỗi, nhưng catch để set UI error nếu cần
         setError('Error loading profile');
         console.error('Fetch profile error:', err);
@@ -74,7 +74,7 @@ const Profile: React.FC<ProfileProps> = ({ walletAddress, setActiveTab }) => {
       } else {
         setError('Failed to update profile');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Axios interceptor đã handle lỗi (alert nếu 400/500), nhưng catch để set UI nếu cần
       setError('Error updating profile');
       console.error('Update profile error:', err);

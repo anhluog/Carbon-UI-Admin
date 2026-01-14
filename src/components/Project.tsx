@@ -3,7 +3,7 @@ import { Award, Calendar, MapPin, Leaf, TrendingUp, Filter, Share2, Eye, BarChar
 import api from '../utils/axiosInstance';
 import React, { useEffect, useState } from 'react';
 import { ethers } from 'ethers';
-import CarbonCreditEx from '../abi/CarbonCreditExchange.json';
+import CarbonCreditEx from '../abi/CarbonCredit.json';
 
 interface ProjectsProps {
   walletAddress: string;
@@ -185,7 +185,7 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
   };
 
   const confirmMint = async () => {
-    const contractAddress = '0x7C96A93a6278308191b607BDd26fadE0efCc6809';
+    const contractAddress = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
 
     if (!mintProject || mintAmount <= 0 || mintAmount > mintProject.availableToMint) return;
 

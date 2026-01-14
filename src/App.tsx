@@ -60,17 +60,18 @@ function App() {
 
       let address: string;
 
-      const extractAddress = async (acct: any): Promise<string> => {
+      const extractAddress = async (acct: unknown): Promise<string> => {
         // If it's already a string address
         if (typeof acct === 'string') return acct;
         // If it's a signer-like object with getAddress()
         if (acct && typeof acct === 'object') {
-          if (typeof (acct as any).getAddress === 'function') {
-            return await (acct as any).getAddress();
+          // Type guard for object with getAddress method
+          if ('getAddress' in acct && typeof acct.getAddress === 'function') {
+            return await (acct.getAddress as () => Promise<string>)();
           }
           // Some providers return objects with an 'address' field
-          if (typeof (acct as any).address === 'string') {
-            return (acct as any).address;
+          if ('address' in acct && typeof acct.address === 'string') {
+            return acct.address;
           }
         }
         throw new Error('Không thể lấy địa chỉ từ tài khoản được trả về');
@@ -94,29 +95,49 @@ function App() {
       // Lấy signer từ provider (default to first account - no param to avoid type issue)
       const signer = await provider.getSigner();  // This returns JsonRpcSigner, but we use it for methods only
 
-      // Kiểm tra network (Polygon Amoy - chainId 80002 / 0x13882)
+      // Kiểm tra network (Localhost - chainId 31337 / 0x7a69)
       const network = await provider.getNetwork();
-      if (network.chainId !== 31337n) {
+      if (network.chainId !== BigInt(import.meta.env.VITE_CHAIN_ID_DECIMAL)) {
         try {
+          // Thử switch trước
           await window.ethereum.request({
             method: "wallet_switchEthereumChain",
-            params: [{ chainId: "0x7a69" }],  // Polygon Amoy hex
+            params: [{ chainId: import.meta.env.VITE_CHAIN_ID }],
           });
-        } catch (switchError: any) {
-          if (switchError.code === 4902) {
-            // Network chưa add: Add Polygon Amoy
-            await window.ethereum.request({
-              method: "wallet_addEthereumChain",
-              params: [{
-                chainId: "0x7a69",
-                chainName: "Hardhat Localhost",
-                rpcUrls: ["http://127.0.0.1:8545"],
-                nativeCurrency: { name: "MATIC", symbol: "MATIC", decimals: 18 },
-                blockExplorerUrls: [],
-              }],
-            });
+        } catch (switchError: unknown) {
+          const isErrorWithCode = (err: unknown): err is { code: number } => {
+            return (
+              typeof err === 'object' &&
+              err !== null &&
+              'code' in err &&
+              typeof (err as { code: unknown }).code === 'number'
+            );
+          };
+
+          // Nếu code 4902: Network chưa tồn tại, add nó
+          if (isErrorWithCode(switchError) && switchError.code === 4902) {
+            try {
+              await window.ethereum.request({
+                method: "wallet_addEthereumChain",
+                params: [{
+                  chainId: import.meta.env.VITE_CHAIN_ID,
+                  chainName: import.meta.env.VITE_CHAIN_NAME,
+                  rpcUrls: [import.meta.env.VITE_RPC_URL],
+                  nativeCurrency: {
+                    name: import.meta.env.VITE_NATIVE_CURRENCY_NAME,
+                    symbol: import.meta.env.VITE_NATIVE_CURRENCY_SYMBOL,
+                    decimals: Number(import.meta.env.VITE_NATIVE_CURRENCY_DECIMALS),
+                  },
+                }],
+              });
+              console.log("✅ Hardhat Local network added successfully");
+            } catch (addError) {
+              console.error("❌ Failed to add network:", addError);
+              throw new Error("Không thể thêm mạng Hardhat Local. Vui lòng thêm thủ công!");
+            }
           } else {
-            throw new Error("Vui lòng chuyển sang mạng Polygon Amoy!");
+            // Lỗi khác khi switch
+            throw new Error("Vui lòng chuyển sang mạng Hardhat Local trong MetaMask!");
           }
         }
       }
@@ -126,7 +147,7 @@ function App() {
       const signature = await signer.signMessage(message);  // Returns Promise<string> - type-safe
 
       // Gọi BE API auth
-      const response = await axios.post("http://localhost:8080/api/auth/login", { 
+      const response = await axios.post("http://localhost:8080/api/auth/login", {
         address,
         message,
         signature
@@ -142,26 +163,26 @@ function App() {
         localStorage.setItem('token', response.data.token);
         console.log("Token saved to localStorage:", response.data.token.substring(0, 20) + "...");  // Debug
 
-        
+
         // Set role từ response nếu có (backend trả roleId)
         let role = 'user';  // Default role
-        if(response.data.user?.roleId == 'ADMIN'){
+        if (response.data.user?.roleId == 'ADMIN') {
           role = 'admin';
         }
-        else if(response.data.user?.roleId == 'VERIFIER'){
+        else if (response.data.user?.roleId == 'VERIFIER') {
           role = 'verifier';
-        }else if(response.data.user?.roleId == 'GOVERNMENT'){
+        } else if (response.data.user?.roleId == 'GOVERNMENT') {
           role = 'government';
-        }else if(response.data.user?.roleId == 'OWNER'){
+        } else if (response.data.user?.roleId == 'OWNER') {
           role = 'owner';
-        }else if(response.data.user?.roleId == 'SUPERADMIN'){
+        } else if (response.data.user?.roleId == 'SUPERADMIN') {
           role = 'superadmin';
         }
 
-        onConnect(address.toLowerCase(),role );  // Redirect với role
+        onConnect(address.toLowerCase(), role);  // Redirect với role
 
         console.log(`✅ Wallet connected: ${address} with role ${role}`);
-        
+
       } else {
         throw new Error("Auth failed: No token in response");
       }
@@ -170,7 +191,7 @@ function App() {
       window.ethereum.on("accountsChanged", () => window.location.reload());
       window.ethereum.on("chainChanged", () => window.location.reload());
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Lỗi kết nối MetaMask:", error);
       setError(error.message || "Kết nối thất bại. Vui lòng thử lại!");
       if (error.code === 4001) {
@@ -195,33 +216,36 @@ function App() {
 
   const renderLogoutConfirmation = () => (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-8">
-            <h2 className="text-xl font-bold mb-4">Confirm Logout</h2>
-            <p className="mb-4">Are you sure you want to log out?</p>
-            <div className="flex justify-end space-x-4">
-                <button onClick={() => setShowLogoutConfirmation(false)} className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">
-                    Cancel
-                </button>
-                <button onClick={handleLogout} className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600">
-                    Logout
-                </button>
-            </div>
+      <div className="bg-white rounded-lg p-8">
+        <h2 className="text-xl font-bold mb-4">Confirm Logout</h2>
+        <p className="mb-4">Are you sure you want to log out?</p>
+        <div className="flex justify-end space-x-4">
+          <button onClick={() => setShowLogoutConfirmation(false)} className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">
+            Cancel
+          </button>
+          <button onClick={handleLogout} className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600">
+            Logout
+          </button>
         </div>
+      </div>
     </div>
   );
 
   useEffect(() => {
     if (window.ethereum) {
-      const handleAccountsChanged = (accounts: string[]) => {
-        if (accounts.length === 0) {
-          handleLogout();
+      const handleAccountsChanged = (accounts: unknown) => {
+        // Type guard to check if accounts is an array
+        if (Array.isArray(accounts)) {
+          if (accounts.length === 0) {
+            handleLogout();
+          }
         }
       };
 
       window.ethereum.on('accountsChanged', handleAccountsChanged);
 
       return () => {
-        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        window.ethereum?.removeListener('accountsChanged', handleAccountsChanged);
       };
     }
   }, [handleLogout]);
@@ -234,20 +258,20 @@ function App() {
   }, []);
 
   const tabs = [
-    { id: 'user', name: 'User', icon: UserIcon, roles: ['user', 'admin', 'superadmin', 'verifier','government'], restricted: true },
+    { id: 'user', name: 'User', icon: UserIcon, roles: ['user', 'admin', 'superadmin', 'verifier', 'government', 'owner'], restricted: true },
     { id: 'requestReview', name: 'Request Review', icon: Plus, roles: ['owner'], restricted: true },
     { id: 'requestRole', name: 'Request Role', icon: Users, roles: ['user',], restricted: true },
-    { id: 'marketplace', name: 'Marketplace', icon: ShoppingCart, roles: ['user','owner','verifier', 'admin','government'], restricted: false },
+    { id: 'marketplace', name: 'Marketplace', icon: ShoppingCart, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
     { id: 'project', name: 'Project', icon: Award, roles: ['owner'], restricted: false },
-    { id: 'verifyRole', name: 'Verify Role', icon: CheckCircle, roles: ['admin','superadmin'], restricted: true },
-    { id: 'verifyProject', name: 'Verify Project', icon: Shield, roles: ['verifier','admin'], restricted: true },
+    { id: 'verifyRole', name: 'Verify Role', icon: CheckCircle, roles: ['admin', 'superadmin'], restricted: true },
+    { id: 'verifyProject', name: 'Verify Project', icon: Shield, roles: ['verifier', 'admin'], restricted: true },
     { id: 'updateProfile', name: 'Update Profile', icon: Edit3, roles: ['user'], restricted: true },
     { id: 'approvedProject', name: 'Approved Project', icon: CheckCircle, roles: ['government'], restricted: true },
-    { id: 'cryptomarket', name: 'Crypto Market', icon: ShoppingCart, roles: ['user','owner','verifier', 'admin','government'], restricted: false },
-    { id: 'orderbook', name: 'Order Book', icon: Building2, roles: ['user','owner','verifier', 'admin','government'], restricted: false },
-    { id: 'myToken', name: 'My Token', icon: Award, roles: ['user','owner'], restricted: true },
-    {id: 'projectDetail', name: 'Project Detail', icon: Award, roles: ['user','owner','verifier', 'admin','government'], restricted: false },
-    {id: 'userManagement', name: 'User Management', icon: Users, roles: ['superadmin','admin'], restricted: true },
+    { id: 'cryptomarket', name: 'Crypto Market', icon: ShoppingCart, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
+    { id: 'orderbook', name: 'Order Book', icon: Building2, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
+    { id: 'myToken', name: 'My Token', icon: Award, roles: ['user', 'owner'], restricted: true },
+    { id: 'projectDetail', name: 'Project Detail', icon: Award, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
+    { id: 'userManagement', name: 'User Management', icon: Users, roles: ['superadmin', 'admin'], restricted: true },
   ];
 
   const displayedTabs = isWalletConnected
@@ -262,8 +286,8 @@ function App() {
         <div className="text-center pt-16">
           <h2 className="text-4xl font-bold text-gray-900 mb-4">Please Log In</h2>
           <p className="text-lg text-gray-600 mb-8">You need to connect your wallet to access this page.</p>
-          <button 
-            onClick={() => handleConnect('MetaMask')} 
+          <button
+            onClick={() => handleConnect('MetaMask')}
             disabled={isConnecting}
             className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:shadow-lg transition-all duration-200 flex items-center space-x-3 mx-auto disabled:opacity-50"
           >
@@ -280,30 +304,40 @@ function App() {
       case 'myToken': return <MyToken />;
       case 'requestReview': return <RequestReview walletAddress={walletAddress} />;
       case 'requestRole': return <RequestRole walletAddress={walletAddress} />;
-      case 'marketplace': return <Marketplace walletAddress={walletAddress} setActiveTab={setActiveTab} />;
-      case 'project': return <Projects walletAddress={walletAddress} onOpenProjectDetail={openProjectDetail} />;  // Truyền handler để mở detail từ list (với projectId)
+
+      // ✅ SỬA: Thêm onOpenProjectDetail cho Marketplace
+      case 'marketplace':
+        return (
+          <Marketplace
+            walletAddress={walletAddress}
+            setActiveTab={setActiveTab}
+            onOpenProjectDetail={(projectId) => openProjectDetail(projectId, 'marketplace')} // ✅ PHẢI CÓ dòng này
+          />
+        );
+
+      case 'project': return <Projects walletAddress={walletAddress} onOpenProjectDetail={openProjectDetail} />;
       case 'verifyRole': return <VerifyRole />;
-      case 'verifyProject': return <VerifyProject onOpenProjectDetail={openProjectDetail} />;  // Truyền handler cho VerifyProject
+      case 'verifyProject': return <VerifyProject onOpenProjectDetail={openProjectDetail} />;
       case 'updateProfile': return <Profile walletAddress={walletAddress} setActiveTab={setActiveTab} />;
-      case 'approvedProject': return <ApprovedProject onOpenProjectDetail={openProjectDetail} />;  // Truyền handler cho ApprovedProject
-      case 'cryptomarket': return <CryptoMarket  />;
-      case 'orderbook': return <OrderBook  />;
+      case 'approvedProject': return <ApprovedProject onOpenProjectDetail={openProjectDetail} />;
+      case 'cryptomarket': return <CryptoMarket />;
+      case 'orderbook': return <OrderBook />;
       case 'userManagement': return <UserManagement />;
-      case 'projectDetail': 
+      case 'projectDetail':
         return selectedProjectId ? (
-          <ProjectDetailPage 
-            projectId={selectedProjectId} 
-            onBack={() => { 
-              setSelectedProjectId(null); 
-              setActiveTab(previousTab); 
-            }} 
+          <ProjectDetailPage
+            projectId={selectedProjectId}
+            onBack={() => {
+              setSelectedProjectId(null);
+              setActiveTab(previousTab);
+            }}
           />
         ) : (
           <div className="text-center pt-16">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">No Project Selected</h2>
             <p className="text-gray-600 mb-8">Please select a project from the Projects tab.</p>
-            <button 
-              onClick={() => setActiveTab(previousTab || 'project')} 
+            <button
+              onClick={() => setActiveTab(previousTab || 'project')}
               className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 flex items-center space-x-2 mx-auto"
             >
               <ArrowLeft className="h-5 w-5" />
@@ -311,7 +345,14 @@ function App() {
             </button>
           </div>
         );
-      default: return <Marketplace walletAddress={walletAddress} setActiveTab={setActiveTab} />;
+      default:
+        return (
+          <Marketplace
+            walletAddress={walletAddress}
+            setActiveTab={setActiveTab}
+            onOpenProjectDetail={(projectId) => openProjectDetail(projectId, 'marketplace')}
+          />
+        );
     }
   };
 
@@ -347,8 +388,8 @@ function App() {
                 </div>
               </div>
             ) : (
-              <button 
-                onClick={() => handleConnect('MetaMask')} 
+              <button
+                onClick={() => handleConnect('MetaMask')}
                 disabled={isConnecting}
                 className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-2 rounded-xl font-medium hover:shadow-lg transition-all duration-200 flex items-center space-x-2 disabled:opacity-50"
               >
@@ -367,10 +408,9 @@ function App() {
               {displayedTabs.map((tab) => {
                 const Icon = tab.icon;
                 return (
-                  <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center space-x-2 px-4 py-3 rounded-xl transition-all duration-200 whitespace-nowrap ${
-                      activeTab === tab.id
-                        ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg shadow-green-600/20'
-                        : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
+                  <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center space-x-2 px-4 py-3 rounded-xl transition-all duration-200 whitespace-nowrap ${activeTab === tab.id
+                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg shadow-green-600/20'
+                    : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
                     }`}>
                     <Icon className="h-4 w-4" />
                     <span className="font-medium text-sm">{tab.name}</span>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Plus, Edit3, Eye, CheckCircle, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import api from '../utils/axiosInstance';
 import { ethers } from 'ethers';
-import CarbonCreditEx from '../abi/CarbonCreditExchange.json';
+import CarbonCreditEx from '../abi/CarbonCredit.json';
 
 interface RoleRequest {
   id: string;
@@ -143,68 +143,83 @@ const VerifyRole: React.FC = () => {
     }
   };
 
-  const handleAccept = async (request: RoleRequest) => {
-    if (!request.userId) {
-      alert('Invalid user ID (wallet address).');
-      setSubmitting(false);
-      return;
-    }
+ const handleAccept = async (request: RoleRequest) => {
+  if (!request.userId) {
+    alert('Invalid user ID (wallet address).');
+    setSubmitting(false);
+    return;
+  }
 
     setSubmitting(true);
     let txHash = null;
 
-    try {
-      // Validate env
-      // const contractAddress = import.meta.env.ADDRESS_CARBONCREDIT;
-      const contractAddress = '0x7C96A93a6278308191b607BDd26fadE0efCc6809';
-      console.log('🔑 CONTRACT ADDR:', contractAddress || '❌ UNDEFINED!');
-      if (!contractAddress || !ethers.isAddress(contractAddress)) {
-        throw new Error('Contract address not configured. Check ADDRESS_CARBONCREDIT in .env.');
-      }
+  try {
+    // Nếu role là OWNER, chỉ cần approve qua API (không cần blockchain)
+    if (request.requestedRole === 'OWNER') {
+      console.log('📝 Approving OWNER role via API only (no blockchain call)');
+      await api.put(`/role-request/approve/${request.id}`);
+      setRequests(prev => prev.filter(r => r.id !== request.id));
+      alert('✅ OWNER role approved! Email sent.');
+      setSubmitting(false);
+      return;
+    }
+
+    // Validate env cho các role khác
+    const contractAddress = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
+    console.log('🔑 CONTRACT ADDR:', contractAddress || '❌ UNDEFINED!');
+    if (!contractAddress || !ethers.isAddress(contractAddress)) {
+      throw new Error('Contract address not configured. Check VITE_CCT_CONTRACT_ADDRESS in .env.');
+    }
 
       const provider = new ethers.BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(contractAddress, CarbonCreditEx.abi, signer);
 
-      // Execute on-chain based on role
-      let tx;
-      if (request.requestedRole === 'VERIFIER') {
-        tx = await contract.verifyOrganization(request.userId);
-      } else if (request.requestedRole === 'GOVERNMENT') {
-        tx = await contract.addGovernment(request.userId);
-      } else if (request.requestedRole === 'ADMIN') {
-        tx = await contract.addAdmin(request.userId);
-      }
-      else {
-        throw new Error(`Unsupported role: ${request.requestedRole}`);
-      }
-
-      // Wait for confirmation (optional: add gas limit nếu cần)
-      console.log('Tx sent:', tx.hash);
-      const receipt = await tx.wait(1); // Wait 1 confirmation
-      txHash = tx.hash;
-      console.log('Tx confirmed:', receipt);
-
-      // Now call API to approve (only if on-chain success)
-      await api.put(`/role-request/approve/${request.id}`);
-      setRequests(prev => prev.filter(r => r.id !== request.id));
-      alert(`Approved! Tx hash: ${txHash.slice(0, 10)}... | Email sent.`);
-    } catch (err: any) {
-      console.error('Accept error:', err);
-      if (err.code === 'INVALID_ARGUMENT') {
-        alert('Contract setup error: Invalid address. Check console.');
-      } else if (err.code === 'ACTION_REJECTED') {
-        alert('User rejected the transaction.');
-      } else if (err.reason || err.message) {
-        alert(`Blockchain failed: ${err.reason || err.message}`);
-      } else {
-        alert(`Accept failed: ${err.message}`);
-      }
-      // Revert API if tx partial success (optional, tùy logic)
-    } finally {
-      setSubmitting(false);
+    // Execute on-chain based on role
+    let tx;
+    console.log(`🔗 Calling blockchain for role: ${request.requestedRole}`);
+    
+    if (request.requestedRole === 'VERIFIER') {
+      tx = await contract.verifyOrganization(request.userId);
+    } else if (request.requestedRole === 'GOVERNMENT') {
+      tx = await contract.addGovernment(request.userId);
+    } else if (request.requestedRole === 'ADMIN') {
+      tx = await contract.addAdmin(request.userId);
+    } else {
+      throw new Error(`Unsupported blockchain role: ${request.requestedRole}`);
     }
-  };
+
+    // Wait for confirmation
+    console.log('⏳ Tx sent:', tx.hash);
+    const receipt = await tx.wait(1); // Wait 1 confirmation
+    txHash = tx.hash;
+    console.log('✅ Tx confirmed:', receipt);
+
+    // Now call API to approve (only if on-chain success)
+    await api.put(`/role-request/approve/${request.id}`);
+    setRequests(prev => prev.filter(r => r.id !== request.id));
+    alert(`✅ Approved!\n\nRole: ${request.requestedRole}\nTx: ${txHash.slice(0, 10)}...\nEmail sent.`);
+    
+  } catch (err: any) {
+    console.error('❌ Accept error:', err);
+    
+    if (err.code === 'INVALID_ARGUMENT') {
+      alert('❌ Contract setup error: Invalid address. Check console.');
+    } else if (err.code === 'ACTION_REJECTED' || err.code === 4001) {
+      alert('❌ User rejected the transaction.');
+    } else if (err.reason) {
+      alert(`❌ Blockchain failed: ${err.reason}`);
+    } else if (err.message?.includes('Contract address not configured')) {
+      alert(`❌ ${err.message}`);
+    } else if (err.message) {
+      alert(`❌ Accept failed: ${err.message}`);
+    } else {
+      alert('❌ Unknown error occurred');
+    }
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   const handleViewRequest = (request: RoleRequest) => {
     setSelectedRequest(request);
