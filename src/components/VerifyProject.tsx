@@ -42,9 +42,10 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
   const [activeTab, setActiveTab] = useState<'processing' | 'processed'>('processing');
   const [processingProjects, setProcessingProjects] = useState<Array<any>>([]); // Cache cho processing
   const [processedProjects, setProcessedProjects] = useState<Array<any>>([]); // Cache cho processed
-  const [projects, setProjects] = useState<Array<any>>([]); // Thêm state cho projects hiện tại
   const [loading, setLoading] = useState(true);
   const [initialLoad, setInitialLoad] = useState(true); // Để phân biệt load ban đầu
+  const [projects, setProjects] = useState<any[]>([]);
+
 
   const [showRejectionPopup, setShowRejectionPopup] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
@@ -52,11 +53,6 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
   const [showAcceptPopup, setShowAcceptPopup] = useState(false);
   const [acceptCredits, setAcceptCredits] = useState<number | ''>('');
   const [projectToAccept, setProjectToAccept] = useState<Project | null>(null);
-
-  // Add Member states
-  const [showAddMemberPopup, setShowAddMemberPopup] = useState(false);
-  const [userId, setUserId] = useState('');
-  const [roleName, setRoleName] = useState('');
 
   // Helper: Map project data
   const mapProjectData = async (projectsData: any[]) => {
@@ -135,10 +131,12 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
 
   // useEffect: Switch projects khi tab thay đổi (không refetch, chỉ switch cache)
   useEffect(() => {
-    // Loại bỏ if (!initialLoad) để đảm bảo setProjects chạy cả khi load ban đầu (khi cache update)
-    const currentProjects = activeTab === 'processing' ? processingProjects : processedProjects;
-    setProjects(currentProjects);
-  }, [activeTab, processingProjects, processedProjects]);
+    if (!initialLoad) {
+      // Không load lại, chỉ set projects từ cache
+      const currentProjects = activeTab === 'processing' ? processingProjects : processedProjects;
+      setProjects(currentProjects);
+    }
+  }, [activeTab, initialLoad, processingProjects, processedProjects]);
 
   // Refetch all khi cần (sau accept/reject)
   const refetchAll = async () => {
@@ -258,33 +256,6 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
     setShowAcceptPopup(true);
   };
 
-  // Handle Add Member
-  const handleAddMember = async () => {
-    if (!userId.trim() || !roleName.trim()) {
-      alert('Please enter both user address and role name');
-      return;
-    }
-    try {
-      await api.post('/api/role-request/add-role', {
-        userId: userId.trim(),
-        roleName: roleName.trim()
-      });
-      alert('Role added successfully');
-      setShowAddMemberPopup(false);
-      setUserId('');
-      setRoleName('');
-    } catch (err) {
-      console.error('Add role failed:', err);
-      alert('Failed to add role');
-    }
-  };
-
-  const handleCloseAddMemberPopup = () => {
-    setShowAddMemberPopup(false);
-    setUserId('');
-    setRoleName('');
-  };
-
   if (loading && initialLoad) {
     return (
       <div className='min-h-screen bg-gray-50'>
@@ -311,19 +282,10 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
               <p className='text-lg text-gray-600 mt-1'>Manage and verify carbon credit projects</p>
             </div>
           </div>
-          <div className='flex space-x-3'>
-            <button className='flex items-center space-x-2 px-5 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all font-medium'>
-              <Plus className='h-5 w-5' />
-              <span>New Project</span>
-            </button>
-            <button
-              onClick={() => setShowAddMemberPopup(true)}
-              className='flex items-center space-x-2 px-5 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all font-medium'
-            >
-              <Users className='h-5 w-5' />
-              <span>Add Member</span>
-            </button>
-          </div>
+          <button className='flex items-center space-x-2 px-5 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all font-medium'>
+            <Plus className='h-5 w-5' />
+            <span>New Project</span>
+          </button>
         </div>
 
         {/* Summary Cards với nút tab tích hợp */}
@@ -537,51 +499,6 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
                   className="px-6 py-2.5 rounded-xl bg-green-500 text-white font-medium hover:bg-green-600 disabled:opacity-50"
                 >
                   Confirm Accept
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Add Member Popup */}
-        {showAddMemberPopup && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">Add Member Role</h2>
-                <button onClick={handleCloseAddMemberPopup} className="p-1 hover:bg-gray-100 rounded">
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-              <div className="space-y-4">
-                <input
-                  type="text"
-                  value={userId}
-                  onChange={(e) => setUserId(e.target.value)}
-                  placeholder="User Address (e.g., 0xc7ba0ae66b3df7237562b5ba7d9b4210f0c0d79e)"
-                  className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <input
-                  type="text"
-                  value={roleName}
-                  onChange={(e) => setRoleName(e.target.value)}
-                  placeholder="Role Name (e.g., ADMIN)"
-                  className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={handleCloseAddMemberPopup}
-                  className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddMember}
-                  disabled={!userId.trim() || !roleName.trim()}
-                  className="px-6 py-2.5 rounded-xl bg-blue-500 text-white font-medium hover:bg-blue-600 disabled:opacity-50"
-                >
-                  Add Role
                 </button>
               </div>
             </div>

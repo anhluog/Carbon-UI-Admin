@@ -1,16 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ethers } from 'ethers';
-import { 
-    TrendingUp, DollarSign, Leaf, Award, 
-    X, Bell, Wallet, History, 
+import {
+    TrendingUp, DollarSign, Leaf, Award,
+    X, Bell, Wallet, History,
     ArrowRightLeft, Search, CheckCircle
 } from 'lucide-react';
-import CarbonCredit from '../abi/CarbonCredit.json';
+import { Client } from '@stomp/stompjs';
+import CarbonCredit from '../abi/CarbonCreditSystem.json';
 import CarbonCreditExchange from '../abi/CarbonCreditExchange.json';
 import api from '../utils/axiosInstance';
 
 const EXCHANGE_CONTRACT_ADDRESS = import.meta.env.VITE_EXCHANGE_CONTRACT_ADDRESS;
 const CCT_CONTRACT_ADDRESS = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
+const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:8081/ws'; // Đổi thành endpoint WebSocket backend của bạn
 
 interface UserProps {
     walletAddress: string;
@@ -20,6 +22,15 @@ interface RetiredEntry {
     amount: string;
     dateOfIssue: string;
     equivalentTrees: string;
+}
+
+interface Notification {
+    id: string;
+    title: string;
+    message: string;
+    type: string;
+    createdAt: string;
+    // Thêm các field khác nếu cần từ backend
 }
 
 const User: React.FC<UserProps> = ({ walletAddress }) => {
@@ -70,6 +81,10 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
         vintage: number;
         type: string;
     }>>([]);
+
+    // --- NOTIFICATIONS STATE ---
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const stompClientRef = useRef<Client | null>(null);
 
     // --- LOGIC FUNCTIONS (GIỮ NGUYÊN) ---
     const fetchData = async () => {
@@ -200,6 +215,65 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
         }
     };
 
+    // --- NOTIFICATIONS FUNCTIONS ---
+    const fetchNotifications = async () => {
+        try {
+            // Gọi API để lấy notifications ban đầu (dùng axiosInstance đã config auth)
+            const response = await api.get('/notifications/my-notifications');
+            setNotifications(response.data || []);
+        } catch (error) {
+            console.error('❌ Error fetching notifications:', error);
+            setNotifications([]);
+        }
+    };
+
+    const connectWebSocket = useCallback(() => {
+        if (!walletAddress) return;
+
+        // Tạo WebSocket URL (thay http bằng ws)
+        const wsUrl = WS_URL.replace(/^http/, 'ws');
+        const fullWsUrl = `${wsUrl}/ws/websocket`;  // Spring STOMP endpoint thường là /ws/websocket nếu không dùng SockJS
+
+        const client = new Client({
+            brokerURL: WS_URL.replace(/^http/, 'ws'),
+            connectHeaders: {
+                // Nếu cần auth, thêm JWT: Authorization: `Bearer ${token}`
+            },
+            reconnectDelay: 5000,
+            heartbeatIncoming: 4000,
+            heartbeatOutgoing: 4000,
+            onConnect: () => {
+                console.log('✅ WebSocket connected!');
+
+                // Subscribe cá nhân: /topic/private/{wallet}
+                client.subscribe(`/topic/private/${walletAddress.toLowerCase()}`, (message) => {
+                    const newNote: Notification = JSON.parse(message.body);
+                    setNotifications(prev => [newNote, ...prev]); // Thêm vào đầu danh sách (mới nhất trước)
+                    // Optional: Hiển thị toast/alert cho user
+                    alert(`🔔 New Notification: ${newNote.title}`);
+                });
+
+                // Optional: Subscribe theo role (lấy role từ API hoặc state)
+                // client.subscribe(`/topic/role/USER`, (message) => { ... });
+
+                // Optional: Subscribe public
+                // client.subscribe(`/topic/public`, (message) => { ... });
+            },
+            onStompError: (frame) => {
+                console.error('❌ STOMP error:', frame);
+            },
+            onWebSocketError: (error) => {
+                console.error('❌ WebSocket error:', error);
+            },
+            onDisconnect: () => {
+                console.log('🔌 WebSocket disconnected');
+            }
+        });
+
+        client.activate();
+        stompClientRef.current = client;
+    }, [walletAddress]);
+
     const handleDepositNative = async () => {
         if (!rechargeAmount || parseFloat(rechargeAmount) <= 0) { alert('Vui lòng nhập số tiền hợp lệ'); return; }
         try {
@@ -210,10 +284,10 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
             const provider = new ethers.BrowserProvider(window.ethereum);
             const signer = await provider.getSigner();
             const amountInWei = ethers.parseEther(rechargeAmount);
-            
+
             const depositInterface = new ethers.Interface(["function depositNative() payable"]);
             const data = depositInterface.encodeFunctionData("depositNative", []);
-            
+
             let gasLimit;
             try {
                 gasLimit = await provider.estimateGas({ from: walletAddress, to: EXCHANGE_CONTRACT_ADDRESS, value: amountInWei, data: data });
@@ -290,7 +364,7 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
             const signer = await provider.getSigner();
             const exchangeContract = new ethers.Contract(EXCHANGE_CONTRACT_ADDRESS, CarbonCreditExchange.abi, signer);
             const amountInWei = ethers.parseEther(withdrawalAmount);
-            
+
             const balance = await exchangeContract.nativeBalances(walletAddress);
             if (balance < amountInWei) { alert('❌ Số dư không đủ!'); return; }
 
@@ -341,9 +415,11 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
     };
 
     // --- DATA THẬT (MẢNG RỖNG CHỜ API) ---
-    const tokenHistory: any[] = []; 
-    const notifications: any[] = []; 
-    const retiredEntries: RetiredEntry[] = []; 
+    const tokenHistory: any[] = [];
+    const retiredEntries: RetiredEntry[] = [];
+
+    // Tính tổng credits cho Withdraw stat (sửa lỗi cũ)
+    const totalExchangeCredits = exchangeCreditBalances.reduce((sum, c) => sum + parseFloat(c.availableBalance || '0'), 0).toFixed(2);
 
     const stats = [
         {
@@ -355,8 +431,8 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
         },
         {
             name: 'Withdraw',
-            value: exchangeNativeBalance,
-            unit: 'tCO₂',
+            value: totalExchangeCredits,
+            unit: 'tCO₂ (Exch)',
             icon: Leaf,
             action: () => setShowWithdrawalPopup(true),
         },
@@ -382,13 +458,31 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
     }, [walletAddress]);
 
     useEffect(() => { if (showRechargePopup) fetchOwnedTokens(); }, [showRechargePopup, walletAddress]);
-    useEffect(() => { 
+    useEffect(() => {
         if (showWithdrawalPopup) {
             fetchExchangeNativeBalance();
             fetchExchangeCreditBalances();
         }
     }, [showWithdrawalPopup, walletAddress]);
     useEffect(() => { if (showTokenHistoryPopup) fetchMyTokens(); }, [showTokenHistoryPopup, walletAddress]);
+
+    // WebSocket & Initial Fetch
+    useEffect(() => {
+        if (!walletAddress) return;
+
+        // Fetch initial notifications
+        fetchNotifications();
+
+        // Connect WebSocket
+        connectWebSocket();
+
+        return () => {
+            // Cleanup
+            if (stompClientRef.current) {
+                stompClientRef.current.deactivate();
+            }
+        };
+    }, [walletAddress, connectWebSocket]);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -397,7 +491,7 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
                 {stats.map((stat, idx) => {
                     const Icon = stat.icon;
                     return (
-                        <div key={idx} 
+                        <div key={idx}
                             onClick={stat.action}
                             className="group relative bg-white rounded-2xl p-6 border border-green-100 shadow-sm hover:shadow-lg hover:border-green-300 transition-all duration-300 cursor-pointer overflow-hidden"
                         >
@@ -407,7 +501,7 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
                                 </div>
                                 <span className="text-xs font-medium px-2 py-1 rounded-full bg-green-50 text-green-700 group-hover:bg-green-100 transition-colors">Action</span>
                             </div>
-                            
+
                             <div className="relative z-10">
                                 <h3 className="text-2xl font-bold text-gray-900 tracking-tight">{stat.value}</h3>
                                 <div className="flex justify-between items-center mt-1">
@@ -420,7 +514,7 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
                 })}
             </div>
 
-            {/* --- NOTIFICATIONS (REAL DATA) --- */}
+            {/* --- NOTIFICATIONS (REAL DATA VIA WS + API) --- */}
             <div className="bg-white rounded-3xl p-6 border border-green-100 shadow-sm">
                 <div className="flex items-center mb-6">
                     <div className="p-2 bg-green-50 rounded-lg mr-3">
@@ -428,7 +522,7 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
                     </div>
                     <h3 className="text-lg font-bold text-gray-900">Notifications</h3>
                 </div>
-                
+
                 {notifications.length === 0 ? (
                     <div className="text-center py-10 text-gray-400 bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
                         <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm">
@@ -437,9 +531,35 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
                         <p className="text-sm font-medium text-gray-500">No new notifications</p>
                     </div>
                 ) : (
-                    <div className="overflow-hidden rounded-xl border border-gray-100">
+                    <div className="overflow-hidden rounded-xl border border-gray-100 max-h-96 overflow-y-auto">
                         <table className="min-w-full divide-y divide-gray-200">
-                            {/* Render data here when available */}
+                            <thead className="sticky top-0 bg-white">
+                                <tr>
+                                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Title</th>
+                                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Message</th>
+                                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Type</th>
+                                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Time</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {notifications.map((n) => (
+                                    <tr key={n.id} className="hover:bg-green-50 transition-colors">
+                                        <td className="px-4 py-3 font-bold text-gray-900">{n.title}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate" title={n.message}>{n.message}</td>
+                                        <td className="px-4 py-3">
+                                            <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${n.type === 'SUCCESS' ? 'bg-green-100 text-green-800' :
+                                                    n.type === 'WARNING' ? 'bg-yellow-100 text-yellow-800' :
+                                                        'bg-gray-100 text-gray-800'
+                                                }`}>
+                                                {n.type}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-xs text-gray-400">
+                                            {n.createdAt ? new Date(n.createdAt).toLocaleString('vi-VN') : 'Just now'}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
                         </table>
                     </div>
                 )}
@@ -458,7 +578,7 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
-                        
+
                         <div className="p-6">
                             <div className="flex bg-gray-50 p-1 rounded-lg mb-6">
                                 <button onClick={() => setRechargeType('Money')} className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${rechargeType === 'Money' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Native (ETH)</button>
@@ -592,9 +712,9 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
                             {/* Holdings Table */}
                             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-8">
                                 <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-white">
-                                    <h4 className="font-bold text-gray-800 flex items-center"><Leaf className="w-4 h-4 mr-2 text-green-500"/> My Holdings</h4>
+                                    <h4 className="font-bold text-gray-800 flex items-center"><Leaf className="w-4 h-4 mr-2 text-green-500" /> My Holdings</h4>
                                 </div>
-                                
+
                                 {myTokens.length === 0 ? (
                                     <div className="text-center py-16">
                                         <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -639,7 +759,7 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
                                     </div>
                                 )}
                             </div>
-                            
+
                             {/* History Section (Real data only) */}
                             {tokenHistory.length > 0 && (
                                 <div>
@@ -687,8 +807,11 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
                                         </div>
                                     )}
                                 </div>
+
+
                             )}
                         </div>
+                        
                     </div>
                 </div>
             )}

@@ -87,7 +87,7 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
   // Function lưu URLs (hoặc hashes) vào user profile qua API
   const updateUserProfileWithUrls = async (docUrls: string[]) => {
     try {
-      const response = await api.post('/user/updateProfile', {
+      const response = await api.put('user/updateProfile', {
         documentUrls: docUrls  // Hoặc documentHashes nếu backend lưu IpfsHash thay vì URL
         // Có thể chỉnh field name theo backend, ví dụ: { licenses: docUrls }
       });
