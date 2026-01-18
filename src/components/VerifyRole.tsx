@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Plus, Edit3, Eye, CheckCircle, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import api from '../utils/axiosInstance';
 import { ethers } from 'ethers';
-import CarbonCreditEx from '../abi/CarbonCredit.json';
-
+import CarbonCreditEx from '../abi/CarbonCreditSystem.json';
 interface RoleRequest {
   id: string;
   userId: string;

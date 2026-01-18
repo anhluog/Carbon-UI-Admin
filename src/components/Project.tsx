@@ -3,7 +3,7 @@ import { Award, Calendar, MapPin, Leaf, TrendingUp, Filter, Share2, Eye, BarChar
 import api from '../utils/axiosInstance';
 import React, { useEffect, useState } from 'react';
 import { ethers } from 'ethers';
-import CarbonCreditEx from '../abi/CarbonCredit.json';
+import CarbonCreditEx from '../abi/CarbonCreditSystem.json';
 
 interface ProjectsProps {
   walletAddress: string;
@@ -211,10 +211,10 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
       await tx.wait();
 
       // Sync backend
-      await api.post(`/projects/${mintProject.id}/mint`, {
-        mintAmount,
-        txHash: tx.hash,
-      });
+      // await api.post(`/projects/${mintProject.id}/mint`, {
+      //   mintAmount,
+      //   txHash: tx.hash,
+      // });
 
       // Đóng modal + refetch data (không reload trang)
       setMintModalOpen(false);

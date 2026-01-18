@@ -44,6 +44,8 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
   const [processedProjects, setProcessedProjects] = useState<Array<any>>([]); // Cache cho processed
   const [loading, setLoading] = useState(true);
   const [initialLoad, setInitialLoad] = useState(true); // Để phân biệt load ban đầu
+  const [projects, setProjects] = useState<any[]>([]);
+
 
   const [showRejectionPopup, setShowRejectionPopup] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');

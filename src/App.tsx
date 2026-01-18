@@ -16,6 +16,8 @@ import CryptoMarket from './components/CryptoMarket';
 import OrderBook from './components/OrderBook';
 import ProjectDetailPage from './components/ProjectDetail';
 import UserManagement from './components/UserManagement';
+import GrafanaDashboardPage from './page/GrafanaDashboardPage';
+import AdminReport from './components/AdminReport';
 
 function App() {
   const [activeTab, setActiveTab] = useState('marketplace');
@@ -147,7 +149,7 @@ function App() {
       const signature = await signer.signMessage(message);  // Returns Promise<string> - type-safe
 
       // Gọi BE API auth
-      const response = await axios.post("http://localhost:8080/api/auth/login", {
+      const response = await axios.post("http://localhost:8081/api/auth/login", {
         address,
         message,
         signature
@@ -272,6 +274,8 @@ function App() {
     { id: 'myToken', name: 'My Token', icon: Award, roles: ['user', 'owner'], restricted: true },
     { id: 'projectDetail', name: 'Project Detail', icon: Award, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
     { id: 'userManagement', name: 'User Management', icon: Users, roles: ['superadmin', 'admin'], restricted: true },
+    { id: 'grafana', name: 'Grafana Dashboard', icon: Award, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
+    { id: 'adminReport', name: 'Admin Report', icon: Award, roles: ['admin', 'superadmin'], restricted: true },
   ];
 
   const displayedTabs = isWalletConnected
@@ -323,6 +327,7 @@ function App() {
       case 'cryptomarket': return <CryptoMarket />;
       case 'orderbook': return <OrderBook />;
       case 'userManagement': return <UserManagement />;
+      case 'adminReport': return <AdminReport />;
       case 'projectDetail':
         return selectedProjectId ? (
           <ProjectDetailPage
@@ -345,6 +350,9 @@ function App() {
             </button>
           </div>
         );
+      case 'grafana':
+        return <GrafanaDashboardPage />;
+
       default:
         return (
           <Marketplace

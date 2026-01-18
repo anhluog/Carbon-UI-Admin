@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit3, Eye, MapPin, CheckCircle, Calendar, X, Clock, TrendingUp, BarChart3, Filter, Leaf } from 'lucide-react';
 import api from '../utils/axiosInstance';  // Import axios instance từ utils
 import { ethers } from 'ethers';
-import CarbonCreditEx from '../abi/CarbonCredit.json';
+import CarbonCreditEx from '../abi/CarbonCreditSystem.json';
 
 interface Project {
     id: string;
@@ -228,85 +228,62 @@ const ApprovedProject: React.FC<ApprovedProjectProps> = ({ onOpenProjectDetail }
     };
 
     const handleConfirmAccept = async (project: Project) => {
-        const userStr = localStorage.getItem('user');
-        if (!userStr) {
-            alert('User not found');
+    // ... lấy user từ localStorage ...
+
+    try {
+        const contractAddress = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
+        const provider = new ethers.BrowserProvider((window as any).ethereum);
+        const signer = await provider.getSigner();
+        const contract = new ethers.Contract(contractAddress, CarbonCreditEx.abi, signer);
+
+        const myAddress = await signer.getAddress();
+
+        // --- BƯỚC DEBUG: Kiểm tra quyền trực tiếp trên chuỗi trước khi gửi ---
+        const isGov = await contract.governmentOrganizations(myAddress);
+        if (!isGov) {
+            alert(`Ví của bạn (${myAddress}) chưa được cấp quyền GOVERNMENT trên Blockchain!`);
             return;
         }
 
-        const user = JSON.parse(userStr);
-
-        try {
-            const contractAddress = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
-
-            const provider = new ethers.BrowserProvider((window as any).ethereum);
-            const signer = await provider.getSigner();
-            const contract = new ethers.Contract(
-                contractAddress,
-                CarbonCreditEx.abi,
-                signer
-            );
-
-            console.log('📝 Approving project:', {
-                projectId: project.id,
-                ownerId: project.ownerId,
-                verifierId: project.verifiedBy,
-                governmentId: user.id,
-                expectedCredits: project.expectedCredits
-            });
-
-            const code = await provider.getCode(project.ownerId);
-            console.log("CODE at Owner Address:", code);
-
-            // 🔹 Gọi smart contract
-            const tx = await contract.approveAndMintProject(
-                project.id,
-                project.ownerId,
-                project.verifiedBy,
-                user.id,
-                project.ipfsHash,
-                project.expectedCredits
-            );
-
-            console.log('Tx sent:', tx.hash);
-
-            const receipt = await tx.wait(1);
-            console.log('Tx confirmed:', receipt);
-
-            // 🔹 LẤY tokenId TỪ EVENT (chuẩn nhất)
-            const event = receipt.logs
-                .map((log: any) => {
-                    try {
-                        return contract.interface.parseLog(log);
-                    } catch {
-                        return null;
-                    }
-                })
-                .find((e: any) => e?.name === 'ProjectApproved');
-
-            if (!event) {
-                throw new Error('ProjectApproved event not found');
-            }
-
-            const creditTokenId = event.args.creditTokenId;
-            const nftTokenId = event.args.nftTokenId;
-
-            console.log('Credit Token ID:', creditTokenId.toString());
-
-            // 🔹 GỬI VỀ BE với field tokenId
-            await api.post(`/projects/${project.id}/approved`, {
-                approved: true,
-                nftTokenId: Number(nftTokenId),     // 👈 BẮT BUỘC
-                tokenId: Number(creditTokenId) // 👈 QUAN TRỌNG
-            });
-
-            fetchRequests(); // Refetch processing after accept
-
-        } catch (err) {
-            console.error('Accept failed:', err);
-            alert('Accept project failed');
+        const isVerifierValid = await contract.verifiedOrganizations(project.verifiedBy);
+        if (!isVerifierValid) {
+            alert(`Địa chỉ Verifier (${project.verifiedBy}) chưa được xác thực trên Blockchain!`);
+            return;
         }
-    };
+
+        console.log("🚀 Gửi dữ liệu:", {
+            uuid: project.id,
+            owner: project.ownerId,
+            verifier: project.verifiedBy,
+            approver: myAddress, // Dùng địa chỉ từ ví thay vì user.id để đảm bảo khớp msg.sender
+            hash: project.ipfsHash,
+            quota: project.expectedCredits
+        });
+
+        // Gọi hàm
+        const tx = await contract.approveAndMintProject(
+            project.id,
+            project.ownerId,
+            project.verifiedBy,
+            myAddress, // Truyền myAddress vào đây
+            project.ipfsHash,
+            project.expectedCredits
+        );
+
+        await tx.wait();
+        alert("Thành công!");
+        fetchRequests();
+
+    } catch (err: any) {
+        console.error('Blockchain error detail:', err);
+        // Cố gắng lấy lý do Revert (nếu có)
+        if (err.data) {
+            alert("Lỗi từ Contract: " + err.data.message);
+        } else {
+            alert("Giao dịch thất bại: Kiểm tra xem quyền GOVERNMENT hoặc Verifier đã được cấp chưa.");
+        }
+    }
+};
 
     // Cập nhật handleViewProject: Gọi prop để mở detail tab thay vì navigate
     const handleViewProject = (project: Project) => {
