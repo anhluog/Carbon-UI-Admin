@@ -219,7 +219,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({
               <div className="flex justify-between items-start mb-6">
                 <div>
                   <h3 className="text-2xl font-bold text-gray-900">Trading Exchange</h3>
-                  <p className="text-sm text-gray-600">Token ID: {selectedTokenId}</p>
+                  <p className="text-sm text-gray-600">Project: {projects.find(p => tradingStatuses.get(p.id)?.tokenId === selectedTokenId)?.name || 'Unknown'}</p>
                 </div>
                 <button
                   onClick={() => {

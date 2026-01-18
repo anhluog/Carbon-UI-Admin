@@ -236,11 +236,32 @@ const ApprovedProject: React.FC<ApprovedProjectProps> = ({ onOpenProjectDetail }
 
         const user = JSON.parse(userStr);
 
+        // 🔹 1. Validate Input Data
+        if (!project.verifiedBy) {
+            console.error('Validation Error: Project verification is missing.', project);
+            alert('Cannot accept: This project has not been verified by a Verifier yet.');
+            return;
+        }
+
         try {
             const contractAddress = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
 
             const provider = new ethers.BrowserProvider((window as any).ethereum);
             const signer = await provider.getSigner();
+            const signerAddress = await signer.getAddress();
+
+            // 🔹 2. Validate Wallet Matches User
+            if (signerAddress.toLowerCase() !== user.id.toLowerCase()) {
+                console.warn(`Wallet mismatch: Connected ${signerAddress}, User ${user.id}`);
+                const proceed = window.confirm(
+                    `Warning: Your connected wallet (${signerAddress.slice(0, 6)}...${signerAddress.slice(-4)}) ` +
+                    `does not match your logged-in ID (${user.id.slice(0, 6)}...${user.id.slice(-4)}).\n\n` +
+                    `The contract might reject this if you are not the authorized Government admin.\n` +
+                    `Do you want to proceed anyway?`
+                );
+                if (!proceed) return;
+            }
+
             const contract = new ethers.Contract(
                 contractAddress,
                 CarbonCreditEx.abi,
@@ -251,19 +272,21 @@ const ApprovedProject: React.FC<ApprovedProjectProps> = ({ onOpenProjectDetail }
                 projectId: project.id,
                 ownerId: project.ownerId,
                 verifierId: project.verifiedBy,
-                governmentId: user.id,
+                governmentId: user.id || signerAddress,
+                connectedWallet: signerAddress,
+                ipfsHash: project.ipfsHash,
                 expectedCredits: project.expectedCredits
             });
 
             const code = await provider.getCode(project.ownerId);
             console.log("CODE at Owner Address:", code);
 
-            // 🔹 Gọi smart contract
+            // 🔹 Call Smart Contract
             const tx = await contract.approveAndMintProject(
                 project.id,
                 project.ownerId,
                 project.verifiedBy,
-                user.id,
+                signerAddress, // Use connected wallet as approver
                 project.ipfsHash,
                 project.expectedCredits
             );
@@ -273,7 +296,7 @@ const ApprovedProject: React.FC<ApprovedProjectProps> = ({ onOpenProjectDetail }
             const receipt = await tx.wait(1);
             console.log('Tx confirmed:', receipt);
 
-            // 🔹 LẤY tokenId TỪ EVENT (chuẩn nhất)
+            // 🔹 Get Token IDs from Event
             const event = receipt.logs
                 .map((log: any) => {
                     try {
@@ -285,7 +308,8 @@ const ApprovedProject: React.FC<ApprovedProjectProps> = ({ onOpenProjectDetail }
                 .find((e: any) => e?.name === 'ProjectApproved');
 
             if (!event) {
-                throw new Error('ProjectApproved event not found');
+                console.error("Event 'ProjectApproved' not found in logs", receipt.logs);
+                throw new Error('ProjectApproved event not found in transaction receipt');
             }
 
             const creditTokenId = event.args.creditTokenId;
@@ -293,18 +317,31 @@ const ApprovedProject: React.FC<ApprovedProjectProps> = ({ onOpenProjectDetail }
 
             console.log('Credit Token ID:', creditTokenId.toString());
 
-            // 🔹 GỬI VỀ BE với field tokenId
+            // 🔹 Call Backend
             await api.post(`/projects/${project.id}/approved`, {
                 approved: true,
-                nftTokenId: Number(nftTokenId),     // 👈 BẮT BUỘC
-                tokenId: Number(creditTokenId) // 👈 QUAN TRỌNG
+                nftTokenId: Number(nftTokenId),
+                tokenId: Number(creditTokenId)
             });
 
-            fetchRequests(); // Refetch processing after accept
+            alert(`Project accepted successfully! Token ID: ${creditTokenId}`);
+            fetchRequests(); // Refetch
 
-        } catch (err) {
+        } catch (err: any) {
             console.error('Accept failed:', err);
-            alert('Accept project failed');
+
+            // Detailed Error Handling
+            let errorMessage = 'Accept project failed.';
+            if (err.code === 'CALL_EXCEPTION') {
+                errorMessage += ' The Smart Contract rejected the transaction.';
+                errorMessage += '\nPossible reasons:\n1. You do not have "Government" role.\n2. Project ID already exists.\n3. Verifier address is invalid.';
+            } else if (err.reason) {
+                errorMessage += ` Reason: ${err.reason}`;
+            } else if (err.message) {
+                errorMessage += ` Details: ${err.message.slice(0, 100)}...`;
+            }
+
+            alert(errorMessage);
         }
     };
 

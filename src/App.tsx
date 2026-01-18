@@ -10,12 +10,12 @@ import Projects from './components/Project';
 import RequestRole from './components/RequestRole';
 import VerifyRole from './components/VerifyRole';
 import VerifyProject from './components/VerifyProject';
-import MyToken from './components/MyToken';
 import ApprovedProject from './components/ApprovedProject';
 import CryptoMarket from './components/CryptoMarket';
 import OrderBook from './components/OrderBook';
 import ProjectDetailPage from './components/ProjectDetail';
 import UserManagement from './components/UserManagement';
+import RetireCredits from './components/RetireCredits';
 
 function App() {
   const [activeTab, setActiveTab] = useState('marketplace');
@@ -272,6 +272,8 @@ function App() {
     { id: 'myToken', name: 'My Token', icon: Award, roles: ['user', 'owner'], restricted: true },
     { id: 'projectDetail', name: 'Project Detail', icon: Award, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
     { id: 'userManagement', name: 'User Management', icon: Users, roles: ['superadmin', 'admin'], restricted: true },
+    { id: 'retire', name: 'Retire Credits', icon: Leaf, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: true },
+  
   ];
 
   const displayedTabs = isWalletConnected
@@ -301,7 +303,6 @@ function App() {
 
     switch (activeTab) {
       case 'user': return <User walletAddress={walletAddress} />;
-      case 'myToken': return <MyToken />;
       case 'requestReview': return <RequestReview walletAddress={walletAddress} />;
       case 'requestRole': return <RequestRole walletAddress={walletAddress} />;
 
@@ -320,8 +321,8 @@ function App() {
       case 'verifyProject': return <VerifyProject onOpenProjectDetail={openProjectDetail} />;
       case 'updateProfile': return <Profile walletAddress={walletAddress} setActiveTab={setActiveTab} />;
       case 'approvedProject': return <ApprovedProject onOpenProjectDetail={openProjectDetail} />;
-      case 'cryptomarket': return <CryptoMarket />;
-      case 'orderbook': return <OrderBook />;
+      case 'cryptomarket': return <CryptoMarket walletAddress={''} />;
+      case 'orderbook': return <OrderBook creditId={''} />;
       case 'userManagement': return <UserManagement />;
       case 'projectDetail':
         return selectedProjectId ? (
@@ -345,6 +346,8 @@ function App() {
             </button>
           </div>
         );
+      case 'retire':
+        return <RetireCredits />;
       default:
         return (
           <Marketplace

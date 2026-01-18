@@ -1,6 +1,9 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import api from '../utils/axiosInstance';
-import { TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import { Client } from '@stomp/stompjs';
+
+const SOCKET_URL = 'ws://localhost:8080/ws';
 
 interface OrderBookProps {
   creditId: string;
@@ -19,317 +22,236 @@ interface OrderBookData {
   lastUpdate: string;
 }
 
+// Helper to calculate accumulated totals
+const processOrderLevels = (rawLevels: any[], isBid: boolean): OrderLevel[] => {
+  if (!rawLevels || !Array.isArray(rawLevels)) return [];
+
+  const levels: OrderLevel[] = [];
+  let total = 0;
+
+  // Clone and sort
+  // Bids: High to Low
+  // Asks: Low to High
+  const sorted = [...rawLevels].sort((a, b) => isBid ? b.price - a.price : a.price - b.price);
+
+  sorted.forEach((item) => {
+    total += item.amount;
+    levels.push({ price: item.price, size: item.amount, total: total });
+  });
+
+  return levels;
+};
+
 const OrderBook: React.FC<OrderBookProps> = ({ creditId }) => {
   const [orderBook, setOrderBook] = useState<OrderBookData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [isConnected, setIsConnected] = useState(false);
 
-  // ✅ Use useCallback to memoize function
-  const loadOrderBook = useCallback(async () => {
-    // ✅ Validation: Stop if creditId is invalid
-    if (!creditId || creditId === 'undefined' || creditId === 'null') {
-      console.warn('⚠️ OrderBook: Invalid creditId, skipping load');
-      setError('Invalid credit ID');
-      return;
-    }
+  const stompClientRef = useRef<Client | null>(null);
 
+  // 1. Initial REST Load (Snapshot)
+  const loadOrderBookSnapshot = useCallback(async () => {
+    if (!creditId) return;
     try {
       setLoading(true);
       setError(null);
-
-      console.log('📊 Loading orderbook for creditId:', creditId);
-
       const response = await api.get(`/orders/snapshot/${creditId}`);
-      
-      // Transform data from API to OrderBook format
       const data = response.data;
-      
-      // Process bids (buy orders) - sorted by price DESC
-      const bidsArray: OrderLevel[] = [];
-      let bidTotal = 0;
-      
-      if (data.bids && Array.isArray(data.bids)) {
-        data.bids.forEach((bid: any) => {
-          bidTotal += bid.amount;
-          bidsArray.push({
-            price: bid.price,
-            size: bid.amount,
-            total: bidTotal
-          });
-        });
-      }
-
-      // Process asks (sell orders) - sorted by price ASC
-      const asksArray: OrderLevel[] = [];
-      let askTotal = 0;
-      
-      if (data.asks && Array.isArray(data.asks)) {
-        data.asks.forEach((ask: any) => {
-          askTotal += ask.amount;
-          asksArray.push({
-            price: ask.price,
-            size: ask.amount,
-            total: askTotal
-          });
-        });
-      }
 
       setOrderBook({
         creditId: creditId,
-        bids: bidsArray,
-        asks: asksArray,
+        bids: processOrderLevels(data.bids, true),
+        asks: processOrderLevels(data.asks, false),
         lastUpdate: new Date().toISOString()
       });
-
-      setLoading(false);
-    } catch (error: any) {
-      console.error('Failed to load order book:', error);
-      if (error.response?.status === 404) {
-        setError('No orderbook found. Be the first to place an order!');
-      } else if (error.response?.status === 403) {
-        setError('Access denied. Please check permissions.');
-      } else {
-        setError('Failed to load orderbook');
-      }
+    } catch (err: any) {
+      console.warn('⚠️ Snapshot failed, waiting for WebSocket:', err.message);
+      // Không set error - WebSocket sẽ cung cấp data
+    } finally {
       setLoading(false);
     }
-  }, [creditId]); // ✅ Only re-create when creditId changes
+  }, [creditId]);
 
+  // 2. WebSocket Connection
   useEffect(() => {
-    // ✅ Skip if invalid creditId
-    if (!creditId || creditId === 'undefined' || creditId === 'null') {
-      console.warn('⚠️ OrderBook mounted with invalid creditId:', creditId);
-      setError('Invalid credit ID');
-      return;
-    }
+    if (!creditId) return;
 
-    // Initial load
-    loadOrderBook();
-
-    // ✅ Auto refresh with longer interval (5 seconds instead of 2)
-    let interval: NodeJS.Timeout | null = null;
+    // Load initial snapshot first
+    loadOrderBookSnapshot();
     
-    if (autoRefresh) {
-      interval = setInterval(() => {
-        loadOrderBook();
-      }, 500000); // ✅ Changed from 2000ms to 5000ms
-      
-      console.log('🔄 Auto-refresh enabled for creditId:', creditId);
-    }
+    // Setup STOMP Client - Native WebSocket (không dùng SockJS)
+    const client = new Client({
+      brokerURL: SOCKET_URL,  // ← DÙNG brokerURL thay vì webSocketFactory
+      reconnectDelay: 5000,
+      heartbeatIncoming: 4000,
+      heartbeatOutgoing: 4000,
+      onConnect: () => {
+        setIsConnected(true);
+        console.log('🟢 Connected to OrderBook WS');
+        // Subscribe to specific credit topic
+        client.subscribe(`/topic/orderbook/${creditId}`, (message) => {
+          if (message.body) {
+            const update = JSON.parse(message.body);
 
-    // ✅ Cleanup function
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-        console.log('🛑 Auto-refresh stopped for creditId:', creditId);
+            // Recalculate totals on the fly
+            setOrderBook({
+              creditId: creditId,
+              bids: processOrderLevels(update.bids, true),
+              asks: processOrderLevels(update.asks, false),
+              lastUpdate: new Date().toISOString()
+            });
+          }
+        });
+      },
+      onDisconnect: () => {
+        setIsConnected(false);
+        console.log('🔴 Disconnected from OrderBook WS');
+      },
+      onStompError: (frame) => {
+        console.error('Broker reported error: ' + frame.headers['message']);
+        setError('Real-time connection failed');
+      },
+      onWebSocketError: (event) => {
+        console.error('WebSocket error:', event);
       }
+    });
+    
+    client.activate();
+    stompClientRef.current = client;
+    
+    return () => {
+      client.deactivate();
     };
-  }, [creditId, autoRefresh, loadOrderBook]); // ✅ Include loadOrderBook in dependencies
+  }, [creditId, loadOrderBookSnapshot]);
 
   const getVolumeBarWidth = (total: number, maxTotal: number): number => {
     if (maxTotal === 0) return 0;
     return (total / maxTotal) * 100;
   };
 
-  // ✅ Early return if invalid creditId
-  if (!creditId || creditId === 'undefined' || creditId === 'null') {
-    return (
-      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-red-100">
-        <div className="text-center py-8">
-          <p className="text-red-600 mb-2">⚠️ Invalid Credit ID</p>
-          <p className="text-sm text-gray-500">
-            Please select a valid carbon credit to view the orderbook.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  if (!creditId) return null;
 
   const maxBidTotal = orderBook?.bids[orderBook.bids.length - 1]?.total || 0;
   const maxAskTotal = orderBook?.asks[orderBook.asks.length - 1]?.total || 0;
   const maxTotal = Math.max(maxBidTotal, maxAskTotal);
 
-  const spreadPrice = orderBook && orderBook.asks.length > 0 && orderBook.bids.length > 0
-    ? orderBook.asks[0].price - orderBook.bids[0].price
-    : 0;
-
-  const spreadPercent = orderBook && orderBook.bids.length > 0 && spreadPrice > 0
-    ? (spreadPrice / orderBook.bids[0].price) * 100
-    : 0;
+  const bestBid = orderBook?.bids[0]?.price || 0;
+  const bestAsk = orderBook?.asks[0]?.price || 0;
+  const spreadPrice = bestAsk && bestBid ? bestAsk - bestBid : 0;
+  const spreadPercent = bestBid > 0 ? (spreadPrice / bestBid) * 100 : 0;
 
   return (
-    <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
-          <span>📊 Order Book</span>
-          {loading && <RefreshCw className="h-4 w-4 animate-spin text-green-600" />}
-        </h3>
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            className={`text-xs px-2 py-1 rounded-lg transition-colors ${
-              autoRefresh
-                ? 'bg-green-100 text-green-700'
-                : 'bg-gray-100 text-gray-600'
-            }`}
-            title={autoRefresh ? 'Auto-refresh every 5 seconds' : 'Manual refresh only'}
-          >
-            {autoRefresh ? '🟢 Auto (5s)' : '⚪ Manual'}
-          </button>
-          <button
-            onClick={loadOrderBook}
-            disabled={loading}
-            className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
-          >
-            Refresh
-          </button>
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 h-full flex flex-col relative">
+      {/* Live Indicator */}
+      {isConnected ? (
+        <div className="absolute top-4 right-4 flex items-center space-x-1 text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full animate-pulse border border-green-200">
+          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+          <span>LIVE</span>
         </div>
-      </div>
-
-      {/* Error State */}
-      {error && (
-        <div className="text-center py-8">
-          <p className="text-gray-500 mb-4">{error}</p>
-          <button
-            onClick={loadOrderBook}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-          >
-            Try Again
-          </button>
+      ) : (
+        <div className="absolute top-4 right-4 flex items-center space-x-1 text-xs font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-full border border-gray-200">
+          <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+          <span>CONNECTING...</span>
         </div>
       )}
-
-      {/* Order Book Data */}
-      {!error && orderBook && (
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
+          <Activity className="h-5 w-5 text-green-600" />
+          <span> Order Book</span>
+        </h3>
+      </div>
+      {/* Error */}
+      {error && (
+        <div className="text-center py-4 bg-red-50 rounded-lg mb-4 text-sm text-red-600">
+          {error}
+        </div>
+      )}
+      {/* Content */}
+      {orderBook ? (
         <>
-          {/* Spread Info */}
+          {/* Spread */}
           {spreadPrice > 0 && (
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Spread:</span>
-                <span className="font-medium text-gray-900">
-                  ${spreadPrice.toFixed(2)} ({spreadPercent.toFixed(2)}%)
-                </span>
-              </div>
+            <div className="flex justify-center items-center space-x-2 mb-4 text-xs font-medium text-gray-500 bg-gray-50 py-1 rounded-md">
+              <span>Spread: <span className="text-gray-900">${spreadPrice.toFixed(2)}</span></span>
+              <span>({spreadPercent.toFixed(2)}%)</span>
             </div>
           )}
+          <div className="grid grid-cols-2 gap-4">
 
-          <div className="grid grid-cols-2 gap-6">
-            {/* Bids (Buy Orders) */}
-            <div>
-              <div className="flex items-center space-x-2 mb-3">
-                <TrendingUp className="h-5 w-5 text-green-600" />
-                <h4 className="text-lg font-semibold text-green-600">Bids (Buy)</h4>
+            {/* BIDS */}
+            <div className="flex flex-col">
+              <div className="flex items-center space-x-2 mb-2 pb-2 border-b border-gray-100">
+                <TrendingUp className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-semibold text-gray-700">Buy Orders</span>
               </div>
-              
-              {orderBook.bids.length > 0 ? (
-                <div className="space-y-1">
-                  <div className="grid grid-cols-3 gap-2 text-xs font-medium text-gray-500 mb-2">
-                    <div>Price (USD)</div>
-                    <div className="text-right">Size</div>
-                    <div className="text-right">Total</div>
-                  </div>
-                  {orderBook.bids.slice(0, 10).map((bid, index) => ( // ✅ Limit to top 10
-                    <div key={index} className="relative">
-                      {/* Volume bar */}
-                      <div
-                        className="absolute inset-0 bg-green-100 opacity-30 rounded"
-                        style={{
-                          width: `${getVolumeBarWidth(bid.total, maxTotal)}%`,
-                        }}
-                      />
-                      {/* Data */}
-                      <div className="relative grid grid-cols-3 gap-2 py-1.5 px-2 hover:bg-green-50 rounded transition-colors">
-                        <div className="text-green-600 font-medium">
-                          ${bid.price.toFixed(2)}
-                        </div>
-                        <div className="text-right text-gray-700">
-                          {bid.size.toLocaleString()}
-                        </div>
-                        <div className="text-right text-gray-500 text-sm">
-                          {bid.total.toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {orderBook.bids.length > 10 && (
-                    <div className="text-center text-xs text-gray-400 pt-2">
-                      +{orderBook.bids.length - 10} more orders
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-400 text-sm">
-                  No buy orders
-                </div>
-              )}
-            </div>
 
-            {/* Asks (Sell Orders) */}
-            <div>
-              <div className="flex items-center space-x-2 mb-3">
-                <TrendingDown className="h-5 w-5 text-red-600" />
-                <h4 className="text-lg font-semibold text-red-600">Asks (Sell)</h4>
+              <div className="flex-1 space-y-0.5">
+                <div className="grid grid-cols-3 text-[10px] text-gray-400 font-medium px-2 mb-1">
+                  <span>Price</span>
+                  <span className="text-right">Amount</span>
+                  <span className="text-right">Total</span>
+                </div>
+
+                {orderBook.bids.length === 0 && <div className="text-center text-xs text-gray-400 py-4">No Bids</div>}
+                {orderBook.bids.map((bid, i) => (
+                  <div key={i} className="relative group cursor-default">
+                    {/* Bar */}
+                    <div
+                      className="absolute right-0 top-0 bottom-0 bg-green-100/50 transition-all duration-300"
+                      style={{ width: `${getVolumeBarWidth(bid.total, maxTotal)}%` }}
+                    />
+
+                    <div className="relative grid grid-cols-3 text-xs py-1.5 px-2 hover:bg-green-50/80 transition-colors">
+                      <span className="text-green-700 font-mono font-medium">${bid.price.toFixed(2)}</span>
+                      <span className="text-right text-gray-700">{bid.size}</span>
+                      <span className="text-right text-gray-400">{bid.total}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-              
-              {orderBook.asks.length > 0 ? (
-                <div className="space-y-1">
-                  <div className="grid grid-cols-3 gap-2 text-xs font-medium text-gray-500 mb-2">
-                    <div>Price (USD)</div>
-                    <div className="text-right">Size</div>
-                    <div className="text-right">Total</div>
-                  </div>
-                  {orderBook.asks.slice(0, 10).map((ask, index) => ( // ✅ Limit to top 10
-                    <div key={index} className="relative">
-                      {/* Volume bar */}
-                      <div
-                        className="absolute inset-0 bg-red-100 opacity-30 rounded"
-                        style={{
-                          width: `${getVolumeBarWidth(ask.total, maxTotal)}%`,
-                        }}
-                      />
-                      {/* Data */}
-                      <div className="relative grid grid-cols-3 gap-2 py-1.5 px-2 hover:bg-red-50 rounded transition-colors">
-                        <div className="text-red-600 font-medium">
-                          ${ask.price.toFixed(2)}
-                        </div>
-                        <div className="text-right text-gray-700">
-                          {ask.size.toLocaleString()}
-                        </div>
-                        <div className="text-right text-gray-500 text-sm">
-                          {ask.total.toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {orderBook.asks.length > 10 && (
-                    <div className="text-center text-xs text-gray-400 pt-2">
-                      +{orderBook.asks.length - 10} more orders
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-400 text-sm">
-                  No sell orders
-                </div>
-              )}
             </div>
-          </div>
+            {/* ASKS */}
+            <div className="flex flex-col">
+              <div className="flex items-center space-x-2 mb-2 pb-2 border-b border-gray-100">
+                <TrendingDown className="h-4 w-4 text-red-600" />
+                <span className="text-sm font-semibold text-gray-700">Sell Orders</span>
+              </div>
+              <div className="flex-1 space-y-0.5">
+                <div className="grid grid-cols-3 text-[10px] text-gray-400 font-medium px-2 mb-1">
+                  <span>Price</span>
+                  <span className="text-right">Amount</span>
+                  <span className="text-right">Total</span>
+                </div>
+                {orderBook.asks.length === 0 && <div className="text-center text-xs text-gray-400 py-4">No Asks</div>}
+                {orderBook.asks.map((ask, i) => (
+                  <div key={i} className="relative group cursor-default">
+                    {/* Bar */}
+                    <div
+                      className="absolute right-0 top-0 bottom-0 bg-red-100/50 transition-all duration-300"
+                      style={{ width: `${getVolumeBarWidth(ask.total, maxTotal)}%` }}
+                    />
 
-          {/* Last Update */}
-          <div className="mt-4 pt-4 border-t border-gray-200 text-center text-xs text-gray-500">
-            Last updated: {new Date(orderBook.lastUpdate).toLocaleTimeString()}
+                    <div className="relative grid grid-cols-3 text-xs py-1.5 px-2 hover:bg-red-50/80 transition-colors">
+                      <span className="text-red-700 font-mono font-medium">${ask.price.toFixed(2)}</span>
+                      <span className="text-right text-gray-700">{ask.size}</span>
+                      <span className="text-right text-gray-400">{ask.total}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </>
-      )}
-
-      {/* Loading State */}
-      {!error && !orderBook && loading && (
-        <div className="text-center py-12">
-          <RefreshCw className="h-8 w-8 animate-spin text-green-600 mx-auto mb-4" />
-          <p className="text-gray-500">Loading orderbook...</p>
+      ) : (
+        // Loading Skeleton
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-100 rounded w-1/3"></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="h-32 bg-gray-50 rounded"></div>
+            <div className="h-32 bg-gray-50 rounded"></div>
+          </div>
         </div>
       )}
     </div>
