@@ -82,8 +82,8 @@ const ApprovedProject: React.FC<ApprovedProjectProps> = ({ onOpenProjectDetail }
         try {
             console.log(`Loading image for project ${projectId} from IPFS: ${ipfsHash}`);
             // Sử dụng Cloudflare IPFS gateway (dweb.link) để tránh 504 timeout và CORS issues với ipfs.io
-            const METADATA_GATEWAY = 'https://dweb.link/ipfs/';
-            const response = await fetch(`${METADATA_GATEWAY}${ipfsHash}`);
+            // const METADATA_GATEWAY = 'https://dweb.link/ipfs/';
+            const response = await fetch(`https://dweb.link/ipfs/${ipfsHash}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: Failed to fetch metadata`);
             }

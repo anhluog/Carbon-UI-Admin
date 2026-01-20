@@ -18,6 +18,8 @@ import UserManagement from './components/UserManagement';
 import RetireCredits from './components/RetireCredits';
 import GrafanaDashboardPage from './page/GrafanaDashboardPage';
 import AdminReport from './components/AdminReport';
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function App() {
   const [activeTab, setActiveTab] = useState('marketplace');
@@ -27,6 +29,9 @@ function App() {
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+
+
 
   // Thêm state cho ProjectDetailPage (sử dụng projectId thay vì full project để fetch data tươi)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -40,6 +45,9 @@ function App() {
     setActiveTab('user');
     setError(null);
   }, []);
+
+
+
 
   const handleConnect = async (walletType: string) => {
     if (walletType !== "MetaMask") {
@@ -277,7 +285,7 @@ function App() {
     { id: 'grafana', name: 'Grafana Dashboard', icon: Award, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
     { id: 'adminReport', name: 'Admin Report', icon: Award, roles: ['admin', 'superadmin'], restricted: true },
     { id: 'retire', name: 'Retire Credits', icon: Leaf, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: true },
-  
+
   ];
 
   const displayedTabs = isWalletConnected
@@ -368,6 +376,7 @@ function App() {
   };
 
   return (
+
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50">
       {showLogoutConfirmation && renderLogoutConfirmation()}
       <header className="bg-white/80 backdrop-blur-sm border-b border-green-200 sticky top-0 z-50">
@@ -411,6 +420,16 @@ function App() {
           </div>
         </div>
       </header>
+
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        closeOnClick
+        pauseOnHover
+        draggable
+        theme="light"
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <nav className="mb-8">

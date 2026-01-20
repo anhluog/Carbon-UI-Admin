@@ -1,1227 +1,546 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Users, UserPlus, Shield, Trash2, Search, 
-  Award, Leaf, Plus, Minus, X, AlertTriangle,
+  Users, Shield, Leaf, Plus, Minus, X, AlertTriangle,
   Loader2, Check, ChevronRight, Clock, ExternalLink,
-  TreePine, RefreshCw, FileText, Download, Eye
+  TreePine, RefreshCw, FileText, Eye, Award
 } from 'lucide-react';
 import api from '../utils/axiosInstance';
 import { ethers } from 'ethers';
 import CarbonCredit from '../abi/CarbonCreditSystem.json';
+import { showSuccess, showError, showInfo, showWarning } from '../utils/toast';
 
-interface User {
-  id: string;
-  userId: string;
-  role: string;
-  email?: string;
-  createdAt?: string;
-}
-
-interface CurrentUser {
-  id: string;
-  userId: string;
-  role: string;
-  email?: string;
-  name?: string;
-}
-
-interface VerifierRole {
-  id: string;
-  organizationName: string;
-  description?: string;
-  version?: number;
-}
-
-// ✅ THÊM: Interface cho Retire
-interface MyCreditResponse {
-  creditId: string;
-  tokenId: number;
-  projectId: string;
-  availableBalance: string; // BigInteger từ Java
-}
-
-interface RetireItem {
-  tokenId: number;
-  creditId: string;
-  projectId: string;
-  amount: number;
-  maxAmount: number;
-}
-
-interface Certificate {
-  certificateId: number;
-  retiredBy: string;
-  totalValue: number;
-  timestamp: number;
-  recordCount: number;
-  txHash: string;
-}
-
-interface CertificateRecord {
-  certificateId: number;
-  creditTokenId: number;
-  creditAmount: number;
-}
+// Interfaces (Giữ nguyên các interface của bạn)
+interface User { id: string; userId: string; role: string; email?: string; createdAt?: string; }
+interface CurrentUser { id: string; userId: string; role: string; email?: string; name?: string; }
+interface VerifierRole { id: string; organizationName: string; description?: string; version?: number; }
+interface MyCreditResponse { creditId: string; tokenId: number; projectId: string; availableBalance: string; }
+interface RetireItem { tokenId: number; creditId: string; projectId: string; amount: number; maxAmount: number; }
+interface Certificate { certificateId: number; retiredBy: string; totalValue: number; timestamp: number; recordCount: number; txHash: string; }
+interface CertificateRecord { certificateId: number; creditTokenId: number; creditAmount: number; }
 
 const UserManagement: React.FC = () => {
-  // Existing states
+  // States
   const [usersByRole, setUsersByRole] = useState<Record<string, User[]>>({
-    'USER': [],
-    'OWNER': [],
-    'VERIFIER': [],
-    'GOVERNMENT': [],
-    'ADMIN': []
+    'USER': [], 'OWNER': [], 'VERIFIER': [], 'GOVERNMENT': [], 'ADMIN': []
   });
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [activeRole, setActiveRole] = useState('USER');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showAddMemberPopup, setShowAddMemberPopup] = useState(false);
   const [newUserId, setNewUserId] = useState('');
   const [newRoleName, setNewRoleName] = useState('');
-  // ✅ Verifier roles
-const [verifierRoles, setVerifierRoles] = useState<VerifierRole[]>([]);
-const [verifierRolesLoading, setVerifierRolesLoading] = useState(false);
-const [selectedVerifierRole, setSelectedVerifierRole] = useState('');
+  const [verifierRoles, setVerifierRoles] = useState<VerifierRole[]>([]);
+  const [verifierRolesLoading, setVerifierRolesLoading] = useState(false);
+  const [selectedVerifierRole, setSelectedVerifierRole] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-// ✅ Submit state
-const [submitting, setSubmitting] = useState(false);
-const roles = ['USER', 'OWNER', 'VERIFIER', 'GOVERNMENT', 'ADMIN'];
-
-  // ✅ THÊM: States cho Retire Credits
+  // Retire States
   const [activeSection, setActiveSection] = useState<'users' | 'retire' | 'certificates'>('users');
   const [myCredits, setMyCredits] = useState<MyCreditResponse[]>([]);
   const [retireItems, setRetireItems] = useState<RetireItem[]>([]);
   const [retireStep, setRetireStep] = useState<'select' | 'confirm' | 'processing' | 'success'>('select');
-  const [processing, setProcessing] = useState(false);
   const [certificate, setCertificate] = useState<Certificate | null>(null);
-  const [certificateRecords, setCertificateRecords] = useState<CertificateRecord[]>([]);
   const [myCertificates, setMyCertificates] = useState<Certificate[]>([]);
   const [loadingCredits, setLoadingCredits] = useState(false);
-  const [retireError, setRetireError] = useState('');
 
   const CONTRACT_ADDRESS = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
+  const roles = ['USER', 'OWNER', 'VERIFIER', 'GOVERNMENT', 'ADMIN'];
 
-  // ✅ Load My Credits từ API
+  // --- LOGIC FETCH DATA ---
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      setLoading(true);
+      const promises = roles.map(role => api.get(`/user/all?roleId=${role}`).catch(() => ({ data: [] })));
+      const responses = await Promise.all(promises);
+
+      const processedData: Record<string, User[]> = {};
+      roles.forEach((role, index) => {
+        processedData[role] = (responses[index].data || [])
+          .filter((u: any) => u && u.isActive)
+          .map((u: any) => ({
+            id: u.id, userId: u.id, role: u.roleId, email: u.email, createdAt: u.createdAt
+          }));
+      });
+      setUsersByRole(processedData);
+    } catch (err: any) {
+      showError('Không thể tải danh sách người dùng');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const loadMyCredits = useCallback(async () => {
-    if (!currentUser?.userId) return;
-    
     try {
       setLoadingCredits(true);
-      setRetireError('');
-      
       const response = await api.get('/wallet/my-credits');
-      const credits: MyCreditResponse[] = response.data;
-      
-      // Filter credits có balance > 0
-      const availableCredits = credits.filter(c => 
-        parseInt(c.availableBalance) > 0
-      );
-      
+      const availableCredits = response.data.filter((c: MyCreditResponse) => parseInt(c.availableBalance) > 0);
       setMyCredits(availableCredits);
-      console.log('✅ Loaded', availableCredits.length, 'credits');
-    } catch (err: any) {
-      console.error('Failed to load credits:', err);
-      setRetireError('Failed to load your credits');
+    } catch (err) {
+      showError('Không thể tải danh sách tín chỉ của bạn');
     } finally {
       setLoadingCredits(false);
     }
-  }, [currentUser]);
+  }, []);
 
-  // ✅ Load Certificates từ blockchain
   const loadMyCertificates = useCallback(async () => {
-    if (!currentUser?.userId) return;
-    
+    if (!window.ethereum) return;
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CarbonCredit.abi, provider);
-      
-      const certs: Certificate[] = [];
-      const filter = contract.filters.BatchCertificateRetired(null, currentUser.userId);
+      const filter = contract.filters.BatchCertificateRetired(null, currentUser?.userId);
       const events = await contract.queryFilter(filter, -10000);
 
-      for (const event of events) {
-        const args = (event as any).args;
-        const certId = Number(args.certificateId);
-        const details = await contract.getCertificateDetails(certId);
-        
-        certs.push({
-          certificateId: certId,
+      const certs = await Promise.all(events.map(async (event: any) => {
+        const details = await contract.getCertificateDetails(Number(event.args.certificateId));
+        return {
+          certificateId: Number(event.args.certificateId),
           retiredBy: details.userId,
           totalValue: Number(details.totalValue),
           timestamp: Number(details.timestamp),
           recordCount: Number(details.recordCount),
           txHash: event.transactionHash
-        });
-      }
+        };
+      }));
 
-      certs.sort((a, b) => b.timestamp - a.timestamp);
-      setMyCertificates(certs);
+      setMyCertificates(certs.sort((a, b) => b.timestamp - a.timestamp));
     } catch (err) {
-      console.warn('Could not load certificates:', err);
+      console.warn('Certs load error', err);
     }
   }, [currentUser, CONTRACT_ADDRESS]);
 
-  // ✅ Load khi chuyển sang section retire
-  useEffect(() => {
-    if (activeSection === 'retire' && myCredits.length === 0) {
-      loadMyCredits();
-    }
-    if (activeSection === 'certificates' && myCertificates.length === 0) {
-      loadMyCertificates();
-    }
-  }, [activeSection, loadMyCredits, loadMyCertificates, myCredits.length, myCertificates.length]);
+  // --- LOGIC ROLE MANAGEMENT ---
 
-  // ✅ Thêm/xóa credit khỏi danh sách retire
-  const addRetireItem = (credit: MyCreditResponse) => {
-    if (retireItems.find(item => item.tokenId === credit.tokenId)) return;
-    if (retireItems.length >= 10) {
-      setRetireError('Maximum 10 different credit types allowed');
-      return;
-    }
+  const handleAddMember = async () => {
+    const trimmedId = newUserId.trim();
+    if (!ethers.isAddress(trimmedId)) return showError('Địa chỉ ví không hợp lệ');
+    if (!newRoleName) return showError('Vui lòng chọn quyền');
+    if (newRoleName === 'VERIFIER' && !selectedVerifierRole) return showError('Vui lòng chọn tổ chức xác minh');
 
-    setRetireItems(prev => [...prev, {
-      tokenId: credit.tokenId,
-      creditId: credit.creditId,
-      projectId: credit.projectId,
-      amount: 1,
-      maxAmount: parseInt(credit.availableBalance)
-    }]);
-  };
-
-  const removeRetireItem = (tokenId: number) => {
-    setRetireItems(prev => prev.filter(item => item.tokenId !== tokenId));
-  };
-
-  const updateAmount = (tokenId: number, newAmount: number) => {
-    setRetireItems(prev => prev.map(item => {
-      if (item.tokenId === tokenId) {
-        const clampedAmount = Math.max(1, Math.min(newAmount, item.maxAmount));
-        return { ...item, amount: clampedAmount };
-      }
-      return item;
-    }));
-  };
-
-  const getTotalAmount = () => {
-    return retireItems.reduce((sum, item) => sum + item.amount, 0);
-  };
-
-  // ✅ Thực hiện retire
-  const handleRetire = async () => {
-    if (retireItems.length === 0) {
-      setRetireError('Please select at least one credit to retire');
-      return;
-    }
-
-    setRetireStep('processing');
-    setProcessing(true);
-    setRetireError('');
+    setSubmitting(true);
+    showInfo('Đang khởi tạo giao dịch trên blockchain...');
 
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CarbonCredit.abi, signer);
 
-      const creditTokenIds = retireItems.map(item => item.tokenId);
-      const amounts = retireItems.map(item => item.amount);
-
-      console.log('🔥 Retiring credits:', { creditTokenIds, amounts });
-
-      const tx = await contract.retireCreditBatch(creditTokenIds, amounts);
-      console.log('📝 Tx sent:', tx.hash);
-
-      const receipt = await tx.wait(1);
-      console.log('✅ Tx confirmed:', receipt);
-
-      // Lấy certificateId từ event
-      let certificateId = 0;
-      for (const log of receipt.logs) {
-        try {
-          const parsed = contract.interface.parseLog({
-            topics: log.topics as string[],
-            data: log.data
-          });
-          if (parsed?.name === 'BatchCertificateRetired') {
-            certificateId = Number(parsed.args.certificateId);
-            break;
-          }
-        } catch {
-          continue;
-        }
+      let tx;
+      if (newRoleName === 'VERIFIER') {
+        const org = verifierRoles.find(r => r.id === selectedVerifierRole);
+        tx = await contract.verifyOrganization(trimmedId, org?.organizationName);
+      } else if (newRoleName === 'GOVERNMENT') {
+        tx = await contract.addGovernment(trimmedId);
+      } else if (newRoleName === 'ADMIN') {
+        tx = await contract.addAdmin(trimmedId);
       }
 
-      if (certificateId > 0) {
-        const details = await contract.getCertificateDetails(certificateId);
-        const records = await contract.getCertificateRecords(certificateId);
+      showInfo('Giao dịch đã gửi. Đang chờ xác nhận...');
+      await tx.wait();
 
+      await api.put('/role-request/add-role', { 
+        userId: trimmedId, 
+        roleName: newRoleName,
+        verifierRoleId: newRoleName === 'VERIFIER' ? selectedVerifierRole : null 
+      });
+
+      showSuccess(`Đã cấp quyền ${newRoleName} thành công!`);
+      setShowAddMemberPopup(false);
+      fetchUsers();
+    } catch (err: any) {
+      showError(err.reason || err.message || 'Giao dịch thất bại');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // --- LOGIC RETIRE CREDITS ---
+
+  const handleRetire = async () => {
+    if (retireItems.length === 0) return showError('Vui lòng chọn ít nhất 1 tín chỉ');
+    
+    setRetireStep('processing');
+    showInfo('Đang tiến hành tiêu hủy tín chỉ...');
+
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, CarbonCredit.abi, signer);
+
+      const tx = await contract.retireCreditBatch(
+        retireItems.map(i => i.tokenId),
+        retireItems.map(i => i.amount)
+      );
+      
+      showInfo('Đang chờ Blockchain xác nhận tiêu hủy...');
+      const receipt = await tx.wait();
+
+      // Tìm Certificate ID từ logs
+      let certId = 0;
+      receipt.logs.forEach((log: any) => {
+        try {
+          const parsed = contract.interface.parseLog(log);
+          if (parsed?.name === 'BatchCertificateRetired') certId = Number(parsed.args.certificateId);
+        } catch {}
+      });
+
+      if (certId) {
+        const details = await contract.getCertificateDetails(certId);
         setCertificate({
-          certificateId,
+          certificateId: certId,
           retiredBy: details.userId,
           totalValue: Number(details.totalValue),
           timestamp: Number(details.timestamp),
           recordCount: Number(details.recordCount),
           txHash: tx.hash
         });
-
-        setCertificateRecords(records.map((r: any) => ({
-          certificateId: Number(r.certificateId),
-          creditTokenId: Number(r.creditTokenId),
-          creditAmount: Number(r.creditAmount)
-        })));
       }
 
+      showSuccess('Tiêu hủy tín chỉ thành công! Chứng chỉ đã được tạo.');
       setRetireStep('success');
-      loadMyCertificates();
       loadMyCredits();
-
     } catch (err: any) {
-      console.error('Retire failed:', err);
+      showError(err.reason || 'Tiêu hủy thất bại');
       setRetireStep('confirm');
-      
-      if (err.code === 'ACTION_REJECTED') {
-        setRetireError('Transaction was rejected');
-      } else if (err.reason) {
-        setRetireError('Contract error: ' + err.reason);
-      } else {
-        setRetireError(err.message || 'Retirement failed');
-      }
-    } finally {
-      setProcessing(false);
     }
   };
 
-  // ✅ View certificate details
-  const viewCertificateDetails = async (certId: number) => {
-    try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, CarbonCredit.abi, provider);
-      
-      const details = await contract.getCertificateDetails(certId);
-      const records = await contract.getCertificateRecords(certId);
-      const cert = myCertificates.find(c => c.certificateId === certId);
-
-      setCertificate({
-        certificateId: certId,
-        retiredBy: details.userId,
-        totalValue: Number(details.totalValue),
-        timestamp: Number(details.timestamp),
-        recordCount: Number(details.recordCount),
-        txHash: cert?.txHash || ''
-      });
-
-      setCertificateRecords(records.map((r: any) => ({
-        certificateId: Number(r.certificateId),
-        creditTokenId: Number(r.creditTokenId),
-        creditAmount: Number(r.creditAmount)
-      })));
-
-      setRetireStep('success');
-      setActiveSection('retire');
-    } catch (err) {
-      console.error('Failed to load certificate:', err);
-    }
-  };
-
-  const resetRetireFlow = () => {
-    setRetireStep('select');
-    setRetireItems([]);
-    setCertificate(null);
-    setCertificateRecords([]);
-    setRetireError('');
-  };
-
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp * 1000).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const shortenAddress = (addr: string) => {
-    return addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : '';
-  };
-
-  const getCurrentUserFromLocalStorage = () => {
-    try {
-      const userStr = localStorage.getItem('user');
-      if (userStr) {
-        const user = JSON.parse(userStr);
-        const role = user.roleId || user.role;
-        setCurrentUser({
-          ...user,
-          role: role
-        });
-        console.log('✅ Current user from localStorage:', { ...user, role });
-        return true;
-      }
-      return false;
-    } catch (err) {
-      console.error('Error parsing current user from localStorage:', err);
-      return false;
-    }
-  };
-
-  // Fetch danh sách verifier roles
-  const fetchVerifierRoles = async () => {
-    try {
-      setVerifierRolesLoading(true);
-      const response = await api.get('/verifier-role/all');
-      const rolesData = Array.isArray(response.data) ? response.data : [];
-      setVerifierRoles(rolesData);
-      console.log('✅ Fetched verifier roles:', rolesData);
-    } catch (err: any) {
-      console.error('❌ Failed to fetch verifier roles:', err);
-      setVerifierRoles([]);
-    } finally {
-      setVerifierRolesLoading(false);
-    }
-  };
-
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      console.log('🔍 Fetching users... Current role:', currentUser?.role);
-
-      if (!currentUser || currentUser.role !== 'ADMIN') {
-        setError('Access denied: Admin role required.');
-        setLoading(false);
-        return;
-      }
-
-      // Gọi API song song cho từng role với param ?roleId=${role}
-      const promises = roles.map(role =>
-        api.get(`/user/all?roleId=${role}`).catch(err => {
-          console.warn(`⚠️ Failed to fetch for role ${role}:`, err.response?.status);
-          return { data: [] }; // Fallback empty array nếu fail
-        })
-      );
-      const responses = await Promise.all(promises);
-
-      const processedData: Record<string, User[]> = {};
-      roles.forEach((role, index) => {
-        const users = Array.isArray(responses[index].data) ? responses[index].data : [];
-        processedData[role] = users
-          .filter((u: any) => u && u.isActive)
-          .map((u: any) => ({
-            id: u.id,
-            userId: u.id,  // id chính là wallet address
-            role: u.roleId,
-            email: u.email,
-            createdAt: u.createdAt
-          }));
-      });
-      console.log('✅ Processed users by role:', processedData);
-      setUsersByRole(processedData);
-    } catch (err: any) {
-      console.error('❌ Overall fetch error:', err.response?.status, err.response?.data);
-      if (err.response?.status === 403) {
-        setError('Failed to load users (403). Check backend permissions.');
-      } else if (err.response?.status === 400) {
-        setError('Invalid request (400). Ensure roleId param is correct.');
-      } else {
-        setError('Failed to load users: ' + (err.response?.data?.message || err.message));
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // --- EFFECTS ---
   useEffect(() => {
-    getCurrentUserFromLocalStorage();
-    fetchVerifierRoles();  // Fetch verifier roles ngay khi component mount
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const u = JSON.parse(userStr);
+      setCurrentUser({ ...u, role: u.roleId || u.role });
+    }
+    
+    api.get('/verifier-role/all').then(res => setVerifierRoles(res.data)).catch(() => {});
   }, []);
 
   useEffect(() => {
-    if (currentUser) {
-      fetchUsers();
-    } else {
-      setLoading(false);
-      setError('No user data found. Please login again.');
-    }
-  }, [currentUser]);
+    if (currentUser?.role === 'ADMIN') fetchUsers();
+  }, [currentUser, fetchUsers]);
 
-  const handleAddMember = async () => {
-    const trimmedUserId = newUserId.trim();
-    
-    // 1. Validate cơ bản
-    if (!trimmedUserId || !ethers.isAddress(trimmedUserId)) {
-      alert('Invalid wallet address.');
-      return;
-    }
-    if (!newRoleName) {
-      alert('Please select a role.');
-      return;
-    }
+  // Helper formats
+  const shorten = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  const formatDate = (ts: number) => new Date(ts * 1000).toLocaleString();
 
-    setSubmitting(true);
-    
-    try {
-      const contractAddress = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
-      if (!contractAddress || !ethers.isAddress(contractAddress)) {
-        throw new Error('Contract address configuration error.');
-      }
-
-      const provider = new ethers.BrowserProvider((window as any).ethereum);
-      const signer = await provider.getSigner();
-      const contract = new ethers.Contract(contractAddress, CarbonCredit.abi, signer);
-
-      let tx;
-      console.log(`🚀 Starting transaction for role: ${newRoleName}`);
-
-      // 2. Logic phân chia Role
-      if (newRoleName === 'VERIFIER') {
-        // --- XỬ LÝ VERIFIER ---
-        if (!selectedVerifierRole) {
-          alert('Please select a Verifier Organization');
-          setSubmitting(false);
-          return;
-        }
-
-        const selectedRoleData = verifierRoles.find(r => r.id === selectedVerifierRole);
-        const orgName = selectedRoleData?.organizationName;
-
-        if (!orgName) {
-          alert('Invalid Verifier Role data (Missing organization name)');
-          setSubmitting(false);
-          return;
-        }
-
-        console.log(`Calling verifyOrganization('${trimmedUserId}', '${orgName}')`);
-        // ⚠️ Nếu ABI chưa update, dòng này sẽ gây lỗi "no matching fragment"
-        tx = await contract.verifyOrganization(trimmedUserId, orgName);
-
-      } else if (newRoleName === 'GOVERNMENT') {
-        // --- XỬ LÝ GOVERNMENT ---
-        console.log(`Calling addGovernment('${trimmedUserId}')`);
-        tx = await contract.addGovernment(trimmedUserId);
-
-      } else if (newRoleName === 'ADMIN') {
-        // --- XỬ LÝ ADMIN ---
-        console.log(`Calling addAdmin('${trimmedUserId}')`);
-        tx = await contract.addAdmin(trimmedUserId);
-
-      } else {
-        throw new Error(`Unsupported role selected: ${newRoleName}`);
-      }
-
-      console.log('📝 Tx sent:', tx.hash);
-      const receipt = await tx.wait(1);
-      console.log('✅ Tx confirmed:', receipt);
-
-      // 3. Gọi API Backend sau khi Blockchain thành công
-      await api.put('/role-request/add-role', { 
-        userId: trimmedUserId, 
-        roleName: newRoleName,
-        // Gửi thêm verifierRoleId nếu là Verifier (Backend cần cái này để lưu ID)
-        verifierRoleId: newRoleName === 'VERIFIER' ? selectedVerifierRole : null 
-      });
-
-      // 4. Reset Form
-      setShowAddMemberPopup(false);
-      setNewUserId('');
-      setNewRoleName('');
-      setSelectedVerifierRole('');
-      fetchVerifierRoles();
-      alert(`Member added successfully!`);
-
-    } catch (err: any) {
-      console.error('❌ Add member error:', err);
-      
-      // Xử lý thông báo lỗi chi tiết
-      let errorMessage = err.message || 'Transaction failed';
-      
-      if (err.code === 'UNSUPPORTED_OPERATION' && err.operation === 'fragment') {
-        errorMessage = 'ABI Mismatch! Please update CarbonCreditSystem.json in frontend.';
-      } else if (err.reason) {
-        errorMessage = `Contract Error: ${err.reason}`;
-      } else if (err.code === 'ACTION_REJECTED') {
-        errorMessage = 'User rejected transaction.';
-      }
-
-      alert(errorMessage);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Reset verifier role khi thay đổi newRoleName
-  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setNewRoleName(e.target.value);
-    if (e.target.value !== 'VERIFIER') {
-      setSelectedVerifierRole('');  // Reset nếu không phải VERIFIER
-    }
-  };
-
-  const handleViewUser = (user: User) => {
-    setSelectedUser(user);
-  };
-
-  const shortenWallet = (address: string) => address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'N/A';
-
-  if (loading && !currentUser) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-green-600" /></div>;
-  }
-
-  if (!currentUser) {
+  if (!currentUser || currentUser.role !== 'ADMIN') {
     return (
-      <div className="flex justify-center items-center h-64 space-y-4">
-        <Shield className="h-12 w-12 text-red-500" />
-        <div className="text-center">
-          <h3 className="text-lg font-semibold text-gray-900">No User Data</h3>
-          <p className="text-sm text-gray-500">Please login again.</p>
-        </div>
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+        <Shield className="h-16 w-16 text-red-500 animate-pulse" />
+        <h3 className="text-xl font-bold">Truy cập bị từ chối</h3>
+        <p className="text-gray-500">Bạn cần quyền Admin để xem trang này.</p>
       </div>
     );
   }
-
-  if (currentUser.role !== 'ADMIN') {
-    return (
-      <div className="flex justify-center items-center h-64 space-y-4">
-        <Shield className="h-12 w-12 text-red-500" />
-        <div className="text-center">
-          <h3 className="text-lg font-semibold text-gray-900">Access Denied</h3>
-          <p className="text-sm text-gray-500">Admin role required.</p>
-          <p className="text-sm text-gray-500">Your role: {currentUser.role}</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-green-600" /></div>;
-  }
-
-  const currentUsers = usersByRole[activeRole] || [];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-3">
-            <div className="bg-gradient-to-br from-green-600 to-emerald-600 p-3 rounded-xl">
+    <div className="space-y-6 max-w-6xl mx-auto p-4">
+      {/* Header Cards */}
+      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center space-x-4">
+            <div className="bg-green-600 p-4 rounded-2xl shadow-lg shadow-green-100">
               <Users className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">User Management</h2>
-              <p className="text-sm text-gray-500">
-                {activeSection === 'users' && 'Manage users and roles'}
-                {activeSection === 'retire' && 'Retire your carbon credits'}
-                {activeSection === 'certificates' && 'View retirement certificates'}
-              </p>
+              <h2 className="text-2xl font-black text-gray-900">Hệ thống quản trị</h2>
+              <p className="text-sm text-gray-500">Quản lý thành viên và tiêu hủy tín chỉ</p>
             </div>
           </div>
-        </div>
-
-        {/* Section Tabs */}
-        <div className="flex space-x-2 bg-gray-100 rounded-xl p-1">
-          <button
-            onClick={() => setActiveSection('users')}
-            className={`flex-1 py-2.5 px-4 rounded-lg font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 ${
-              activeSection === 'users'
-                ? 'bg-white text-green-600 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            User Management
-          </button>
-          <button
-            onClick={() => setActiveSection('retire')}
-            className={`flex-1 py-2.5 px-4 rounded-lg font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 ${
-              activeSection === 'retire'
-                ? 'bg-white text-green-600 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Leaf className="w-4 h-4" />
-            Retire Credits
-          </button>
-          <button
-            onClick={() => setActiveSection('certificates')}
-            className={`flex-1 py-2.5 px-4 rounded-lg font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 ${
-              activeSection === 'certificates'
-                ? 'bg-white text-green-600 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Award className="w-4 h-4" />
-            Certificates ({myCertificates.length})
-          </button>
-        </div>
-      </div>
-
-      {/* Content based on active section */}
-      {activeSection === 'users' && (
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="text-xl font-semibold text-gray-900">User Management</h3>
-            <div className="flex items-center space-x-2">
+          
+          <div className="flex bg-gray-100 p-1.5 rounded-2xl">
+            {[
+              { id: 'users', label: 'Thành viên', icon: Users },
+              { id: 'retire', label: 'Tiêu hủy', icon: Leaf },
+              { id: 'certificates', label: 'Chứng chỉ', icon: Award }
+            ].map(tab => (
               <button
-                onClick={fetchUsers}
-                disabled={loading}
-                className="px-4 py-2 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors flex items-center space-x-2 disabled:opacity-50"
+                key={tab.id}
+                onClick={() => setActiveSection(tab.id as any)}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                  activeSection === tab.id ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
               >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                <span>Refresh</span>
-              </button>
-              <button
-                onClick={() => setShowAddMemberPopup(true)}
-                className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-200 flex items-center space-x-2"
-              >
-                <Plus className="h-5 w-5" />
-                <span>Add Member</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Role Tabs */}
-          <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl">
-            {roles.map((role) => (
-              <button
-                key={role}
-                onClick={() => setActiveRole(role)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors flex-1 ${activeRole === role
-                    ? 'bg-white shadow-sm text-green-600'
-                    : 'text-gray-500 hover:text-gray-700'
-                  }`}
-              >
-                {role}
-                <span className="ml-2 bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-                  {usersByRole[role]?.length || 0}
-                </span>
+                <tab.icon className="w-4 h-4" />
+                <span>{tab.label}</span>
               </button>
             ))}
           </div>
-
-          {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-center space-x-2">
-              <AlertTriangle className="h-4 w-4" />
-              <span>{error}</span>
-              <button onClick={fetchUsers} className="ml-2 text-red-600 hover:underline">Retry</button>
-            </div>
-          )}
-
-          {currentUsers.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              No users in {activeRole} role.
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {currentUsers.map((user) => (
-                <div key={user.id} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-emerald-600 rounded-full flex items-center justify-center">
-                        <span className="text-white font-medium">
-                          {user.userId ? user.userId.slice(0, 2).toUpperCase() : 'N/A'}
-                        </span>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-gray-900">Wallet: {shortenWallet(user.userId)}</h4>
-                        <p className="text-sm text-gray-600">Role: {user.role}</p>
-                        {user.email && <p className="text-sm text-gray-500">Email: {user.email}</p>}
-                        {user.createdAt && <p className="text-sm text-gray-500">Joined: {new Date(user.createdAt).toLocaleDateString()}</p>}
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handleViewUser(user)}
-                        className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-2 rounded-xl font-medium hover:shadow-lg transition-all duration-200 flex items-center space-x-2"
-                      >
-                        <Eye className="h-4 w-4" />
-                        <span>View Details</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Add Member Popup */}
-          {showAddMemberPopup && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg p-8 max-w-md w-full">
-                <h2 className="text-xl font-bold mb-4">Add Member</h2>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Wallet Address</label>
-                  <input
-                    type="text"
-                    value={newUserId}
-                    onChange={(e) => setNewUserId(e.target.value)}
-                    placeholder="0x..."
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
-                  <select
-                    value={newRoleName}
-                    onChange={handleRoleChange}  // Sử dụng handler tùy chỉnh
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="">Select Role</option>
-                    <option value="VERIFIER">Verifier</option>
-                    <option value="GOVERNMENT">Government</option>
-                    <option value="ADMIN">Admin</option>
-                  </select>
-                </div>
-                {/* Sub-select cho Verifier Role - chỉ hiện khi chọn VERIFIER */}
-                {newRoleName === 'VERIFIER' && (
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Verifier Role</label>
-                    {verifierRolesLoading ? (
-                      <div className="flex justify-center p-3">
-                        <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
-                        <span className="ml-2 text-sm text-gray-500">Loading verifier roles...</span>
-                      </div>
-                    ) : verifierRoles.length === 0 ? (
-                      <p className="text-sm text-red-500">No verifier roles available.</p>
-                    ) : (
-                      <select
-                        value={selectedVerifierRole}
-                        onChange={(e) => setSelectedVerifierRole(e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                      >
-                        <option value="">Select Verifier Role</option>
-                        {verifierRoles.map((vr) => (
-                          <option key={vr.id} value={vr.id}>
-                            {vr.organizationName}  {/* Sửa từ vr.name thành vr.organizationName */}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                )}
-                <div className="flex justify-end space-x-3">
-                  <button
-                    onClick={handleAddMember}
-                    disabled={!newUserId.trim() || !newRoleName || (newRoleName === 'VERIFIER' && !selectedVerifierRole) || submitting || verifierRolesLoading}
-                    className="px-6 py-2 rounded-lg bg-green-500 text-white hover:bg-green-600 disabled:bg-gray-400 flex items-center space-x-2"
-                  >
-                    {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                    <span>Add</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowAddMemberPopup(false);
-                      setNewUserId('');
-                      setNewRoleName('');
-                      setSelectedVerifierRole('');
-                    }}
-                    disabled={submitting}
-                    className="px-6 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* View Details Modal */}
-          {selectedUser && (
-            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-                <div className="p-6">
-                  <div className="flex justify-between items-start mb-6">
-                    <div>
-                      <h3 className="text-2xl font-bold text-gray-900 mb-2">Wallet: {shortenWallet(selectedUser.userId)}</h3>
-                      <p className="text-sm text-gray-600">Role: {selectedUser.role}</p>
-                      {selectedUser.email && <p className="text-sm text-gray-500">Email: {selectedUser.email}</p>}
-                      {selectedUser.createdAt && <p className="text-sm text-gray-500">Joined: {new Date(selectedUser.createdAt).toLocaleDateString()}</p>}
-                    </div>
-                    <button onClick={() => setSelectedUser(null)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
-      )}
+      </div>
 
-      {/* ✅ RETIRE CREDITS SECTION */}
-      {activeSection === 'retire' && (
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-          {/* Progress Steps */}
-          <div className="flex border-b border-gray-100 bg-gray-50">
-            {[
-              { key: 'select', label: 'Select Credits', icon: TreePine },
-              { key: 'confirm', label: 'Confirm', icon: FileText },
-              { key: 'processing', label: 'Processing', icon: Loader2 },
-              { key: 'success', label: 'Certificate', icon: Award }
-            ].map((s, index) => {
-              const stepKeys = ['select', 'confirm', 'processing', 'success'];
-              const currentIndex = stepKeys.indexOf(retireStep);
-              const isActive = index === currentIndex;
-              const isCompleted = index < currentIndex;
-              const Icon = s.icon;
-              
-              return (
-                <div 
-                  key={s.key}
-                  className={`flex-1 py-4 px-4 text-center text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-                    isActive ? 'bg-white text-green-700 border-b-2 border-green-600' :
-                    isCompleted ? 'text-green-600 bg-green-50' : 'text-gray-400'
+      {/* 1. SECTION: USER MANAGEMENT */}
+      {activeSection === 'users' && (
+        <div className="space-y-6 animate-in fade-in duration-500">
+          <div className="flex justify-between items-center">
+            <div className="flex space-x-2 overflow-x-auto pb-2">
+              {roles.map(role => (
+                <button
+                  key={role}
+                  onClick={() => setActiveRole(role)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                    activeRole === role ? 'bg-green-600 text-white' : 'bg-white border border-gray-200 text-gray-500'
                   }`}
                 >
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs ${
-                    isCompleted ? 'bg-green-600 text-white' :
-                    isActive ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-500'
-                  }`}>
-                    {isCompleted ? <Check className="w-4 h-4" /> : <Icon className={`w-4 h-4 ${isActive && s.key === 'processing' ? 'animate-spin' : ''}`} />}
-                  </div>
-                  <span className="hidden sm:inline">{s.label}</span>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="p-6">
-            {/* Error Message */}
-            {retireError && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 text-red-700">
-                <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="font-medium">Error</p>
-                  <p className="text-sm mt-0.5">{retireError}</p>
-                </div>
-                <button onClick={() => setRetireError('')} className="p-1 hover:bg-red-100 rounded">
-                  <X className="w-4 h-4" />
+                  {role} ({usersByRole[role]?.length || 0})
                 </button>
-              </div>
-            )}
-
-            {/* Step 1: Select Credits */}
-            {retireStep === 'select' && (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold text-gray-900">Your Carbon Credits</h3>
-                  <button
-                    onClick={loadMyCredits}
-                    disabled={loadingCredits}
-                    className="text-sm text-green-600 hover:text-green-700 font-medium flex items-center gap-1"
-                  >
-                    <RefreshCw className={`w-4 h-4 ${loadingCredits ? 'animate-spin' : ''}`} />
-                    Refresh
-                  </button>
-                </div>
-
-                {loadingCredits ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
-                  </div>
-                ) : myCredits.length === 0 ? (
-                  <div className="text-center py-12 bg-gray-50 rounded-xl">
-                    <TreePine className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-500 font-medium">No carbon credits available</p>
-                  </div>
-                ) : (
-                  <div className="grid gap-3 max-h-64 overflow-y-auto pr-2">
-                    {myCredits.map(credit => {
-                      const isSelected = retireItems.some(item => item.tokenId === credit.tokenId);
-                      
-                      return (
-                        <div
-                          key={credit.tokenId}
-                          className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${
-                            isSelected
-                              ? 'border-green-500 bg-green-50'
-                              : 'border-gray-200 hover:border-gray-300 bg-white'
-                          }`}
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                              isSelected ? 'bg-green-600' : 'bg-gray-100'
-                            }`}>
-                              <TreePine className={`w-6 h-6 ${isSelected ? 'text-white' : 'text-gray-500'}`} />
-                            </div>
-                            <div>
-                              <p className="font-semibold text-gray-900">Project {credit.projectId.slice(0, 8)}...</p>
-                              <p className="text-sm text-gray-500">Token #{credit.tokenId}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="text-right">
-                              <p className="font-bold text-green-600 text-lg">{credit.availableBalance}</p>
-                              <p className="text-xs text-gray-400">tCO₂e</p>
-                            </div>
-                            <button
-                              onClick={() => isSelected ? removeRetireItem(credit.tokenId) : addRetireItem(credit)}
-                              className={`p-2.5 rounded-xl transition-all ${
-                                isSelected
-                                  ? 'bg-red-100 text-red-600 hover:bg-red-200'
-                                  : 'bg-green-100 text-green-600 hover:bg-green-200'
-                              }`}
-                            >
-                              {isSelected ? <Minus className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Selected Items */}
-                {retireItems.length > 0 && (
-                  <div className="border-t border-gray-100 pt-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Credits to Retire ({retireItems.length}/10)
-                    </h3>
-                    <div className="space-y-3">
-                      {retireItems.map(item => (
-                        <div
-                          key={item.tokenId}
-                          className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200"
-                        >
-                          <div>
-                            <p className="font-medium text-gray-900">Token #{item.tokenId}</p>
-                            <p className="text-sm text-gray-500">Project {item.projectId.slice(0, 8)}...</p>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-1">
-                              <button
-                                onClick={() => updateAmount(item.tokenId, item.amount - 1)}
-                                disabled={item.amount <= 1}
-                                className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30"
-                              >
-                                <Minus className="w-4 h-4" />
-                              </button>
-                              <input
-                                type="number"
-                                value={item.amount}
-                                onChange={(e) => updateAmount(item.tokenId, parseInt(e.target.value) || 1)}
-                                min={1}
-                                max={item.maxAmount}
-                                className="w-16 text-center font-semibold text-gray-900 border-0 focus:ring-0"
-                              />
-                              <button
-                                onClick={() => updateAmount(item.tokenId, item.amount + 1)}
-                                disabled={item.amount >= item.maxAmount}
-                                className="p-1.5 rounded hover:bg-gray-100 disabled:opacity-30"
-                              >
-                                <Plus className="w-4 h-4" />
-                              </button>
-                            </div>
-                            <span className="text-sm text-gray-400">/ {item.maxAmount}</span>
-                            <button
-                              onClick={() => removeRetireItem(item.tokenId)}
-                              className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Summary */}
-                <div className="flex items-center justify-between pt-6 border-t border-gray-100">
-                  <div>
-                    <p className="text-sm text-gray-500">Total to retire</p>
-                    <p className="text-3xl font-bold text-green-600">
-                      {getTotalAmount()} <span className="text-lg font-normal text-gray-500">tCO₂e</span>
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setRetireStep('confirm')}
-                    disabled={retireItems.length === 0}
-                    className="px-8 py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    Continue
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 2: Confirm */}
-            {retireStep === 'confirm' && (
-              <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-gray-900">Confirm Retirement</h3>
-
-                <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl p-6 text-white">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
-                      <Leaf className="w-9 h-9" />
-                    </div>
-                    <div>
-                      <p className="text-green-100 text-sm">Total Carbon Credits</p>
-                      <p className="text-4xl font-bold">{getTotalAmount()} tCO₂e</p>
-                      <p className="text-green-100 text-sm mt-1">{retireItems.length} credit type(s)</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-                  <AlertTriangle className="w-6 h-6 text-amber-600 flex-shrink-0" />
-                  <div>
-                    <p className="font-semibold text-amber-800">This action is permanent</p>
-                    <p className="text-sm text-amber-700 mt-1">
-                      Credits will be burned on-chain and cannot be recovered.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-6 border-t">
-                  <button
-                    onClick={() => setRetireStep('select')}
-                    className="px-6 py-3 border border-gray-300 rounded-xl font-medium hover:bg-gray-50"
-                  >
-                    Back
-                  </button>
-                  <button
-                    onClick={handleRetire}
-                    className="px-8 py-3.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-semibold hover:shadow-lg flex items-center gap-2"
-                  >
-                    <Leaf className="w-5 h-5" />
-                    Retire {getTotalAmount()} tCO₂e
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Processing */}
-            {retireStep === 'processing' && (
-              <div className="text-center py-16">
-                <div className="w-24 h-24 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
-                  <Loader2 className="w-12 h-12 text-green-600 animate-spin" />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">Processing Retirement</h3>
-                <p className="text-gray-500">Please confirm in your wallet...</p>
-              </div>
-            )}
-
-            {/* Step 4: Success */}
-            {retireStep === 'success' && certificate && (
-              <div className="space-y-6">
-                <div className="text-center py-6">
-                  <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl">
-                    <Award className="w-10 h-10 text-white" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Retirement Successful! 🎉</h3>
-                  <p className="text-gray-500">Your credits have been permanently retired</p>
-                </div>
-
-                <div className="bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 rounded-2xl p-8 border-2 border-green-200">
-                  <div className="text-center border-b border-green-200 pb-6 mb-6">
-                    <p className="text-xs text-green-600 uppercase tracking-widest font-semibold">
-                      Certificate of Retirement
-                    </p>
-                    <p className="text-4xl font-bold text-green-800 mt-2">#{certificate.certificateId}</p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-6 mb-6">
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase">Amount</p>
-                      <p className="text-2xl font-bold text-green-700">{certificate.totalValue} tCO₂e</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase">Date</p>
-                      <p className="text-lg font-semibold text-gray-700">{formatDate(certificate.timestamp)}</p>
-                    </div>
-                  </div>
-
-                  <div className="text-center">
-                    <a 
-                      href={`https://sepolia.etherscan.io/tx/${certificate.txHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
-                    >
-                      View Transaction <ExternalLink className="w-4 h-4" />
-                    </a>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-center gap-4">
-                  <button
-                    onClick={resetRetireFlow}
-                    className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-semibold hover:shadow-lg"
-                  >
-                    Retire More Credits
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ✅ CERTIFICATES SECTION */}
-      {activeSection === 'certificates' && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Retirement Certificates</h3>
+              ))}
+            </div>
             <button
-              onClick={loadMyCertificates}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              onClick={() => setShowAddMemberPopup(true)}
+              className="bg-black text-white px-5 py-2.5 rounded-xl font-bold flex items-center space-x-2 hover:bg-gray-800 transition-all"
             >
-              <RefreshCw className="w-4 h-4 text-gray-500" />
+              <Plus className="w-4 h-4" />
+              <span>Thêm mới</span>
             </button>
           </div>
 
-          {myCertificates.length === 0 ? (
-            <div className="text-center py-12">
-              <Award className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500">No certificates yet</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {myCertificates.map(cert => (
-                <div 
-                  key={cert.certificateId}
-                  className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl hover:shadow-md transition-all cursor-pointer border border-green-100"
-                  onClick={() => viewCertificateDetails(cert.certificateId)}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
-                      <Award className="w-7 h-7 text-white" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-gray-900 text-lg">Certificate #{cert.certificateId}</p>
-                      <div className="flex items-center gap-3 text-sm text-gray-500">
-                        <span className="flex items-center gap-1">
-                          <TreePine className="w-3.5 h-3.5" />
-                          {cert.totalValue} tCO₂e
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5" />
-                          {formatDate(cert.timestamp)}
-                        </span>
-                      </div>
-                    </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {usersByRole[activeRole]?.map(user => (
+              <div key={user.id} className="bg-white p-5 rounded-2xl border border-gray-100 hover:shadow-md transition-all group">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center font-bold text-gray-600">
+                    {user.role[0]}
                   </div>
-                  <div className="flex items-center gap-3">
-                    <a
-                      href={`https://sepolia.etherscan.io/tx/${cert.txHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    >
-                      <ExternalLink className="w-5 h-5" />
-                    </a>
-                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                  <div className="overflow-hidden">
+                    <p className="font-bold text-gray-900 truncate">{shorten(user.userId)}</p>
+                    <p className="text-xs text-gray-500">{user.email || 'No email'}</p>
                   </div>
                 </div>
-              ))}
+                <button 
+                  onClick={() => setSelectedUser(user)}
+                  className="w-full py-2 bg-gray-50 text-gray-600 rounded-xl text-xs font-bold group-hover:bg-green-50 group-hover:text-green-600 transition-colors"
+                >
+                  Xem chi tiết
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 2. SECTION: RETIRE CREDITS */}
+      {activeSection === 'retire' && (
+        <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm animate-in slide-in-from-bottom-4 duration-500">
+          {/* Step Progress */}
+          <div className="grid grid-cols-4 bg-gray-50 border-b border-gray-100">
+            {['Chọn tín chỉ', 'Xác nhận', 'Đang xử lý', 'Hoàn tất'].map((label, idx) => (
+              <div key={idx} className={`py-4 text-center text-[10px] font-black uppercase tracking-widest ${
+                idx === ['select', 'confirm', 'processing', 'success'].indexOf(retireStep) ? 'text-green-600 border-b-2 border-green-600 bg-white' : 'text-gray-400'
+              }`}>
+                {label}
+              </div>
+            ))}
+          </div>
+
+          <div className="p-8">
+            {retireStep === 'select' && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xl font-bold">Tín chỉ khả dụng</h3>
+                  <button onClick={loadMyCredits} className="p-2 hover:bg-gray-100 rounded-full"><RefreshCw className="w-4 h-4" /></button>
+                </div>
+                
+                <div className="grid gap-3">
+                  {myCredits.map(c => {
+                    const isSelected = retireItems.some(i => i.tokenId === c.tokenId);
+                    return (
+                      <div key={c.tokenId} className={`p-4 rounded-2xl border-2 transition-all flex items-center justify-between ${
+                        isSelected ? 'border-green-500 bg-green-50' : 'border-gray-100 hover:border-gray-200'
+                      }`}>
+                        <div className="flex items-center space-x-4">
+                          <div className={`p-3 rounded-xl ${isSelected ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                            <TreePine className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-sm">Token #{c.tokenId}</p>
+                            <p className="text-xs text-gray-500">Số dư: {c.availableBalance} tCO2e</p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            if (isSelected) setRetireItems(prev => prev.filter(i => i.tokenId !== c.tokenId));
+                            else setRetireItems(prev => [...prev, { ...c, amount: 1, maxAmount: parseInt(c.availableBalance) }]);
+                          }}
+                          className={`px-4 py-2 rounded-xl font-bold text-xs ${isSelected ? 'bg-red-50 text-red-600' : 'bg-green-600 text-white'}`}
+                        >
+                          {isSelected ? 'Bỏ chọn' : 'Chọn'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {retireItems.length > 0 && (
+                  <div className="pt-6 border-t">
+                    <button 
+                      onClick={() => setRetireStep('confirm')}
+                      className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-green-100 flex items-center justify-center space-x-2"
+                    >
+                      <span>Tiếp tục tiêu hủy {retireItems.length} loại tín chỉ</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {retireStep === 'confirm' && (
+              <div className="text-center space-y-6 max-w-md mx-auto">
+                <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+                  <AlertTriangle className="w-10 h-10" />
+                </div>
+                <h3 className="text-2xl font-bold">Xác nhận vĩnh viễn</h3>
+                <p className="text-gray-500 text-sm">
+                  Tín chỉ sau khi tiêu hủy sẽ không thể khôi phục và sẽ được ghi nhận vào chứng chỉ bảo vệ môi trường của bạn.
+                </p>
+                <div className="bg-gray-50 p-6 rounded-3xl">
+                  <p className="text-xs text-gray-400 font-bold uppercase">Tổng lượng tiêu hủy</p>
+                  <p className="text-4xl font-black text-green-600">
+                    {retireItems.reduce((acc, curr) => acc + curr.amount, 0)} <span className="text-sm">tCO2e</span>
+                  </p>
+                </div>
+                <div className="flex space-x-3">
+                  <button onClick={() => setRetireStep('select')} className="flex-1 py-4 font-bold text-gray-500">Quay lại</button>
+                  <button onClick={handleRetire} className="flex-1 bg-black text-white py-4 rounded-2xl font-bold">Xác nhận tiêu hủy</button>
+                </div>
+              </div>
+            )}
+
+            {retireStep === 'processing' && (
+              <div className="py-20 text-center space-y-4">
+                <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto" />
+                <p className="font-bold text-lg">Đang xử lý giao dịch...</p>
+                <p className="text-gray-400 text-sm">Vui lòng xác nhận trên ví Metamask của bạn</p>
+              </div>
+            )}
+
+            {retireStep === 'success' && certificate && (
+              <div className="text-center space-y-6 animate-in zoom-in-95">
+                <div className="w-20 h-20 bg-green-600 text-white rounded-full flex items-center justify-center mx-auto shadow-xl">
+                  <Check className="w-10 h-10" />
+                </div>
+                <h3 className="text-2xl font-bold">Tiêu hủy hoàn tất!</h3>
+                <div className="bg-gradient-to-br from-green-600 to-emerald-700 p-8 rounded-3xl text-white text-left relative overflow-hidden shadow-2xl shadow-green-200">
+                  <Award className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10" />
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Chứng chỉ tiêu hủy</p>
+                  <p className="text-3xl font-black mt-1">#{certificate.certificateId}</p>
+                  <div className="mt-8 flex justify-between items-end">
+                    <div>
+                      <p className="text-[10px] opacity-70">Tổng giá trị</p>
+                      <p className="text-xl font-bold">{certificate.totalValue} tCO2e</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] opacity-70">Ngày tạo</p>
+                      <p className="text-xs font-bold">{formatDate(certificate.timestamp)}</p>
+                    </div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => { setRetireStep('select'); setRetireItems([]); }} 
+                  className="bg-gray-100 text-gray-600 px-8 py-3 rounded-xl font-bold"
+                >
+                  Thực hiện giao dịch khác
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 3. SECTION: CERTIFICATES */}
+      {activeSection === 'certificates' && (
+        <div className="space-y-4 animate-in fade-in duration-500">
+           <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Lịch sử chứng chỉ</h3>
+              <button onClick={loadMyCertificates} className="p-2 hover:bg-gray-100 rounded-full"><RefreshCw className="w-4 h-4" /></button>
+           </div>
+           {myCertificates.map(cert => (
+             <div key={cert.certificateId} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center justify-between group hover:border-green-500 transition-all">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-green-50 text-green-600 rounded-xl flex items-center justify-center">
+                    <Award className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="font-bold">Chứng chỉ #{cert.certificateId}</p>
+                    <p className="text-xs text-gray-400">{formatDate(cert.timestamp)} • {cert.totalValue} tCO2e</p>
+                  </div>
+                </div>
+                <a 
+                  href={`https://sepolia.etherscan.io/tx/${cert.txHash}`} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="p-2 bg-gray-50 text-gray-400 rounded-lg group-hover:bg-green-50 group-hover:text-green-600 transition-all"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+             </div>
+           ))}
+        </div>
+      )}
+
+      {/* POPUP: ADD MEMBER */}
+      {showAddMemberPopup && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-black">Cấp quyền mới</h2>
+              <button onClick={() => setShowAddMemberPopup(false)} className="p-2 hover:bg-gray-100 rounded-full"><X /></button>
             </div>
-          )}
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-black uppercase text-gray-400 mb-2 block">Địa chỉ ví (Wallet)</label>
+                <input
+                  type="text"
+                  value={newUserId}
+                  onChange={(e) => setNewUserId(e.target.value)}
+                  placeholder="0x..."
+                  className="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-500 outline-none font-mono text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-black uppercase text-gray-400 mb-2 block">Loại quyền</label>
+                <select
+                  value={newRoleName}
+                  onChange={(e) => {setNewRoleName(e.target.value); setSelectedVerifierRole('');}}
+                  className="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-500 outline-none font-bold"
+                >
+                  <option value="">Chọn Role</option>
+                  <option value="VERIFIER">Verifier</option>
+                  <option value="GOVERNMENT">Government</option>
+                  <option value="ADMIN">Admin</option>
+                </select>
+              </div>
+
+              {newRoleName === 'VERIFIER' && (
+                <div>
+                  <label className="text-xs font-black uppercase text-gray-400 mb-2 block">Tổ chức xác minh</label>
+                  <select
+                    value={selectedVerifierRole}
+                    onChange={(e) => setSelectedVerifierRole(e.target.value)}
+                    className="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-500 outline-none font-bold text-sm"
+                  >
+                    <option value="">Chọn tổ chức</option>
+                    {verifierRoles.map((vr) => (
+                      <option key={vr.id} value={vr.id}>{vr.organizationName}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={handleAddMember}
+              disabled={submitting}
+              className="w-full mt-8 bg-green-600 text-white py-4 rounded-2xl font-black shadow-lg shadow-green-100 flex items-center justify-center space-x-2 disabled:opacity-50"
+            >
+              {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Xác nhận cấp quyền</span>}
+            </button>
+          </div>
         </div>
       )}
     </div>

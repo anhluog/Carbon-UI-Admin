@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { User, Save, X, CheckCircle, Edit3 } from 'lucide-react';
 import api from '../utils/axiosInstance';  // Import axios instance từ utils
+import {
+  showSuccess,
+  showError,
+  showWarning,
+  showInfo
+} from "../utils/toast";
 
 interface ProfileProps {
   walletAddress: string;
@@ -17,78 +23,76 @@ function Profile({ walletAddress }: ProfileProps) {
   });
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
   // Fetch user data từ API khi component mount (sử dụng axios)
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        setLoading(true);
-        // Giả sử endpoint GET /profile để lấy user data (thêm vào backend nếu chưa có)
-        // Có thể pass walletAddress nếu backend cần: api.get(`/profile/${walletAddress}`)
-        const response = await api.get('user/profile');  // Hoặc '/users/me' tùy backend
-        if (response.data) {
-          setUser(response.data);  // Giả sử response.data là UserDTO
-        } else {
-          setError('Failed to load profile');
-        }
-      } catch (err: unknown) {
-        // Axios interceptor đã handle lỗi, nhưng catch để set UI error nếu cần
-        setError('Error loading profile');
-        console.error('Fetch profile error:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUserProfile();
-  }, []);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setUser(prev => ({ ...prev, [name]: value }));
-    setError('');  // Clear error on change
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user.name.trim() || !user.email.trim()) {
-      setError('Name and email are required');
-      return;
-    }
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
+  const fetchUserProfile = async () => {
     try {
-      // Gửi PUT /updateProfile với UserDTO (axios tự add token qua interceptor)
-      const response = await api.put('user/updateProfile', {
-        name: user.name,
-        email: user.email,
-      });  // Không gửi id/roleId, backend dùng principal.getName()
+      setLoading(true);
+      const response = await api.get('user/profile');
 
       if (response.data) {
         setUser(response.data);
-        setIsEditing(false);
-        setSuccess('Profile updated successfully!');
       } else {
-        setError('Failed to update profile');
+        showError("Không tìm thấy dữ liệu hồ sơ");
       }
-    } catch (err: unknown) {
-      // Axios interceptor đã handle lỗi (alert nếu 400/500), nhưng catch để set UI nếu cần
-      setError('Error updating profile');
-      console.error('Update profile error:', err);
+    } catch (err) {
+      showError("Lỗi khi tải hồ sơ người dùng");
+      console.error('Fetch profile error:', err);
     } finally {
       setLoading(false);
     }
   };
 
+  fetchUserProfile();
+}, []);
+
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setUser(prev => ({ ...prev, [name]: value }));
+     showWarning("Vui lòng nhập đầy đủ tên và email");
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  if (!user.name.trim() || !user.email.trim()) {
+    showWarning("Vui lòng nhập đầy đủ tên và email");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    showInfo("Đang cập nhật hồ sơ...");
+
+    const response = await api.put('user/updateProfile', {
+      name: user.name,
+      email: user.email,
+    });
+
+    if (response.data) {
+      setUser(response.data);
+      setIsEditing(false);
+      showSuccess("Cập nhật hồ sơ thành công!");
+    } else {
+      showError("Cập nhật hồ sơ thất bại");
+    }
+  } catch (err: any) {
+    showError("Lỗi khi cập nhật hồ sơ người dùng");
+    console.error('Update profile error:', err);
+  } finally {
+    setLoading(false);
+  }
+};
+
+
   const handleCancel = () => {
     // Reset to original data nếu cần (ở đây đơn giản reset editing)
     // Để full reset, lưu originalUser state riêng và setUser(originalUser)
     setIsEditing(false);
-    setError('');
-    setSuccess('');
+    showInfo("Đã hủy chỉnh sửa hồ sơ");
   };
 
   const handleEdit = () => {
@@ -203,19 +207,6 @@ function Profile({ walletAddress }: ProfileProps) {
               }`}
             />
           </div>
-
-          {/* Error/Success Messages */}
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-          {success && (
-            <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm flex items-center space-x-2">
-              <CheckCircle className="h-4 w-4" />
-              <span>{success}</span>
-            </div>
-          )}
 
           {/* Actions */}
           {isEditing ? (

@@ -3,7 +3,7 @@ import api from '../utils/axiosInstance';
 import { TrendingUp, TrendingDown, Activity } from 'lucide-react';
 import { Client } from '@stomp/stompjs';
 
-const SOCKET_URL = 'ws://localhost:8080/ws';
+const SOCKET_URL = 'ws://localhost:8081/ws';
 
 interface OrderBookProps {
   creditId: string;
