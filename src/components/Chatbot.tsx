@@ -4,56 +4,60 @@ import { MessageSquare, X, Send } from 'lucide-react';
 import userAvatar from '../assets/User.png';
 import botAvatar from '../assets/NoDy.png';
 
+import { sendChatMessage } from '../services/chatApi.ts';
+
+type Message = {
+    text: string;
+    sender: 'user' | 'bot';
+};
+
 const Chatbot: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
-    const [messages, setMessages] = useState<{ text: string; sender: 'user' | 'bot' }[]>([]);
+    const [messages, setMessages] = useState<Message[]>([]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    // Auto scroll ref
+    // Auto scroll
     const chatEndRef = useRef<HTMLDivElement | null>(null);
 
-    const toggleChat = () => setIsOpen(!isOpen);
+    const toggleChat = () => setIsOpen(prev => !prev);
 
     const handleSendMessage = async () => {
-        if (!inputValue.trim()) return;
+        if (!inputValue.trim() || isLoading) return;
 
-        const userMessage = inputValue;
+        const userMessage = inputValue.trim();
 
-        setMessages(prev => [...prev, { text: userMessage, sender: 'user' }]);
+        // 1️⃣ Hiển thị message user ngay
+        setMessages(prev => [
+            ...prev,
+            { text: userMessage, sender: 'user' },
+        ]);
         setInputValue('');
         setIsLoading(true);
 
         try {
-            const res = await fetch('http://localhost:8081/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    model: 'llama',
-                    messages: [{ role: 'user', content: userMessage }],
-                    max_tokens: 100,
-                    temperature: 0.7,
-                }),
-            });
+            // 2️⃣ Gọi API qua service
+            const reply = await sendChatMessage(userMessage);
 
-            const data = await res.json();
-
-            const reply =
-                data?.choices?.[0]?.message?.content ??
-                '⚠️ Không có phản hồi từ model';
-
-            setMessages(prev => [...prev, { text: reply, sender: 'bot' }]);
-        } catch (error) {
+            // 3️⃣ Hiển thị phản hồi từ bot
             setMessages(prev => [
                 ...prev,
-                { text: '❌ Không kết nối được backend Java', sender: 'bot' },
+                { text: reply, sender: 'bot' },
+            ]);
+        } catch (err) {
+            setMessages(prev => [
+                ...prev,
+                {
+                    text: '❌ Có lỗi xảy ra khi xử lý yêu cầu.',
+                    sender: 'bot',
+                },
             ]);
         } finally {
             setIsLoading(false);
         }
     };
 
-    // AUTO SCROLL khi có message mới hoặc bot đang typing
+    // Auto scroll khi có message mới
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isLoading]);
@@ -109,7 +113,7 @@ const Chatbot: React.FC = () => {
                                 )}
 
                                 <div
-                                    className={`max-w-[75%] rounded-lg px-4 py-2 ${
+                                    className={`max-w-[75%] rounded-lg px-4 py-2 text-sm leading-relaxed ${
                                         msg.sender === 'user'
                                             ? 'bg-green-600 text-white'
                                             : 'bg-gray-200 text-gray-800'
@@ -157,11 +161,13 @@ const Chatbot: React.FC = () => {
                                 e.key === 'Enter' && handleSendMessage()
                             }
                             placeholder="Type a message..."
-                            className="mr-2 flex-1 rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                            disabled={isLoading}
+                            className="mr-2 flex-1 rounded-lg border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
                         />
                         <button
                             onClick={handleSendMessage}
-                            className="rounded-lg bg-green-600 p-2 text-white transition hover:bg-green-700"
+                            disabled={isLoading}
+                            className="rounded-lg bg-green-600 p-2 text-white transition hover:bg-green-700 disabled:opacity-50"
                         >
                             <Send size={22} />
                         </button>
