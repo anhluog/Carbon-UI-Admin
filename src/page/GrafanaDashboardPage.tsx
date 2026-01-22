@@ -127,7 +127,7 @@ const GrafanaDashboardPage = () => {
                         <h3 className="text-lg font-bold">Dữ liệu chi tiết</h3>
                         <button
                             onClick={() =>
-                                fetch("http://localhost:8081/api/grafana/export?dashboardUid=" +
+                                fetch("http://localhost:8080/api/grafana/export?dashboardUid=" +
                                     currentPanel.uid +
                                     "&panelId=" +
                                     currentPanel.tablePanelId
