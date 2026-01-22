@@ -21,6 +21,193 @@ function App() {
   const [walletAddress, setWalletAddress] = useState('');
   const [userRole, setUserRole] = useState('user');
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
+<<<<<<< Updated upstream
+=======
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+
+
+
+  // Thêm state cho ProjectDetailPage (sử dụng projectId thay vì full project để fetch data tươi)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  // Thêm state để lưu tab trước khi mở detail (để back đúng tab)
+  const [previousTab, setPreviousTab] = useState<string>('project');
+
+  const onConnect = useCallback((address: string, role: string = 'user') => {
+    setWalletAddress(address);
+    setIsWalletConnected(true);
+    setUserRole(role);
+    setActiveTab('user');
+    setError(null);
+  }, []);
+
+
+
+
+  const handleConnect = async (walletType: string) => {
+    if (walletType !== "MetaMask") {
+      alert(`🚧 ${walletType} chưa được hỗ trợ, chỉ hỗ trợ MetaMask hiện tại.`);
+      return;
+    }
+
+    setIsConnecting(true);
+    setError(null);
+
+    try {
+      // Kiểm tra có cài MetaMask chưa
+      if (!window.ethereum) {
+        throw new Error("Vui lòng cài đặt MetaMask trước khi tiếp tục!");
+      }
+
+      // Kiểm tra kết nối hiện tại (không mở popup nếu đã connect)
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const accounts = await provider.listAccounts();  // Lấy accounts hiện tại (không request)
+
+      let address: string;
+
+      const extractAddress = async (acct: unknown): Promise<string> => {
+        // If it's already a string address
+        if (typeof acct === 'string') return acct;
+        // If it's a signer-like object with getAddress()
+        if (acct && typeof acct === 'object') {
+          // Type guard for object with getAddress method
+          if ('getAddress' in acct && typeof acct.getAddress === 'function') {
+            return await (acct.getAddress as () => Promise<string>)();
+          }
+          // Some providers return objects with an 'address' field
+          if ('address' in acct && typeof acct.address === 'string') {
+            return acct.address;
+          }
+        }
+        throw new Error('Không thể lấy địa chỉ từ tài khoản được trả về');
+      };
+
+      if (accounts.length === 0) {
+        // Chưa connect: Yêu cầu kết nối (mở popup MetaMask)
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+        // Sau request, lấy lại accounts
+        const newAccounts = await provider.listAccounts();
+        if (newAccounts.length === 0) {
+          throw new Error("Người dùng từ chối kết nối ví!");
+        }
+        address = await extractAddress(newAccounts[0]);
+      } else {
+        // Đã connect: Lấy address hiện tại (không mở popup)
+        address = await extractAddress(accounts[0]);
+        console.log("✅ Đã kết nối sẵn:", address);
+      }
+
+      // Lấy signer từ provider (default to first account - no param to avoid type issue)
+      const signer = await provider.getSigner();  // This returns JsonRpcSigner, but we use it for methods only
+
+      // Kiểm tra network (Localhost - chainId 31337 / 0x7a69)
+      const network = await provider.getNetwork();
+      if (network.chainId !== BigInt(import.meta.env.VITE_CHAIN_ID_DECIMAL)) {
+        try {
+          // Thử switch trước
+          await window.ethereum.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: import.meta.env.VITE_CHAIN_ID }],
+          });
+        } catch (switchError: unknown) {
+          const isErrorWithCode = (err: unknown): err is { code: number } => {
+            return (
+              typeof err === 'object' &&
+              err !== null &&
+              'code' in err &&
+              typeof (err as { code: unknown }).code === 'number'
+            );
+          };
+
+          // Nếu code 4902: Network chưa tồn tại, add nó
+          if (isErrorWithCode(switchError) && switchError.code === 4902) {
+            try {
+              await window.ethereum.request({
+                method: "wallet_addEthereumChain",
+                params: [{
+                  chainId: import.meta.env.VITE_CHAIN_ID,
+                  chainName: import.meta.env.VITE_CHAIN_NAME,
+                  rpcUrls: [import.meta.env.VITE_RPC_URL],
+                  nativeCurrency: {
+                    name: import.meta.env.VITE_NATIVE_CURRENCY_NAME,
+                    symbol: import.meta.env.VITE_NATIVE_CURRENCY_SYMBOL,
+                    decimals: Number(import.meta.env.VITE_NATIVE_CURRENCY_DECIMALS),
+                  },
+                }],
+              });
+              console.log("✅ Hardhat Local network added successfully");
+            } catch (addError) {
+              console.error("❌ Failed to add network:", addError);
+              throw new Error("Không thể thêm mạng Hardhat Local. Vui lòng thêm thủ công!");
+            }
+          } else {
+            // Lỗi khác khi switch
+            throw new Error("Vui lòng chuyển sang mạng Hardhat Local trong MetaMask!");
+          }
+        }
+      }
+
+      // Sign message để auth với BE (order: message, address)
+      const message = `Login to CarbonCredit App - ${new Date().toISOString()}`;
+      const signature = await signer.signMessage(message);  // Returns Promise<string> - type-safe
+
+      // Gọi BE API auth
+      const response = await axios.post("http://localhost:8080/api/auth/login", {
+        address,
+        message,
+        signature
+      });
+
+
+      console.log("✅ Auth success:", response.data);
+
+      // ← SỬA: Lưu token chỉ khi success và token tồn tại
+      if (response.status === 200 && response.data.token) {
+        // Ví dụ trong login handler
+        localStorage.setItem('user', JSON.stringify(response.data.user)); // Đảm bảo response.data.user có { id: '...', ... }
+        localStorage.setItem('token', response.data.token);
+        console.log("Token saved to localStorage:", response.data.token.substring(0, 20) + "...");  // Debug
+
+
+        // Set role từ response nếu có (backend trả roleId)
+        let role = 'user';  // Default role
+        if (response.data.user?.roleId == 'ADMIN') {
+          role = 'admin';
+        }
+        else if (response.data.user?.roleId == 'VERIFIER') {
+          role = 'verifier';
+        } else if (response.data.user?.roleId == 'GOVERNMENT') {
+          role = 'government';
+        } else if (response.data.user?.roleId == 'OWNER') {
+          role = 'owner';
+        } else if (response.data.user?.roleId == 'SUPERADMIN') {
+          role = 'superadmin';
+        }
+
+        onConnect(address.toLowerCase(), role);  // Redirect với role
+
+        console.log(`✅ Wallet connected: ${address} with role ${role}`);
+
+      } else {
+        throw new Error("Auth failed: No token in response");
+      }
+
+      // Lắng nghe thay đổi (reload trang để reset state)
+      window.ethereum.on("accountsChanged", () => window.location.reload());
+      window.ethereum.on("chainChanged", () => window.location.reload());
+
+    } catch (error: unknown) {
+      console.error("❌ Lỗi kết nối MetaMask:", error);
+      setError(error.message || "Kết nối thất bại. Vui lòng thử lại!");
+      if (error.code === 4001) {
+        setError("Người dùng từ chối kết nối ví!");
+      }
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+>>>>>>> Stashed changes
 
   const handleLogout = useCallback(() => {
     setIsWalletConnected(false);

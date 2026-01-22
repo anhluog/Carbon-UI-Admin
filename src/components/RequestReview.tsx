@@ -33,9 +33,15 @@ const RequestReview: React.FC<RequestReviewProps> = ({ walletAddress }) => {
     e.preventDefault();
     setIsSubmitting(true);
 
+<<<<<<< Updated upstream
     console.log("🚀 === STARTING CARBON CREDIT MINTING ===");
     console.log("📦 Form data submitted:", formData);
     console.log("🌍 Contract address:", import.meta.env.VITE_CARBONCREDIT_ADDRESS);
+=======
+    console.log("🚀 === BẮT ĐẦU LUU BACKEND ===");
+    console.log("📦 Dữ liệu form gửi đi:", formData);
+    console.log("🌍 Backend URL: http://localhost:8080/api/projects/save");
+>>>>>>> Stashed changes
 
     try {
       if (!(window as any).ethereum) throw new Error("❌ MetaMask not detected!");

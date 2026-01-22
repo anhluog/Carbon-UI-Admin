@@ -1,5 +1,6 @@
 import React from 'react';
 
+<<<<<<< Updated upstream
 const OrderBook: React.FC = () => {
   // Mock data for the order book
   const bids = [
@@ -9,6 +10,9 @@ const OrderBook: React.FC = () => {
     { price: 2.27, size: 800, total: 4500 },
     { price: 2.26, size: 600, total: 5100 },
   ];
+=======
+const SOCKET_URL = 'ws://localhost:8080/ws';
+>>>>>>> Stashed changes
 
   const asks = [
     { price: 2.31, size: 1300, total: 1300 },

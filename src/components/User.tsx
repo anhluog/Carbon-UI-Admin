@@ -1,7 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
+<<<<<<< Updated upstream
 import { TrendingUp, TrendingDown, DollarSign, Leaf, Award, Activity, X, MapPin, Calendar, Bell } from 'lucide-react';
 import CarbonCredit from '../abi/CarbonCredit.json';
+=======
+import {
+    TrendingUp, DollarSign, Leaf, Award,
+    X, Bell, Wallet, History,
+    ArrowRightLeft, Search, CheckCircle
+} from 'lucide-react';
+import { Client } from '@stomp/stompjs';
+import CarbonCredit from '../abi/CarbonCreditSystem.json';
+import CarbonCreditExchange from '../abi/CarbonCreditExchange.json';
+import api from '../utils/axiosInstance';
+import { showSuccess, showError, showInfo, showWarning } from '../utils/toast'; // Thêm import toast
+
+const EXCHANGE_CONTRACT_ADDRESS = import.meta.env.VITE_EXCHANGE_CONTRACT_ADDRESS;
+const CCT_CONTRACT_ADDRESS = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
+const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:8080/ws';
+>>>>>>> Stashed changes
 
 interface UserProps {
   walletAddress: string;
