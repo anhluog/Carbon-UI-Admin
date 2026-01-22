@@ -107,18 +107,49 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
         try {
             const provider = new ethers.BrowserProvider(window.ethereum);
             const cctContract = new ethers.Contract(CCT_CONTRACT_ADDRESS, CarbonCredit.abi, provider);
-            const res = await api.get('/projects/MyProject');
-            const mintedProjects = res.data.filter((p: any) => p.nftTokenId !== null && p.issueAmount > 0);
+            
+            // CHỈNH SỬA Ở ĐÂY: Lấy tất cả dự án thay vì chỉ MyProject
+            const res = await api.get('projects/ProjectApproved'); // Hoặc API nào trả về toàn bộ project
+            
+            // Lọc các dự án đã có Token (nftTokenId != null)
+            const allMintedProjects = res.data.filter((p: any) => p.nftTokenId !== null);
 
-            const tokens = await Promise.all(mintedProjects.map(async (p: any) => {
-                try {
-                    const projectInfo = await cctContract.projectsByUUID(p.id);
-                    const balance = await cctContract.balanceOf(walletAddress, projectInfo.creditTokenId);
-                    return { tokenId: Number(projectInfo.creditTokenId), nftTokenId: Number(projectInfo.nftTokenId), balance: Number(balance), projectName: p.name };
-                } catch (err) { return { tokenId: 0, nftTokenId: 0, balance: 0, projectName: p.name }; }
-            }));
-            setOwnedTokens(tokens.filter(t => t.balance > 0));
-        } catch (error) { setOwnedTokens([]); }
+            if (allMintedProjects.length === 0) {
+                setOwnedTokens([]);
+                return;
+            }
+
+            const tokens = await Promise.all(
+                allMintedProjects.map(async (p: any) => {
+                    try {
+                        // Lấy thông tin creditTokenId từ Smart Contract dựa trên UUID của dự án
+                        const projectInfo = await cctContract.projectsByUUID(p.id);
+                        const creditTokenId = projectInfo.creditTokenId;
+
+                        // Kiểm tra số dư thực tế của ví bạn đối với Token ID này
+                        const balance = await cctContract.balanceOf(walletAddress, creditTokenId);
+                        
+                        return {
+                            tokenId: Number(creditTokenId),
+                            nftTokenId: Number(projectInfo.nftTokenId),
+                            balance: Number(balance),
+                            projectName: p.name
+                        };
+                    } catch (err) {
+                        return { tokenId: 0, nftTokenId: 0, balance: 0, projectName: p.name };
+                    }
+                })
+            );
+
+            // Chỉ hiển thị những Token nào bạn thực sự có số dư > 0 trong ví
+            const tokensYouPossess = tokens.filter(t => t.balance > 0);
+            setOwnedTokens(tokensYouPossess);
+            
+            console.log("Tokens found in wallet:", tokensYouPossess);
+        } catch (error) {
+            console.error("Error fetching wallet tokens:", error);
+            setOwnedTokens([]);
+        }
     };
 
     const fetchExchangeNativeBalance = async () => {
@@ -178,6 +209,7 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
                     setNotifications(prev => [newNote, ...prev]);
                     showInfo(`🔔 Thông báo mới: ${newNote.title}`); // Thay alert
                 });
+                
             },
         });
         client.activate();

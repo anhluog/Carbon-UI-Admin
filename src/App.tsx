@@ -268,23 +268,19 @@ function App() {
   }, []);
 
   const tabs = [
-    { id: 'user', name: 'User', icon: UserIcon, roles: ['user', 'admin', 'superadmin', 'verifier', 'government', 'owner'], restricted: true },
-    { id: 'requestReview', name: 'Request Review', icon: Plus, roles: ['owner'], restricted: true },
-    { id: 'requestRole', name: 'Request Role', icon: Users, roles: ['user',], restricted: true },
-    { id: 'marketplace', name: 'Marketplace', icon: ShoppingCart, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
-    { id: 'project', name: 'Project', icon: Award, roles: ['owner'], restricted: false },
-    { id: 'verifyRole', name: 'Verify Role', icon: CheckCircle, roles: ['admin', 'superadmin'], restricted: true },
-    { id: 'verifyProject', name: 'Verify Project', icon: Shield, roles: ['verifier', 'admin'], restricted: true },
-    { id: 'updateProfile', name: 'Update Profile', icon: Edit3, roles: ['user'], restricted: true },
-    { id: 'approvedProject', name: 'Approved Project', icon: CheckCircle, roles: ['government'], restricted: true },
-    { id: 'cryptomarket', name: 'Crypto Market', icon: ShoppingCart, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
-    { id: 'orderbook', name: 'Order Book', icon: Building2, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
-    { id: 'myToken', name: 'My Token', icon: Award, roles: ['user', 'owner'], restricted: true },
-    { id: 'projectDetail', name: 'Project Detail', icon: Award, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
-    { id: 'userManagement', name: 'User Management', icon: Users, roles: ['superadmin', 'admin'], restricted: true },
-    { id: 'grafana', name: 'Grafana Dashboard', icon: Award, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
-    { id: 'adminReport', name: 'Admin Report', icon: Award, roles: ['admin', 'superadmin'], restricted: true },
-    { id: 'retire', name: 'Retire Credits', icon: Leaf, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: true },
+    { id: 'user', name: 'Trang chủ', icon: UserIcon, roles: ['user', 'admin', 'superadmin', 'verifier', 'government', 'owner'], restricted: true },
+    { id: 'requestReview', name: 'Đăng ký dự án', icon: Plus, roles: ['owner'], restricted: true },
+    { id: 'requestRole', name: 'Đăng kí nhà phát triển', icon: Users, roles: ['user',], restricted: true },
+    { id: 'marketplace', name: 'Sàn giao dịch', icon: ShoppingCart, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
+    { id: 'project', name: 'Dự án', icon: Award, roles: ['owner'], restricted: false },
+    { id: 'verifyRole', name: 'Xác minh doanh nghiệp', icon: CheckCircle, roles: ['admin', 'superadmin'], restricted: true },
+    { id: 'verifyProject', name: 'Thẩm định dự án', icon: Shield, roles: ['verifier'], restricted: true },
+    { id: 'updateProfile', name: 'Cập nhật hồ sơ', icon: Edit3, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: true },
+    { id: 'approvedProject', name: 'Cấp phép dự án', icon: CheckCircle, roles: ['government'], restricted: true },
+    { id: 'userManagement', name: 'Quản lí người dùng', icon: Users, roles: ['superadmin', 'admin'], restricted: true },
+    { id: 'grafana', name: 'Báo cáo và phân tích', icon: Award, roles: ['admin'], restricted: false },
+    { id: 'adminReport', name: 'Xuất báo cáo', icon: Award, roles: ['admin', 'superadmin'], restricted: true },
+    { id: 'retire', name: 'Bù trừ tín chỉ', icon: Leaf, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: true },
 
   ];
 

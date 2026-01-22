@@ -15,7 +15,7 @@ import api from "../utils/axiosInstance";
 interface MarketplaceProps {
   walletAddress: string;
   setActiveTab: (tab: string) => void;
-  onOpenProjectDetail: (projectId: string) => void; // ✅ THÊM prop này
+  onOpenProjectDetail: (projectId: string) => void;
 }
 
 interface Project {
@@ -32,21 +32,21 @@ interface Project {
 }
 
 interface TradingStatus {
-  isMinted: boolean;           // ✅ THÊM
+  isMinted: boolean;
   tokenId: number | null;
-  availableAmount: number;     // ✅ THÊM
-  issueAmount: number;         // ✅ THÊM
-  projectName: string;         // ✅ THÊM
-  projectId: string;           // ✅ THÊM
+  availableAmount: number;
+  issueAmount: number;
+  projectName: string;
+  projectId: string;
   hasOrderBook: boolean;
   canTrade: boolean;
-  hasCredit?: boolean;         // ✅ DEPRECATED - keep for backward compatibility
+  hasCredit?: boolean;
 }
 
 const Marketplace: React.FC<MarketplaceProps> = ({
   walletAddress,
   setActiveTab,
-  onOpenProjectDetail // ✅ THÊM prop này
+  onOpenProjectDetail
 }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [tradingStatuses, setTradingStatuses] = useState<Map<string, TradingStatus>>(new Map());
@@ -56,7 +56,6 @@ const Marketplace: React.FC<MarketplaceProps> = ({
   const [selectedTokenId, setSelectedTokenId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
 
   useEffect(() => {
     loadMarketplaceProjects();
@@ -84,11 +83,9 @@ const Marketplace: React.FC<MarketplaceProps> = ({
             );
 
             console.log(`✅ Status loaded for ${project.name}:`, statusResponse.data);
-
             statusMap.set(project.id, statusResponse.data);
           } catch (err) {
             console.error(`❌ Failed to load status for ${project.id}:`, err);
-            // ✅ Set default fallback status
             statusMap.set(project.id, {
               isMinted: false,
               tokenId: null,
@@ -111,20 +108,17 @@ const Marketplace: React.FC<MarketplaceProps> = ({
       setLoading(false);
     } catch (error: any) {
       console.error("❌ Failed to load marketplace projects:", error);
-      setError("Failed to load projects. Please try again.");
+      setError("Không thể tải danh sách dự án. Vui lòng thử lại.");
       setLoading(false);
     }
   };
 
-  // ✅ SỬA: Handler để mở ProjectDetail
   const handleOpenProjectDetail = (project: Project) => {
     console.log('📝 Opening project detail:', project.id, project.name);
 
     if (onOpenProjectDetail) {
-      // ✅ ĐÚNG: Dùng callback từ App.tsx
       onOpenProjectDetail(project.id);
     } else {
-      // ❌ FALLBACK: Dùng event (nên tránh)
       console.warn('⚠️ onOpenProjectDetail prop not provided, using event fallback');
       setActiveTab('projectDetail');
       window.dispatchEvent(
@@ -139,12 +133,12 @@ const Marketplace: React.FC<MarketplaceProps> = ({
     const status = tradingStatuses.get(project.id);
 
     if (!status?.canTrade) {
-      alert("⚠️ This project doesn't have carbon credits yet");
+      alert("⚠️ Dự án này chưa có tín chỉ carbon để giao dịch.");
       return;
     }
 
     if (!status.tokenId) {
-      alert("⚠️ Token ID not found");
+      alert("⚠️ Không tìm thấy Token ID.");
       return;
     }
 
@@ -157,6 +151,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({
     setSelectedTokenId(status.tokenId);
     setShowCryptoMarket(true);
   };
+  
   const filteredProjects = projects.filter((project) => {
     const status = tradingStatuses.get(project.id);
 
@@ -179,7 +174,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({
     if (!status) {
       return (
         <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
-          ⏳ Loading...
+          ⏳ Đang tải...
         </span>
       );
     }
@@ -187,7 +182,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({
     if (status.hasOrderBook) {
       return (
         <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 flex items-center gap-1">
-          🟢 Active Trading
+          🟢 Đang giao dịch
           <span className="text-[10px]">({status.availableAmount} tCO₂)</span>
         </span>
       );
@@ -196,7 +191,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({
     if (status.canTrade && status.isMinted) {
       return (
         <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 flex items-center gap-1">
-          🔵 Ready to Trade
+          🔵 Sẵn sàng GD
           <span className="text-[10px]">({status.availableAmount} tCO₂)</span>
         </span>
       );
@@ -204,7 +199,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({
 
     return (
       <span className="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
-        ⚠️ No Credits
+        ⚠️ Chưa có tín chỉ
       </span>
     );
   };
@@ -218,8 +213,8 @@ const Marketplace: React.FC<MarketplaceProps> = ({
             <div className="p-6">
               <div className="flex justify-between items-start mb-6">
                 <div>
-                  <h3 className="text-2xl font-bold text-gray-900">Trading Exchange</h3>
-                  <p className="text-sm text-gray-600">Project: {projects.find(p => tradingStatuses.get(p.id)?.tokenId === selectedTokenId)?.name || 'Unknown'}</p>
+                  <h3 className="text-2xl font-bold text-gray-900">Sàn Giao Dịch</h3>
+                  <p className="text-sm text-gray-600">Dự án: {projects.find(p => tradingStatuses.get(p.id)?.tokenId === selectedTokenId)?.name || 'Không xác định'}</p>
                 </div>
                 <button
                   onClick={() => {
@@ -231,7 +226,6 @@ const Marketplace: React.FC<MarketplaceProps> = ({
                   <X className="h-6 w-6" />
                 </button>
               </div>
-              {/* ✅ Pass tokenId as creditId */}
               <CryptoMarket
                 walletAddress={walletAddress}
                 creditId={selectedTokenId.toString()}
@@ -244,10 +238,10 @@ const Marketplace: React.FC<MarketplaceProps> = ({
       {/* Header */}
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-4">
-          🌍 Carbon Credits Marketplace
+          🌍 Sàn Giao Dịch Tín Chỉ Carbon
         </h2>
         <p className="text-gray-600">
-          Trade carbon credits from government-approved environmental projects.
+          Mua bán tín chỉ carbon từ các dự án môi trường đã được chính phủ phê duyệt.
         </p>
       </div>
 
@@ -256,7 +250,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start space-x-3">
           <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="font-medium text-red-900">Error</p>
+            <p className="font-medium text-red-900">Lỗi</p>
             <p className="text-sm text-red-700">{error}</p>
           </div>
         </div>
@@ -267,10 +261,10 @@ const Marketplace: React.FC<MarketplaceProps> = ({
         <div className="flex items-start space-x-3">
           <CheckCircle className="h-6 w-6 text-green-600 flex-shrink-0 mt-0.5" />
           <div>
-            <h3 className="font-bold text-gray-900 mb-2">Government Approved Projects</h3>
+            <h3 className="font-bold text-gray-900 mb-2">Dự Án Đã Được Chính Phủ Phê Duyệt</h3>
             <p className="text-sm text-gray-700">
-              All projects listed here have been verified and approved by government authorities.
-              You can safely place buy or sell orders. OrderBook will be created automatically on the first trade.
+              Tất cả các dự án được liệt kê ở đây đã được xác minh và phê duyệt bởi cơ quan chức năng.
+              Bạn có thể đặt lệnh mua hoặc bán một cách an toàn. Sổ lệnh (OrderBook) sẽ được tạo tự động ngay khi có giao dịch đầu tiên.
             </p>
           </div>
         </div>
@@ -283,7 +277,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search projects..."
+              placeholder="Tìm kiếm dự án..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
@@ -299,7 +293,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({
               : 'bg-gray-200 hover:bg-gray-300'
               }`}
           >
-            All Projects
+            Tất cả dự án
           </button>
           <button
             onClick={() => setActiveFilter("trading")}
@@ -308,7 +302,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({
               : 'bg-gray-200 hover:bg-gray-300'
               }`}
           >
-            Active Trading
+            Đang giao dịch
           </button>
           <button
             onClick={() => setActiveFilter("available")}
@@ -317,34 +311,33 @@ const Marketplace: React.FC<MarketplaceProps> = ({
               : 'bg-gray-200 hover:bg-gray-300'
               }`}
           >
-            Ready to Trade
+            Sẵn sàng GD
           </button>
         </div>
 
-        <h3 className="text-xl font-bold text-gray-900 mb-4">Approved Projects</h3>
+        <h3 className="text-xl font-bold text-gray-900 mb-4">Danh Sách Dự Án</h3>
         <div className="overflow-x-auto">
           {loading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-              <p className="text-gray-500">Loading projects...</p>
+              <p className="text-gray-500">Đang tải dữ liệu...</p>
             </div>
           ) : filteredProjects.length > 0 ? (
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Project Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vintage</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tên Dự Án</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Loại hình</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Địa điểm</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Niên vụ</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Hành động</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredProjects.map((project) => (
                   <tr key={project.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {/* ✅ Click vào tên → Mở ProjectDetail */}
                       <button
                         onClick={() => handleOpenProjectDetail(project)}
                         className="text-left hover:text-green-600 font-medium transition-colors underline decoration-dotted"
@@ -373,7 +366,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({
                         disabled={!tradingStatuses.get(project.id)?.canTrade}
                         className="text-green-600 hover:text-green-900 font-medium transition-colors disabled:text-gray-400 disabled:cursor-not-allowed"
                       >
-                        Trade →
+                        Giao dịch →
                       </button>
                     </td>
                   </tr>
@@ -383,8 +376,8 @@ const Marketplace: React.FC<MarketplaceProps> = ({
           ) : (
             <div className="text-center py-12">
               <Award className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 text-lg mb-2">No projects found</p>
-              <p className="text-gray-400">Try adjusting your filters.</p>
+              <p className="text-gray-500 text-lg mb-2">Không tìm thấy dự án nào</p>
+              <p className="text-gray-400">Hãy thử điều chỉnh bộ lọc tìm kiếm.</p>
             </div>
           )}
         </div>

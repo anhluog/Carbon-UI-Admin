@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { User, Save, X, CheckCircle, Edit3 } from 'lucide-react';
-import api from '../utils/axiosInstance';  // Import axios instance từ utils
+import { 
+  User, Save, X, Edit3, Mail, Shield, Hash, Wallet, Loader2, CheckCircle2
+} from 'lucide-react';
+import api from '../utils/axiosInstance';
 import {
   showSuccess,
   showError,
@@ -22,221 +24,292 @@ function Profile({ walletAddress }: ProfileProps) {
     documentHash: ''
   });
   const [isEditing, setIsEditing] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Mặc định true để load lần đầu
+  const [submitting, setSubmitting] = useState(false);
 
-  // Fetch user data từ API khi component mount (sử dụng axios)
+  // Fetch user data
   useEffect(() => {
-  const fetchUserProfile = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get('user/profile');
-
-      if (response.data) {
-        setUser(response.data);
-      } else {
-        showError("Không tìm thấy dữ liệu hồ sơ");
+    const fetchUserProfile = async () => {
+      try {
+        setLoading(true);
+        const response = await api.get('user/profile');
+        if (response.data) {
+          setUser(response.data);
+        } else {
+          // Fallback data if needed or just error
+          // setUser(prev => ({ ...prev, id: walletAddress })); 
+        }
+      } catch (err) {
+        // Silent error or show toast depend on UX
+        console.error('Fetch profile error:', err);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      showError("Lỗi khi tải hồ sơ người dùng");
-      console.error('Fetch profile error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  fetchUserProfile();
-}, []);
-
+    fetchUserProfile();
+  }, [walletAddress]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setUser(prev => ({ ...prev, [name]: value }));
-     showWarning("Vui lòng nhập đầy đủ tên và email");
+    // ĐÃ XÓA: showWarning ở đây vì nó sẽ spam mỗi khi gõ phím
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (!user.name.trim() || !user.email.trim()) {
-    showWarning("Vui lòng nhập đầy đủ tên và email");
-    return;
-  }
-
-  setLoading(true);
-
-  try {
-    showInfo("Đang cập nhật hồ sơ...");
-
-    const response = await api.put('user/updateProfile', {
-      name: user.name,
-      email: user.email,
-    });
-
-    if (response.data) {
-      setUser(response.data);
-      setIsEditing(false);
-      showSuccess("Cập nhật hồ sơ thành công!");
-    } else {
-      showError("Cập nhật hồ sơ thất bại");
+    if (!user.name.trim() || !user.email.trim()) {
+      showWarning("Vui lòng nhập đầy đủ tên và email");
+      return;
     }
-  } catch (err: any) {
-    showError("Lỗi khi cập nhật hồ sơ người dùng");
-    console.error('Update profile error:', err);
-  } finally {
-    setLoading(false);
-  }
-};
 
+    setSubmitting(true);
+    try {
+      const response = await api.put('user/updateProfile', {
+        name: user.name,
+        email: user.email,
+        documentHash: user.documentHash // Gửi thêm nếu API hỗ trợ
+      });
+
+      if (response.data) {
+        setUser(response.data);
+        setIsEditing(false);
+        showSuccess("Cập nhật hồ sơ thành công!");
+      }
+    } catch (err: any) {
+      showError("Cập nhật hồ sơ thất bại");
+      console.error('Update profile error:', err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleCancel = () => {
-    // Reset to original data nếu cần (ở đây đơn giản reset editing)
-    // Để full reset, lưu originalUser state riêng và setUser(originalUser)
     setIsEditing(false);
-    showInfo("Đã hủy chỉnh sửa hồ sơ");
+    showInfo("Đã hủy chỉnh sửa");
+    // Nên refetch lại dữ liệu gốc nếu muốn reset hoàn toàn các thay đổi chưa lưu
   };
 
-  const handleEdit = () => {
-    setIsEditing(true);
-  };
-
-  if (loading && user.id === '') {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center">
-        <div className="text-lg text-gray-600">Loading profile...</div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-10 w-10 text-emerald-600 animate-spin" />
+          <p className="text-gray-500 font-medium">Đang tải hồ sơ...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 py-8 px-4">
-      <div className="max-w-md mx-auto space-y-6">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-emerald-600 rounded-full flex items-center justify-center">
-              <User className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Update Profile</h1>
-              <p className="text-sm text-gray-600">Manage your personal information</p>
+    <div className="min-h-screen bg-gray-50 py-10 px-4 sm:px-6 lg:px-8 font-sans">
+      <div className="max-w-4xl mx-auto">
+        
+        {/* Main Card */}
+        <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
+          
+          {/* Header Banner */}
+          <div className="h-40 bg-gradient-to-r from-emerald-600 to-teal-500 relative">
+            <div className="absolute inset-0 bg-black/10"></div>
+            <div className="absolute bottom-4 right-6 text-white/80 text-sm font-medium flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+              Account Active
             </div>
           </div>
-          {!isEditing && (
-            <button
-              onClick={handleEdit}
-              className="flex items-center space-x-2 text-green-600 hover:text-green-700 font-medium transition-colors"
-            >
-              <Edit3 className="h-4 w-4" />
-              <span>Edit</span>
-            </button>
-          )}
+
+          {/* Profile Section */}
+          <div className="px-8 pb-8">
+            <div className="relative flex justify-between items-end -mt-16 mb-8">
+              <div className="flex items-end">
+                <div className="relative">
+                  <div className="w-32 h-32 rounded-full border-4 border-white bg-white shadow-md flex items-center justify-center overflow-hidden">
+                    <div className="w-full h-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                      <User className="h-16 w-16" />
+                    </div>
+                  </div>
+                  {/* Role Badge */}
+                  <div className="absolute bottom-1 right-1 bg-gray-900 text-white text-xs font-bold px-3 py-1 rounded-full border-2 border-white shadow-sm">
+                    {user.roleId || 'User'}
+                  </div>
+                </div>
+                
+                <div className="ml-6 mb-2 hidden sm:block">
+                  <h1 className="text-3xl font-bold text-gray-900">{user.name || 'Unnamed User'}</h1>
+                  <p className="text-gray-500 flex items-center gap-1 mt-1">
+                    <Wallet className="h-3 w-3" />
+                    {user.id || walletAddress}
+                  </p>
+                </div>
+              </div>
+
+              {/* Edit Toggle Button */}
+              {!isEditing && (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="mb-2 px-5 py-2.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl font-medium transition-colors flex items-center gap-2 shadow-sm border border-emerald-100"
+                >
+                  <Edit3 className="h-4 w-4" />
+                  Chỉnh sửa
+                </button>
+              )}
+            </div>
+
+            {/* Mobile Name View */}
+            <div className="sm:hidden mb-8 text-center">
+               <h1 className="text-2xl font-bold text-gray-900">{user.name || 'Unnamed User'}</h1>
+               <p className="text-gray-500 text-sm truncate px-4 mt-1">{user.id || walletAddress}</p>
+            </div>
+
+            {/* Form Section */}
+            <form onSubmit={handleSubmit}>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                
+                {/* Left Column */}
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <User className="h-5 w-5 text-emerald-500" />
+                      Thông tin cá nhân
+                    </h3>
+                    
+                    <div className="space-y-5">
+                      {/* Name Input */}
+                      <div className="group">
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Họ và tên</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <User className="h-5 w-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                          </div>
+                          <input
+                            type="text"
+                            name="name"
+                            value={user.name}
+                            onChange={handleInputChange}
+                            disabled={!isEditing}
+                            className={`block w-full pl-10 pr-3 py-3 rounded-xl border-2 transition-all duration-200 outline-none ${
+                              isEditing 
+                                ? 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white' 
+                                : 'border-transparent bg-gray-50 text-gray-700'
+                            }`}
+                            placeholder="Nhập tên của bạn"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Email Input */}
+                      <div className="group">
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Địa chỉ Email</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Mail className="h-5 w-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                          </div>
+                          <input
+                            type="email"
+                            name="email"
+                            value={user.email}
+                            onChange={handleInputChange}
+                            disabled={!isEditing}
+                            className={`block w-full pl-10 pr-3 py-3 rounded-xl border-2 transition-all duration-200 outline-none ${
+                              isEditing 
+                                ? 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white' 
+                                : 'border-transparent bg-gray-50 text-gray-700'
+                            }`}
+                            placeholder="example@domain.com"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column */}
+                <div className="space-y-6">
+                   <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <Shield className="h-5 w-5 text-emerald-500" />
+                      Bảo mật & Dữ liệu
+                    </h3>
+
+                    <div className="space-y-5">
+                      {/* User ID / Wallet (Read Only) */}
+                      <div className="group">
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Wallet ID</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Wallet className="h-5 w-5 text-gray-400" />
+                          </div>
+                          <input
+                            type="text"
+                            value={user.id || walletAddress}
+                            readOnly
+                            className="block w-full pl-10 pr-3 py-3 rounded-xl border-2 border-transparent bg-gray-100 text-gray-500 cursor-not-allowed"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Document Hash */}
+                      <div className="group">
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Document Hash</label>
+                        <div className="relative">
+                           <div className="absolute top-3 left-3 flex items-start pointer-events-none">
+                            <Hash className="h-5 w-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                          </div>
+                          <textarea
+                            name="documentHash"
+                            value={user.documentHash}
+                            onChange={handleInputChange}
+                            disabled={!isEditing}
+                            rows={3}
+                            className={`block w-full pl-10 pr-3 py-3 rounded-xl border-2 transition-all duration-200 outline-none resize-none ${
+                              isEditing 
+                                ? 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white' 
+                                : 'border-transparent bg-gray-50 text-gray-700'
+                            }`}
+                            placeholder={isEditing ? "Nhập mã hash tài liệu..." : "Chưa có dữ liệu"}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Action Buttons */}
+              {isEditing && (
+                <div className="mt-10 pt-6 border-t border-gray-100 flex flex-col sm:flex-row gap-4 justify-end">
+                   <button
+                    type="button"
+                    onClick={handleCancel}
+                    disabled={submitting}
+                    className="px-6 py-3 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 focus:ring-4 focus:ring-gray-100 transition-all flex items-center justify-center gap-2"
+                  >
+                    <X className="h-5 w-5" />
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold hover:shadow-lg hover:shadow-emerald-500/30 focus:ring-4 focus:ring-emerald-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        Đang lưu...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-5 w-5" />
+                        Lưu thay đổi
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </form>
+          </div>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* ID (Read-only) */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">User ID</label>
-            <input
-              type="text"
-              value={user.id || walletAddress}  // Fallback to walletAddress nếu API không trả id
-              readOnly
-              className="w-full p-3 border border-gray-300 rounded-xl bg-gray-50 text-gray-500"
-            />
-          </div>
-
-          {/* Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-            <input
-              type="text"
-              name="name"
-              value={user.name}
-              onChange={handleInputChange}
-              required={isEditing}
-              disabled={!isEditing}
-              className={`w-full p-3 border rounded-xl transition-colors ${
-                isEditing
-                  ? 'border-gray-300 focus:border-green-500 focus:ring-1 focus:ring-green-500'
-                  : 'bg-gray-50 text-gray-500 border-gray-200'
-              }`}
-            />
-          </div>
-
-          {/* Email */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input
-              type="email"
-              name="email"
-              value={user.email}
-              onChange={handleInputChange}
-              required={isEditing}
-              disabled={!isEditing}
-              className={`w-full p-3 border rounded-xl transition-colors ${
-                isEditing
-                  ? 'border-gray-300 focus:border-green-500 focus:ring-1 focus:ring-green-500'
-                  : 'bg-gray-50 text-gray-500 border-gray-200'
-              }`}
-            />
-          </div>
-
-          {/* Role (Read-only) */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-            <input
-              type="text"
-              value={user.roleId}
-              readOnly
-              className="w-full p-3 border border-gray-300 rounded-xl bg-gray-50 text-gray-500"
-            />
-          </div>
-
-          {/* Document Hash */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Document Hash (Optional)</label>
-            <textarea
-              name="documentHash"
-              value={user.documentHash}
-              onChange={handleInputChange}
-              rows={3}
-              disabled={!isEditing}
-              placeholder="Enter document hash (e.g., IPFS CID or SHA-256)"
-              className={`w-full p-3 border rounded-xl transition-colors resize-none ${
-                isEditing
-                  ? 'border-gray-300 focus:border-green-500 focus:ring-1 focus:ring-green-500'
-                  : 'bg-gray-50 text-gray-500 border-gray-200'
-              }`}
-            />
-          </div>
-
-          {/* Actions */}
-          {isEditing ? (
-            <div className="flex space-x-3 pt-4">
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50"
-              >
-                {loading ? (
-                  <span>Updating...</span>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4" />
-                    <span>Save Changes</span>
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={handleCancel}
-                disabled={loading}
-                className="px-6 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50"
-              >
-                <X className="h-4 w-4" />
-                <span>Cancel</span>
-              </button>
-            </div>
-          ) : null}
-        </form>
       </div>
     </div>
   );

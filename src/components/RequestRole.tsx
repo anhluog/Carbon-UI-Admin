@@ -1,58 +1,36 @@
-import React, { useState, useEffect } from 'react';
-import { Users, CheckCircle, Award, Shield, Upload, FileText, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Users, CheckCircle, Award, Upload, FileText, X } from 'lucide-react';
 import api from '../utils/axiosInstance';
 import axios from 'axios';
-import { showSuccess, showError, showInfo } from '../utils/toast'; // Import các hàm toast
+import { showSuccess, showError, showInfo } from '../utils/toast';
 
 interface RequestRoleProps {
   walletAddress: string;
 }
 
-interface VerifierRole {
-  id: string;
-  organizationName: string;
-  description?: string;
-}
-
 const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
-  const [selectedRole, setSelectedRole] = useState<string>('');
+  const [selectedRole, setSelectedRole] = useState<string>('OWNER');
   const [formData, setFormData] = useState({ reason: '' });
-  const [verifierRoles, setVerifierRoles] = useState<VerifierRole[]>([]);
-  const [selectedVerifierRoleId, setSelectedVerifierRoleId] = useState<string>('');
   const [licenseFiles, setLicenseFiles] = useState<File[]>([]);
   const [uploadedDocUrls, setUploadedDocUrls] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessUI, setShowSuccessUI] = useState(false);
 
-  // Fetch verifier roles
-  useEffect(() => {
-    const fetchVerifierRoles = async () => {
-      try {
-        const response = await api.get('/verifier-role/all');
-        setVerifierRoles(response.data || []);
-      } catch (err: any) {
-        showError('Không thể tải danh sách tổ chức xác minh');
-      }
-    };
-    if (selectedRole === 'VERIFIER') {
-      fetchVerifierRoles();
-    }
-  }, [selectedRole]);
-
-  // Upload to IPFS
+  /* ===================== UPLOAD IPFS ===================== */
   const uploadToIPFS = async (files: File[]): Promise<string[]> => {
     setUploading(true);
     showInfo(`Đang tải lên ${files.length} tài liệu lên IPFS...`);
-    
+
     try {
-      const docUrls = await Promise.all(
+      const urls = await Promise.all(
         files.map(async (file) => {
-          const docForm = new FormData();
-          docForm.append("file", file);
-          const docRes = await axios.post(
-            "https://api.pinata.cloud/pinning/pinFileToIPFS",
-            docForm,
+          const formData = new FormData();
+          formData.append('file', file);
+
+          const res = await axios.post(
+            'https://api.pinata.cloud/pinning/pinFileToIPFS',
+            formData,
             {
               headers: {
                 pinata_api_key: import.meta.env.VITE_PINATA_API_KEY,
@@ -60,79 +38,70 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
               },
             }
           );
-          return `https://gateway.pinata.cloud/ipfs/${docRes.data.IpfsHash}`;
+
+          return `https://gateway.pinata.cloud/ipfs/${res.data.IpfsHash}`;
         })
       );
-      showSuccess("Tải tài liệu lên IPFS thành công!");
-      return docUrls;
+
+      showSuccess('Tải tài liệu lên IPFS thành công');
+      return urls;
     } catch (err) {
-      showError("Lỗi khi tải tài liệu lên IPFS");
+      showError('Lỗi khi tải tài liệu lên IPFS');
       throw err;
     } finally {
       setUploading(false);
     }
   };
 
-  const updateUserProfileWithUrls = async (docUrls: string[]) => {
+  /* ===================== UPDATE PROFILE ===================== */
+  const updateUserProfileWithUrls = async (urls: string[]) => {
     try {
-      await api.put('user/updateProfile', { documentUrls: docUrls });
-      showSuccess('Đã cập nhật hồ sơ với tài liệu mới');
-      return true;
+      await api.put('/user/updateProfile', { documentUrls: urls });
+      showSuccess('Đã cập nhật hồ sơ người dùng');
     } catch (err: any) {
-      showError(`Cập nhật hồ sơ thất bại: ${err.response?.data?.message || err.message}`);
-      return false;
+      showError(err.response?.data?.message || 'Cập nhật hồ sơ thất bại');
     }
   };
 
+  /* ===================== FILE HANDLING ===================== */
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const newFiles = Array.from(e.target.files);
-      setLicenseFiles(newFiles);
+    if (!e.target.files || e.target.files.length === 0) return;
 
-      try {
-        const urls = await uploadToIPFS(newFiles);
-        setUploadedDocUrls(urls);
-        await updateUserProfileWithUrls(urls);
-      } catch (err) {
-        // Lỗi đã được xử lý bằng toast trong uploadToIPFS
-      }
+    const files = Array.from(e.target.files);
+    setLicenseFiles(files);
+
+    try {
+      const urls = await uploadToIPFS(files);
+      setUploadedDocUrls(urls);
+      await updateUserProfileWithUrls(urls);
+    } catch {
+      /* lỗi đã toast */
     }
   };
 
   const removeFile = (index: number) => {
-    const updatedFiles = licenseFiles.filter((_, i) => i !== index);
-    const updatedUrls = uploadedDocUrls.filter((_, i) => i !== index);
-    setLicenseFiles(updatedFiles);
-    setUploadedDocUrls(updatedUrls);
-    showInfo("Đã xóa file khỏi danh sách tạm thời");
+    setLicenseFiles((prev) => prev.filter((_, i) => i !== index));
+    setUploadedDocUrls((prev) => prev.filter((_, i) => i !== index));
+    showInfo('Đã xóa file khỏi danh sách');
   };
 
+  /* ===================== SUBMIT ===================== */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validation
-    if (!selectedRole || !formData.reason.trim()) {
-      showError('Vui lòng chọn quyền và nhập lý do');
-      return;
-    }
-    if (selectedRole === 'VERIFIER' && !selectedVerifierRoleId) {
-      showError('Vui lòng chọn tổ chức xác minh');
+
+    if (!formData.reason.trim()) {
+      showError('Vui lòng nhập lý do yêu cầu');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const submitData: any = {
-        requestedRole: selectedRole,
+      await api.post('/role-request/request', {
+        requestedRole: 'OWNER',
         reason: formData.reason,
-      };
+      });
 
-      if (selectedRole === 'VERIFIER') {
-        submitData.verifierRoleId = selectedVerifierRoleId;
-      }
-
-      await api.post('/role-request/request', submitData);
-      showSuccess('Yêu cầu cấp quyền đã được gửi đi thành công!');
+      showSuccess('Gửi yêu cầu cấp quyền thành công');
       setShowSuccessUI(true);
     } catch (err: any) {
       showError(err.response?.data?.message || 'Lỗi khi gửi yêu cầu');
@@ -141,26 +110,24 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
     }
   };
 
-  const roleOptions = [
-    { value: 'OWNER', label: 'Owner', icon: Award, description: 'Toàn quyền quản lý dự án và tín chỉ carbon.' },
-    { value: 'VERIFIER', label: 'Verifier', icon: Shield, description: 'Xác minh và phê duyệt các dự án carbon.' },
-  ];
-
+  /* ===================== SUCCESS UI ===================== */
   if (showSuccessUI) {
     return (
       <div className="max-w-2xl mx-auto">
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-8 border border-green-200 text-center shadow-xl">
+        <div className="bg-white rounded-2xl p-8 border border-green-200 text-center shadow-xl">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="h-8 w-8 text-green-600" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Gửi yêu cầu thành công!</h2>
+          <h2 className="text-2xl font-bold mb-4">Gửi yêu cầu thành công!</h2>
           <p className="text-gray-600 mb-6">
-            Yêu cầu của bạn đang chờ quản trị viên phê duyệt. Vui lòng kiểm tra email để cập nhật trạng thái.
+            Yêu cầu của bạn đang chờ quản trị viên xét duyệt.
           </p>
           <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-left">
-            <p className="text-green-800 font-medium">Quyền yêu cầu: {selectedRole}</p>
+            <p className="font-medium text-green-800">Quyền yêu cầu: OWNER</p>
             {uploadedDocUrls.length > 0 && (
-              <p className="text-green-700 text-sm mt-2">Số lượng tài liệu đính kèm: {uploadedDocUrls.length}</p>
+              <p className="text-sm text-green-700 mt-2">
+                Số tài liệu đính kèm: {uploadedDocUrls.length}
+              </p>
             )}
           </div>
         </div>
@@ -168,161 +135,103 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
     );
   }
 
+  /* ===================== MAIN UI ===================== */
   return (
-    <div className="max-w-4xl mx-auto p-4">
-      <div className="mb-8 text-center md:text-left">
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">Yêu cầu quyền mới</h2>
-        <p className="text-gray-600">Gửi hồ sơ để được cấp quyền tương ứng trên hệ thống.</p>
-      </div>
+    <div className="max-w-3xl mx-auto p-4">
+      <h2 className="text-3xl font-bold mb-2">Yêu cầu quyền Owner</h2>
+      <p className="text-gray-600 mb-6">
+        Gửi hồ sơ để được cấp quyền quản lý dự án và tín chỉ carbon.
+      </p>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
-          <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm space-y-6">
-            {/* Wallet Address */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Địa chỉ ví (Chỉ đọc)</label>
-              <input type="text" value={walletAddress} readOnly className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-gray-500 text-sm" />
-            </div>
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white rounded-2xl p-6 border shadow-sm space-y-6"
+      >
+        {/* Wallet */}
+        <div>
+          <label className="text-sm font-medium text-gray-700">
+            Địa chỉ ví
+          </label>
+          <input
+            value={walletAddress}
+            readOnly
+            className="w-full mt-2 px-4 py-3 rounded-xl border bg-gray-50 text-sm"
+          />
+        </div>
 
-            {/* Role Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-4">Chọn loại quyền *</label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {roleOptions.map((role) => (
-                  <label key={role.value} className="relative cursor-pointer">
-                    <input
-                      type="radio"
-                      name="selectedRole"
-                      value={role.value}
-                      checked={selectedRole === role.value}
-                      onChange={(e) => setSelectedRole(e.target.value)}
-                      className="sr-only peer"
-                    />
-                    <div className="border-2 border-gray-200 rounded-xl p-4 transition-all peer-checked:border-green-500 peer-checked:bg-green-50 hover:bg-gray-50">
-                      <role.icon className="h-6 w-6 text-green-600 mb-2" />
-                      <div className="font-bold text-gray-900">{role.label}</div>
-                      <div className="text-xs text-gray-500">{role.description}</div>
-                    </div>
-                  </label>
-                ))}
+        {/* Role (fixed OWNER) */}
+        <div className="border-2 border-green-500 bg-green-50 rounded-xl p-4">
+          <Award className="h-6 w-6 text-green-600 mb-2" />
+          <p className="font-bold">OWNER</p>
+          <p className="text-xs text-gray-600">
+            Toàn quyền quản lý dự án và tín chỉ carbon
+          </p>
+        </div>
+
+        {/* Upload */}
+        <div>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">
+            Tài liệu hỗ trợ (nếu có)
+          </label>
+          <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100">
+            <Upload className={`h-6 w-6 mb-2 ${uploading ? 'animate-bounce text-blue-500' : 'text-gray-500'}`} />
+            <span className="text-sm text-gray-500">
+              {uploading ? 'Đang tải...' : 'Nhấp để tải lên hoặc kéo thả'}
+            </span>
+            <input
+              type="file"
+              multiple
+              className="hidden"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={handleFileChange}
+              disabled={uploading}
+            />
+          </label>
+
+          {licenseFiles.map((file, i) => (
+            <div key={i} className="flex justify-between items-center mt-2 p-3 bg-gray-50 rounded-xl">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <FileText className="h-5 w-5 text-blue-500" />
+                <span className="truncate text-sm">{file.name}</span>
               </div>
-            </div>
-
-            {selectedRole && (
-              <div className="space-y-6 animate-in fade-in slide-in-from-top-4">
-                {selectedRole === 'VERIFIER' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Tổ chức xác minh *</label>
-                    <select
-                      value={selectedVerifierRoleId}
-                      onChange={(e) => setSelectedVerifierRoleId(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 outline-none"
-                      required
-                    >
-                      <option value="">Chọn một tổ chức</option>
-                      {verifierRoles.map((role) => (
-                        <option key={role.id} value={role.id}>{role.organizationName}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {/* Upload Section */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {selectedRole === 'VERIFIER' ? 'Chứng chỉ/Giấy phép hành nghề *' : 'Tài liệu hỗ trợ (Nếu có)'}
-                  </label>
-                  <div className="flex items-center justify-center w-full">
-                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all">
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <Upload className={`h-6 w-6 mb-2 ${uploading ? 'animate-bounce text-blue-500' : 'text-gray-500'}`} />
-                        <p className="text-sm text-gray-500">
-                          {uploading ? 'Đang xử lý...' : 'Nhấp để tải lên hoặc kéo thả'}
-                        </p>
-                      </div>
-                      <input type="file" multiple className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} disabled={uploading} />
-                    </label>
-                  </div>
-
-                  {licenseFiles.length > 0 && (
-                    <div className="mt-4 space-y-2">
-                      {licenseFiles.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
-                          <div className="flex items-center space-x-3 overflow-hidden">
-                            <FileText className="h-5 w-5 text-blue-500 flex-shrink-0" />
-                            <span className="text-sm truncate">{file.name}</span>
-                            {uploadedDocUrls[index] && <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Đã lên IPFS</span>}
-                          </div>
-                          <button type="button" onClick={() => removeFile(index)} className="text-red-400 hover:text-red-600 transition-colors">
-                            <X className="h-5 w-5" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Reason */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Lý do yêu cầu *</label>
-                  <textarea
-                    value={formData.reason}
-                    onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                    rows={4}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 outline-none resize-none"
-                    placeholder="Mô tả ngắn gọn lý do và kinh nghiệm của bạn..."
-                    required
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="pt-4">
-              <button
-                type="submit"
-                disabled={isSubmitting || uploading || !selectedRole}
-                className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 rounded-xl font-bold shadow-lg hover:opacity-90 disabled:opacity-50 flex items-center justify-center space-x-2 transition-all"
-              >
-                {isSubmitting ? (
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <Users className="h-5 w-5" />
-                    <span>Gửi yêu cầu ngay</span>
-                  </>
-                )}
+              <button type="button" onClick={() => removeFile(i)}>
+                <X className="h-5 w-5 text-red-500" />
               </button>
             </div>
-          </form>
+          ))}
         </div>
 
-        {/* Info Panel */}
-        <div className="space-y-6">
-          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-            <h3 className="font-bold text-gray-900 mb-4">Thông tin các quyền</h3>
-            <div className="space-y-4">
-              {roleOptions.map((role) => (
-                <div key={role.value} className="flex items-start space-x-3">
-                  <div className="p-2 bg-green-50 rounded-lg">
-                    <role.icon className="h-5 w-5 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-sm text-gray-900">{role.label}</p>
-                    <p className="text-xs text-gray-500 leading-relaxed">{role.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6">
-            <h4 className="font-bold text-blue-900 mb-2 text-sm">Quy trình xét duyệt</h4>
-            <p className="text-xs text-blue-800 leading-relaxed">
-              Yêu cầu của bạn sẽ được đội ngũ quản trị hệ thống kiểm tra thông tin và tài liệu đính kèm. Quá trình này thường mất từ 3-5 ngày làm việc.
-            </p>
-          </div>
+        {/* Reason */}
+        <div>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">
+            Lý do yêu cầu *
+          </label>
+          <textarea
+            rows={4}
+            required
+            value={formData.reason}
+            onChange={(e) => setFormData({ reason: e.target.value })}
+            className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500"
+            placeholder="Mô tả lý do và kinh nghiệm của bạn..."
+          />
         </div>
-      </div>
+
+        {/* Submit */}
+        <button
+          type="submit"
+          disabled={isSubmitting || uploading}
+          className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 rounded-xl font-bold flex justify-center items-center"
+        >
+          {isSubmitting ? (
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <>
+              <Users className="h-5 w-5 mr-2" />
+              Gửi yêu cầu
+            </>
+          )}
+        </button>
+      </form>
     </div>
   );
 };
