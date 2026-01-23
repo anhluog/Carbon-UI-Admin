@@ -21,6 +21,9 @@ import AdminReport from './components/AdminReport';
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+// 🔹 BRO ONLY ADD: import Chatbot
+import Chatbot from './components/Chatbot';
+
 function App() {
   const [activeTab, setActiveTab] = useState('marketplace');
   const [isWalletConnected, setIsWalletConnected] = useState(false);
@@ -29,9 +32,6 @@ function App() {
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-
-
 
   // Thêm state cho ProjectDetailPage (sử dụng projectId thay vì full project để fetch data tươi)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -46,9 +46,6 @@ function App() {
     setError(null);
   }, []);
 
-
-
-
   const handleConnect = async (walletType: string) => {
     if (walletType !== "MetaMask") {
       alert(`🚧 ${walletType} chưa được hỗ trợ, chỉ hỗ trợ MetaMask hiện tại.`);
@@ -59,27 +56,21 @@ function App() {
     setError(null);
 
     try {
-      // Kiểm tra có cài MetaMask chưa
       if (!window.ethereum) {
         throw new Error("Vui lòng cài đặt MetaMask trước khi tiếp tục!");
       }
 
-      // Kiểm tra kết nối hiện tại (không mở popup nếu đã connect)
       const provider = new ethers.BrowserProvider(window.ethereum);
-      const accounts = await provider.listAccounts();  // Lấy accounts hiện tại (không request)
+      const accounts = await provider.listAccounts();
 
       let address: string;
 
       const extractAddress = async (acct: unknown): Promise<string> => {
-        // If it's already a string address
         if (typeof acct === 'string') return acct;
-        // If it's a signer-like object with getAddress()
         if (acct && typeof acct === 'object') {
-          // Type guard for object with getAddress method
           if ('getAddress' in acct && typeof acct.getAddress === 'function') {
             return await (acct.getAddress as () => Promise<string>)();
           }
-          // Some providers return objects with an 'address' field
           if ('address' in acct && typeof acct.address === 'string') {
             return acct.address;
           }
@@ -88,43 +79,30 @@ function App() {
       };
 
       if (accounts.length === 0) {
-        // Chưa connect: Yêu cầu kết nối (mở popup MetaMask)
         await window.ethereum.request({ method: "eth_requestAccounts" });
-        // Sau request, lấy lại accounts
         const newAccounts = await provider.listAccounts();
         if (newAccounts.length === 0) {
           throw new Error("Người dùng từ chối kết nối ví!");
         }
         address = await extractAddress(newAccounts[0]);
       } else {
-        // Đã connect: Lấy address hiện tại (không mở popup)
         address = await extractAddress(accounts[0]);
         console.log("✅ Đã kết nối sẵn:", address);
       }
 
-      // Lấy signer từ provider (default to first account - no param to avoid type issue)
-      const signer = await provider.getSigner();  // This returns JsonRpcSigner, but we use it for methods only
-
-      // Kiểm tra network (Localhost - chainId 31337 / 0x7a69)
+      const signer = await provider.getSigner();
       const network = await provider.getNetwork();
       if (network.chainId !== BigInt(import.meta.env.VITE_CHAIN_ID_DECIMAL)) {
         try {
-          // Thử switch trước
           await window.ethereum.request({
             method: "wallet_switchEthereumChain",
             params: [{ chainId: import.meta.env.VITE_CHAIN_ID }],
           });
         } catch (switchError: unknown) {
           const isErrorWithCode = (err: unknown): err is { code: number } => {
-            return (
-              typeof err === 'object' &&
-              err !== null &&
-              'code' in err &&
-              typeof (err as { code: unknown }).code === 'number'
-            );
+            return typeof err === 'object' && err !== null && 'code' in err && typeof (err as { code: unknown }).code === 'number';
           };
 
-          // Nếu code 4902: Network chưa tồn tại, add nó
           if (isErrorWithCode(switchError) && switchError.code === 4902) {
             try {
               await window.ethereum.request({
@@ -146,62 +124,44 @@ function App() {
               throw new Error("Không thể thêm mạng Hardhat Local. Vui lòng thêm thủ công!");
             }
           } else {
-            // Lỗi khác khi switch
             throw new Error("Vui lòng chuyển sang mạng Hardhat Local trong MetaMask!");
           }
         }
       }
 
-      // Sign message để auth với BE (order: message, address)
       const message = `Login to CarbonCredit App - ${new Date().toISOString()}`;
-      const signature = await signer.signMessage(message);  // Returns Promise<string> - type-safe
+      const signature = await signer.signMessage(message);
 
-      // Gọi BE API auth
       const response = await axios.post("http://localhost:8080/api/auth/login", {
         address,
         message,
         signature
       });
 
-
       console.log("✅ Auth success:", response.data);
 
-      // ← SỬA: Lưu token chỉ khi success và token tồn tại
       if (response.status === 200 && response.data.token) {
-        // Ví dụ trong login handler
-        localStorage.setItem('user', JSON.stringify(response.data.user)); // Đảm bảo response.data.user có { id: '...', ... }
+        localStorage.setItem('user', JSON.stringify(response.data.user));
         localStorage.setItem('token', response.data.token);
-        console.log("Token saved to localStorage:", response.data.token.substring(0, 20) + "...");  // Debug
 
+        let role = 'user';
+        if (response.data.user?.roleId == 'ADMIN') role = 'admin';
+        else if (response.data.user?.roleId == 'VERIFIER') role = 'verifier';
+        else if (response.data.user?.roleId == 'GOVERNMENT') role = 'government';
+        else if (response.data.user?.roleId == 'OWNER') role = 'owner';
+        else if (response.data.user?.roleId == 'SUPERADMIN') role = 'superadmin';
 
-        // Set role từ response nếu có (backend trả roleId)
-        let role = 'user';  // Default role
-        if (response.data.user?.roleId == 'ADMIN') {
-          role = 'admin';
-        }
-        else if (response.data.user?.roleId == 'VERIFIER') {
-          role = 'verifier';
-        } else if (response.data.user?.roleId == 'GOVERNMENT') {
-          role = 'government';
-        } else if (response.data.user?.roleId == 'OWNER') {
-          role = 'owner';
-        } else if (response.data.user?.roleId == 'SUPERADMIN') {
-          role = 'superadmin';
-        }
-
-        onConnect(address.toLowerCase(), role);  // Redirect với role
-
+        onConnect(address.toLowerCase(), role);
         console.log(`✅ Wallet connected: ${address} with role ${role}`);
 
       } else {
         throw new Error("Auth failed: No token in response");
       }
 
-      // Lắng nghe thay đổi (reload trang để reset state)
       window.ethereum.on("accountsChanged", () => window.location.reload());
       window.ethereum.on("chainChanged", () => window.location.reload());
 
-    } catch (error: unknown) {
+    } catch (error: any) {
       console.error("❌ Lỗi kết nối MetaMask:", error);
       setError(error.message || "Kết nối thất bại. Vui lòng thử lại!");
       if (error.code === 4001) {
@@ -218,10 +178,10 @@ function App() {
     setUserRole('user');
     setShowLogoutConfirmation(false);
     setActiveTab('marketplace');
-    localStorage.removeItem('token');  // Clear token khi logout
-    window.ethereum?.removeAllListeners();  // Clear listeners
-    setSelectedProjectId(null);  // Reset project khi logout
-    setPreviousTab('project');  // Reset previous tab
+    localStorage.removeItem('token');
+    window.ethereum?.removeAllListeners();
+    setSelectedProjectId(null);
+    setPreviousTab('project');
   }, []);
 
   const renderLogoutConfirmation = () => (
@@ -244,7 +204,6 @@ function App() {
   useEffect(() => {
     if (window.ethereum) {
       const handleAccountsChanged = (accounts: unknown) => {
-        // Type guard to check if accounts is an array
         if (Array.isArray(accounts)) {
           if (accounts.length === 0) {
             handleLogout();
@@ -260,11 +219,10 @@ function App() {
     }
   }, [handleLogout]);
 
-  // Handlers cho ProjectDetailPage (sử dụng projectId để fetch data)
   const openProjectDetail = useCallback((projectId: string, fromTab: string = 'project') => {
     setPreviousTab(fromTab);
     setSelectedProjectId(projectId);
-    setActiveTab('projectDetail');  // Nhảy sang tab detail
+    setActiveTab('projectDetail');
   }, []);
 
   const tabs = [
@@ -281,7 +239,6 @@ function App() {
     { id: 'grafana', name: 'Báo cáo và phân tích', icon: Award, roles: ['admin'], restricted: false },
     { id: 'adminReport', name: 'Xuất báo cáo', icon: Award, roles: ['admin', 'superadmin'], restricted: true },
     { id: 'retire', name: 'Bù trừ tín chỉ', icon: Leaf, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: true },
-
   ];
 
   const displayedTabs = isWalletConnected
@@ -314,13 +271,12 @@ function App() {
       case 'requestReview': return <RequestReview walletAddress={walletAddress} />;
       case 'requestRole': return <RequestRole walletAddress={walletAddress} />;
 
-      // ✅ SỬA: Thêm onOpenProjectDetail cho Marketplace
       case 'marketplace':
         return (
           <Marketplace
             walletAddress={walletAddress}
             setActiveTab={setActiveTab}
-            onOpenProjectDetail={(projectId) => openProjectDetail(projectId, 'marketplace')} // ✅ PHẢI CÓ dòng này
+            onOpenProjectDetail={(projectId) => openProjectDetail(projectId, 'marketplace')}
           />
         );
 
@@ -372,7 +328,6 @@ function App() {
   };
 
   return (
-
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50">
       {showLogoutConfirmation && renderLogoutConfirmation()}
       <header className="bg-white/80 backdrop-blur-sm border-b border-green-200 sticky top-0 z-50">
@@ -448,6 +403,10 @@ function App() {
         </nav>
         {renderContent()}
       </div>
+
+      {/* 🔹 BRO ONLY ADD: Chatbot UI mount */}
+      <Chatbot />
+
     </div>
   );
 }
