@@ -53,12 +53,16 @@ function Profile({ walletAddress }: ProfileProps) {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setUser(prev => ({ ...prev, [name]: value }));
-    // ĐÃ XÓA: showWarning ở đây vì nó sẽ spam mỗi khi gõ phím
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.preventDefault();
 
+    if (!user.name.trim() || !user.email.trim()) {
+      showWarning("Vui lòng nhập đầy đủ tên và email");
+      return;
+    }
     if (!user.name.trim() || !user.email.trim()) {
       showWarning("Vui lòng nhập đầy đủ tên và email");
       return;

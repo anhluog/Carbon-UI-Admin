@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Users, Shield, Trash2, Search, 
+  Users, Shield, 
   Award, Leaf, Plus, Minus, X, AlertTriangle,
-  Loader2, Check, ChevronRight, Clock, ExternalLink,
-  TreePine, RefreshCw, FileText, Download, Eye, CheckCircle
+  Loader2, ChevronRight, Clock, ExternalLink,
+  TreePine, RefreshCw, Eye, CheckCircle
 } from 'lucide-react';
 import api from '../utils/axiosInstance';
 import { ethers } from 'ethers';

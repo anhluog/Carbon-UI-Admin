@@ -12,7 +12,7 @@ import { Client } from '@stomp/stompjs';
 import { TrendingUp, TrendingDown, BarChart3, RefreshCw } from 'lucide-react';
 import api from '../utils/axiosInstance';
 
-const SOCKET_URL = 'ws://localhost:8081/ws';
+const SOCKET_URL = 'ws://localhost:8080/ws';
 
 interface CandlestickChartProps {
   creditId: string;
@@ -60,7 +60,6 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ creditId }) => {
     }
   }, []);
 
-  // ✅ Load dữ liệu THỰC từ API
   const loadRealData = useCallback(async () => {
     if (!candlestickSeriesRef.current || !volumeSeriesRef.current || !creditId) return;
 
@@ -339,8 +338,8 @@ const CandlestickChart: React.FC<CandlestickChartProps> = ({ creditId }) => {
                 key={tf}
                 onClick={() => setTimeFrame(tf)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${timeFrame === tf
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
                   }`}
               >
                 {tf}

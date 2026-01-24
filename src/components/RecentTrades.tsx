@@ -3,7 +3,7 @@ import { Client } from '@stomp/stompjs';
 import { ArrowUpRight, ArrowDownRight, Zap, RefreshCw } from 'lucide-react';
 import api from '../utils/axiosInstance';
 
-const SOCKET_URL = 'ws://localhost:8081/ws';
+const SOCKET_URL = 'ws://localhost:8080/ws';
 
 interface RecentTradesProps {
   creditId?: string;
@@ -15,15 +15,15 @@ interface Trade {
   buyOrderId: string;
   sellOrderId: string;
   creditId: string;
-  amount: number;        
+  amount: number;
   price: number;
-  totalValue: number;    
-  tradeAt: string;       
+  totalValue: number;
+  tradeAt: string;
 }
 
-const RecentTrades: React.FC<RecentTradesProps> = ({ 
-  creditId, 
-  maxTrades = 20 
+const RecentTrades: React.FC<RecentTradesProps> = ({
+  creditId,
+  maxTrades = 20
 }) => {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -31,27 +31,26 @@ const RecentTrades: React.FC<RecentTradesProps> = ({
   const stompClientRef = useRef<Client | null>(null);
   const [lastPrice, setLastPrice] = useState<number | null>(null);
 
-  // ✅ Load lịch sử trades từ API khi mount
   useEffect(() => {
     const loadHistoricalTrades = async () => {
       if (!creditId) {
         setLoading(false);
         return;
       }
-      
+
       try {
         setLoading(true);
-        const response = await api.get(`/trades/recent/${creditId}`, {
+        const response = await api.get(`/market/recent/${creditId}`, {
           params: { limit: maxTrades }
         });
-        
+
         if (response.data && Array.isArray(response.data)) {
           // Sắp xếp mới nhất lên đầu
-          const sortedTrades = response.data.sort((a: Trade, b: Trade) => 
+          const sortedTrades = response.data.sort((a: Trade, b: Trade) =>
             new Date(b.tradeAt).getTime() - new Date(a.tradeAt).getTime()
           );
           setTrades(sortedTrades);
-          
+
           if (sortedTrades.length > 0) {
             setLastPrice(sortedTrades[0].price);
           }
@@ -79,20 +78,20 @@ const RecentTrades: React.FC<RecentTradesProps> = ({
         setIsConnected(true);
         console.log('🟢 Connected to Trades WS');
 
-        const topic = creditId 
-          ? `/topic/trades/${creditId}` 
+        const topic = creditId
+          ? `/topic/trades/${creditId}`
           : '/topic/trades/all';
 
         client.subscribe(topic, (message) => {
           if (message.body) {
             const trade: Trade = JSON.parse(message.body);
             console.log('📊 Received trade:', trade);
-            
+
             setTrades(prev => {
               // Kiểm tra trade đã tồn tại chưa (tránh duplicate)
               const exists = prev.some(t => t.tradeId === trade.tradeId);
               if (exists) return prev;
-              
+
               const updated = [trade, ...prev];
               return updated.slice(0, maxTrades);
             });
@@ -124,10 +123,10 @@ const RecentTrades: React.FC<RecentTradesProps> = ({
   const formatTime = (tradeAt: string) => {
     if (!tradeAt) return '--:--:--';
     const date = new Date(tradeAt);
-    return date.toLocaleTimeString('vi-VN', { 
-      hour: '2-digit', 
-      minute: '2-digit', 
-      second: '2-digit' 
+    return date.toLocaleTimeString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
     });
   };
 
@@ -189,13 +188,12 @@ const RecentTrades: React.FC<RecentTradesProps> = ({
         ) : (
           trades.map((trade, index) => {
             const priceDirection = getPriceChange(trade.price, index);
-            
+
             return (
-              <div 
+              <div
                 key={trade.tradeId || index}
-                className={`grid grid-cols-4 text-xs py-2 px-2 hover:bg-gray-50 transition-colors ${
-                  index === 0 ? 'animate-pulse bg-yellow-50' : ''
-                }`}
+                className={`grid grid-cols-4 text-xs py-2 px-2 hover:bg-gray-50 transition-colors ${index === 0 ? 'animate-pulse bg-yellow-50' : ''
+                  }`}
               >
                 {/* Price */}
                 <div className="flex items-center space-x-1">
@@ -205,10 +203,9 @@ const RecentTrades: React.FC<RecentTradesProps> = ({
                   {priceDirection === 'down' && (
                     <ArrowDownRight className="h-3 w-3 text-red-500" />
                   )}
-                  <span className={`font-mono font-medium ${
-                    priceDirection === 'up' ? 'text-green-600' : 
+                  <span className={`font-mono font-medium ${priceDirection === 'up' ? 'text-green-600' :
                     priceDirection === 'down' ? 'text-red-600' : 'text-gray-700'
-                  }`}>
+                    }`}>
                     ${trade.price.toFixed(2)}
                   </span>
                 </div>

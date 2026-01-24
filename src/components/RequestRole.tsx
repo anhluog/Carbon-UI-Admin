@@ -82,7 +82,7 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
     setLicenseFiles(files);
 
     try {
-      const { cids, urls } = await uploadToIPFS(files);
+      const { urls } = await uploadToIPFS(files);
       // Cập nhật profile người dùng bằng các URL để họ xem được ảnh
       await updateUserProfileWithUrls(urls);
     } catch { /* lỗi đã toast */ }
@@ -119,7 +119,31 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
       showSuccess('Gửi yêu cầu cấp quyền thành công');
       setShowSuccessUI(true);
     } catch (err: any) {
-      showError(err.response?.data?.[0] || err.response?.data?.message || 'Lỗi khi gửi yêu cầu');
+      console.error('Request Role Error:', err);
+      console.error('Error Response:', err.response?.data);
+      console.error('Error Status:', err.response?.status);
+
+      // Hiển thị thông báo lỗi chi tiết hơn
+      const errorMessage = err.response?.data?.message
+        || err.response?.data?.error
+        || err.response?.data?.detail
+        || err.message
+        || 'Lỗi khi gửi yêu cầu';
+
+      const statusCode = err.response?.status;
+      if (statusCode === 400) {
+        showError(`Yêu cầu không hợp lệ: ${errorMessage}`);
+      } else if (statusCode === 401) {
+        showError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+      } else if (statusCode === 403) {
+        showError('Bạn không có quyền thực hiện hành động này.');
+      } else if (statusCode === 409) {
+        showError(`Xung đột: ${errorMessage}`);
+      } else if (statusCode === 500) {
+        showError(`Lỗi máy chủ: ${errorMessage}`);
+      } else {
+        showError(errorMessage);
+      }
     } finally {
       setIsSubmitting(false);
     }

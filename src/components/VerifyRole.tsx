@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Users, Edit3, Eye, CheckCircle, Loader2,
-  AlertTriangle, RefreshCw, X, Shield, ExternalLink
+  Eye, CheckCircle, Loader2,
+  RefreshCw, X, Shield, ExternalLink
 } from 'lucide-react';
 import api from '../utils/axiosInstance';
 import { ethers } from 'ethers';

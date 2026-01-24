@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Leaf, Upload, Calendar, MapPin, Award, Plus, CheckCircle } from 'lucide-react';
+import { Leaf, Calendar, MapPin, Award, Plus, CheckCircle } from 'lucide-react';
 import { ethers } from "ethers";
 import axios from 'axios';
 import api from '../utils/axiosInstance';
@@ -78,7 +78,6 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
 
       const provider = new ethers.BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
-      const signerAddress = await signer.getAddress();
 
       // Upload ảnh
       let imageUrls: string[] = [];
