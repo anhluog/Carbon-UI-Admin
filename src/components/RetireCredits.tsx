@@ -319,7 +319,6 @@ const RetireCredits: React.FC = () => {
     }
   };
 
-  // --- RENDER COMPONENT ---
   const renderCertificateContent = () => {
     if (!certificate) return null;
     const t = currentTemplate;
@@ -339,7 +338,7 @@ const RetireCredits: React.FC = () => {
             </div>
 
             <h1 className={`text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r ${t.colors.primary} mb-2 uppercase tracking-wide`}>
-              Chứng Nhận Thu Hồi
+              Chứng Nhận Bù trừ
             </h1>
             <p className="text-gray-500 font-medium mb-6">Xác minh bù đắp tín chỉ Carbon</p>
 
@@ -366,7 +365,7 @@ const RetireCredits: React.FC = () => {
             {certificateRecords.length > 0 && (
               <div className="bg-white/40 rounded-xl p-4 border border-white/50 mb-6 text-left">
                 <p className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-1">
-                  <TreePine className="w-3 h-3" /> Chi Tiết Phân Bổ
+                  <TreePine className="w-3 h-3" /> Chi Tiết 
                 </p>
                 <div className="space-y-2 max-h-32 overflow-y-auto pr-1 custom-scrollbar">
                   {certificateRecords.map((rec, idx) => (
@@ -417,7 +416,7 @@ const RetireCredits: React.FC = () => {
             onClick={() => { setActiveTab('retire'); resetRetireFlow(); }}
             className={`px-6 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'retire' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
           >
-            <Leaf className="w-4 h-4" /> Thu hồi mới
+            <Leaf className="w-4 h-4" /> Bù trừ Tín Chỉ
           </button>
           <button
             onClick={() => setActiveTab('certificates')}
@@ -591,7 +590,7 @@ const RetireCredits: React.FC = () => {
                   <button onClick={() => setRetireStep('template')} className="px-6 py-3 border rounded-xl font-medium hover:bg-gray-50">Quay lại</button>
                   <button onClick={handleRetire} disabled={processing} className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 flex justify-center items-center gap-2">
                     {processing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Leaf className="w-5 h-5" />}
-                    Xác nhận & Thu hồi
+                    Xác nhận & Bù trừ
                   </button>
                 </div>
               </div>

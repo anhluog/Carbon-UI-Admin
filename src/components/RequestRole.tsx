@@ -82,7 +82,7 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
     setLicenseFiles(files);
 
     try {
-      const { cids, urls } = await uploadToIPFS(files);
+      const { urls } = await uploadToIPFS(files);
       // Cập nhật profile người dùng bằng các URL để họ xem được ảnh
       await updateUserProfileWithUrls(urls);
     } catch { /* lỗi đã toast */ }
