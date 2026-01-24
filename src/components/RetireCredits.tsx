@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
+import {
   Award, Leaf, Plus, Minus, X, AlertTriangle,
   Loader2, Check, ChevronRight, Clock, ExternalLink,
   TreePine, RefreshCw, FileText, Wallet, Palette,
@@ -15,6 +15,7 @@ interface MyCreditResponse {
   creditId: string;
   tokenId: number;
   projectId: string;
+  projectName: string;
   availableBalance: string;
 }
 
@@ -22,6 +23,7 @@ interface RetireItem {
   tokenId: number;
   creditId: string;
   projectId: string;
+  projectName: string;
   amount: number;
   maxAmount: number;
 }
@@ -36,6 +38,7 @@ interface Certificate {
 }
 
 interface CertificateRecord {
+  projectName: string;
   creditTokenId: number;
   creditAmount: number;
 }
@@ -183,6 +186,7 @@ const RetireCredits: React.FC = () => {
       });
 
       setCertificateRecords(data.records.map((r: any) => ({
+        projectName: r.projectName,
         creditTokenId: Number(r.tokenId),
         creditAmount: Number(r.amount)
       })));
@@ -233,6 +237,7 @@ const RetireCredits: React.FC = () => {
       tokenId: credit.tokenId,
       creditId: credit.creditId,
       projectId: credit.projectId,
+      projectName: credit.projectName,
       amount: 1,
       maxAmount: parseInt(credit.availableBalance)
     }]);
@@ -294,10 +299,11 @@ const RetireCredits: React.FC = () => {
           txHash: tx.hash,
           nftTokenId: 0
         });
-        
+
         setCertificateRecords(retireItems.map(item => ({
-            creditTokenId: item.tokenId,
-            creditAmount: item.amount
+          projectName: item.projectName,
+          creditTokenId: item.tokenId,
+          creditAmount: item.amount
         })));
 
         setRetireStep('success');
@@ -331,7 +337,7 @@ const RetireCredits: React.FC = () => {
             <div className={`inline-flex p-4 rounded-full bg-gradient-to-br ${t.colors.secondary} shadow-lg mb-6 ring-4 ring-white`}>
               <Icon className="w-10 h-10 text-white" />
             </div>
-            
+
             <h1 className={`text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r ${t.colors.primary} mb-2 uppercase tracking-wide`}>
               Chứng Nhận Thu Hồi
             </h1>
@@ -346,9 +352,9 @@ const RetireCredits: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-4 text-left mb-8">
               <div className="bg-white/50 rounded-xl p-3 border border-white/60">
-                <p className="text-xs text-gray-400 uppercase">Mã Chứng Nhận</p>
-                <p className="font-mono font-bold text-gray-800 truncate" title={certificate.certificateId}>
-                  #{certificate.certificateId.length > 10 ? certificate.certificateId.slice(0, 10) + '...' : certificate.certificateId}
+                <p className="text-xs text-gray-400 uppercase">Nhà giảm phát thải </p>
+                <p className="font-mono font-bold text-gray-800 truncate" title={certificate.retiredBy}>
+                  {certificate.retiredBy}
                 </p>
               </div>
               <div className="bg-white/50 rounded-xl p-3 border border-white/60">
@@ -365,7 +371,7 @@ const RetireCredits: React.FC = () => {
                 <div className="space-y-2 max-h-32 overflow-y-auto pr-1 custom-scrollbar">
                   {certificateRecords.map((rec, idx) => (
                     <div key={idx} className="flex justify-between text-sm border-b border-gray-200/50 pb-1 last:border-0">
-                      <span className="text-gray-600">Mã Token #{rec.creditTokenId}</span>
+                      <span className="text-gray-600">{rec.projectName}</span>
                       <span className="font-bold text-gray-800">{rec.creditAmount} tCO₂e</span>
                     </div>
                   ))}
@@ -375,7 +381,7 @@ const RetireCredits: React.FC = () => {
 
             <div className="border-t border-gray-200 pt-4 flex flex-col items-center gap-2">
               {certificate.txHash && (
-                <a 
+                <a
                   href={`https://sepolia.etherscan.io/tx/${certificate.txHash}`}
                   target="_blank" rel="noopener noreferrer"
                   className="text-xs text-blue-500 hover:underline flex items-center gap-1"
@@ -448,7 +454,7 @@ const RetireCredits: React.FC = () => {
               <div className="mb-6 bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex items-center gap-3">
                 <AlertTriangle className="w-5 h-5" />
                 <span>{retireError}</span>
-                <button onClick={() => setRetireError('')} className="ml-auto hover:bg-red-100 p-1 rounded"><X className="w-4 h-4"/></button>
+                <button onClick={() => setRetireError('')} className="ml-auto hover:bg-red-100 p-1 rounded"><X className="w-4 h-4" /></button>
               </div>
             )}
 
@@ -474,13 +480,18 @@ const RetireCredits: React.FC = () => {
                     {myCredits.map(credit => {
                       const isSelected = retireItems.some(i => i.tokenId === credit.tokenId);
                       return (
-                        <div key={credit.tokenId} 
+                        <div key={credit.tokenId}
                           onClick={() => isSelected ? removeRetireItem(credit.tokenId) : addRetireItem(credit)}
                           className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between ${isSelected ? 'border-green-500 bg-green-50' : 'border-gray-100 hover:border-green-200'}`}
                         >
                           <div>
-                            <p className="font-bold text-gray-800">Token #{credit.tokenId}</p>
-                            <p className="text-xs text-gray-500">Mã dự án: {credit.projectId.substring(0, 8)}...</p>
+                            <p className="font-bold text-gray-800">
+                              {credit.projectName}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Token #{credit.tokenId}
+                            </p>
+
                           </div>
                           <div className="text-right">
                             <p className="text-green-600 font-bold">{credit.availableBalance} <span className="text-xs">khả dụng</span></p>
@@ -498,16 +509,16 @@ const RetireCredits: React.FC = () => {
                     <div className="space-y-2 mb-6">
                       {retireItems.map(item => (
                         <div key={item.tokenId} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                          <span className="text-sm font-medium">Token #{item.tokenId}</span>
+                          <span className="text-sm font-medium">{item.projectName}</span>
                           <div className="flex items-center gap-2 bg-white border rounded-lg p-1">
-                            <button onClick={() => updateAmount(item.tokenId, item.amount - 1)} className="p-1 hover:bg-gray-100 rounded"><Minus className="w-3 h-3"/></button>
-                            <input 
-                              type="number" 
-                              value={item.amount} 
+                            <button onClick={() => updateAmount(item.tokenId, item.amount - 1)} className="p-1 hover:bg-gray-100 rounded"><Minus className="w-3 h-3" /></button>
+                            <input
+                              type="number"
+                              value={item.amount}
                               onChange={e => updateAmount(item.tokenId, parseInt(e.target.value) || 1)}
-                              className="w-12 text-center text-sm border-0 focus:ring-0 p-0"
+                              className="w-16 text-center appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
-                            <button onClick={() => updateAmount(item.tokenId, item.amount + 1)} className="p-1 hover:bg-gray-100 rounded"><Plus className="w-3 h-3"/></button>
+                            <button onClick={() => updateAmount(item.tokenId, item.amount + 1)} className="p-1 hover:bg-gray-100 rounded"><Plus className="w-3 h-3" /></button>
                           </div>
                         </div>
                       ))}
@@ -516,7 +527,7 @@ const RetireCredits: React.FC = () => {
                       <span className="text-green-800 font-medium">Tổng thu hồi</span>
                       <span className="text-2xl font-bold text-green-700">{getTotalAmount()} tCO₂e</span>
                     </div>
-                    <button 
+                    <button
                       onClick={() => setRetireStep('template')}
                       className="w-full py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors flex justify-center items-center gap-2"
                     >
@@ -532,7 +543,7 @@ const RetireCredits: React.FC = () => {
               <div className="space-y-6">
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                   {TEMPLATES.map(t => (
-                    <button 
+                    <button
                       key={t.id}
                       onClick={() => setSelectedTemplate(t.id)}
                       className={`p-3 rounded-xl border-2 text-left transition-all ${selectedTemplate === t.id ? `border-green-500 ring-2 ring-green-100` : 'border-gray-200 hover:border-gray-300'}`}
@@ -570,7 +581,7 @@ const RetireCredits: React.FC = () => {
                   <p className="text-green-800 text-sm uppercase tracking-wide font-semibold mb-1">Tổng lượng thu hồi</p>
                   <p className="text-5xl font-black text-green-700">{getTotalAmount()} <span className="text-2xl">tCO₂e</span></p>
                 </div>
-                
+
                 <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200 flex gap-3 text-yellow-800 text-sm">
                   <AlertTriangle className="w-5 h-5 flex-shrink-0" />
                   <p>Lưu ý: Hành động này là vĩnh viễn. Các tín chỉ đã thu hồi sẽ bị hủy trên blockchain và không thể hoàn tác hoặc giao dịch lại.</p>
@@ -627,8 +638,8 @@ const RetireCredits: React.FC = () => {
                 const savedTemplate = localStorage.getItem(`cert_template_${cert.certificateId}`) as TemplateType || 'classic';
                 const t = TEMPLATES.find(temp => temp.id === savedTemplate) || TEMPLATES[0];
                 return (
-                  <div 
-                    key={cert.certificateId} 
+                  <div
+                    key={cert.certificateId}
                     onClick={() => viewCertificateDetails(cert.certificateId)}
                     className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer hover:shadow-md transition-all bg-gradient-to-r ${t.preview} ${t.colors.border}`}
                   >

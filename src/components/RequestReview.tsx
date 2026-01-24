@@ -81,7 +81,7 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
 
     console.log("🚀 === BẮT ĐẦU LUU BACKEND ===");
     console.log("📦 Dữ liệu form gửi đi:", formData);
-    console.log("🌍 Backend URL: http://localhost:8081/api/projects/save");
+    console.log("🌍 Backend URL: http://localhost:80/api/projects/save");
 
     try {
       if (!(window as any).ethereum) throw new Error("❌ MetaMask not detected!");

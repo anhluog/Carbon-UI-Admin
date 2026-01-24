@@ -9,11 +9,10 @@ import { Client } from '@stomp/stompjs';
 import CarbonCredit from '../abi/CarbonCreditSystem.json';
 import CarbonCreditExchange from '../abi/CarbonCreditExchange.json';
 import api from '../utils/axiosInstance';
-import { showSuccess, showError, showInfo, showWarning } from '../utils/toast'; // Thêm import toast
-
+import { showSuccess, showError, showInfo, showWarning } from '../utils/toast';
 const EXCHANGE_CONTRACT_ADDRESS = import.meta.env.VITE_EXCHANGE_CONTRACT_ADDRESS;
 const CCT_CONTRACT_ADDRESS = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
-const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:8081/ws';
+const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:8080/ws';
 
 interface UserProps {
     walletAddress: string;
@@ -104,51 +103,61 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
 
     const fetchOwnedTokens = async () => {
         if (!walletAddress || !CCT_CONTRACT_ADDRESS) return;
+
         try {
             const provider = new ethers.BrowserProvider(window.ethereum);
+            // Dùng Multicall hoặc balanceOfBatch để tối ưu
             const cctContract = new ethers.Contract(CCT_CONTRACT_ADDRESS, CarbonCredit.abi, provider);
-            
-            // CHỈNH SỬA Ở ĐÂY: Lấy tất cả dự án thay vì chỉ MyProject
-            const res = await api.get('projects/ProjectApproved'); // Hoặc API nào trả về toàn bộ project
-            
-            // Lọc các dự án đã có Token (nftTokenId != null)
-            const allMintedProjects = res.data.filter((p: any) => p.nftTokenId !== null);
 
-            if (allMintedProjects.length === 0) {
-                setOwnedTokens([]);
-                return;
+            // 1. Lấy TẤT CẢ dự án đang hoạt động trên sàn (Không phải chỉ dự án của user)
+            // Bạn cần một API trả về danh sách tất cả tokenId đang có: ví dụ GET /api/projects/market
+            const res = await api.get('/projects/ProjectApproved'); // Giả sử API này trả về all projects
+            const allProjects = res.data || [];
+
+            if (allProjects.length === 0) return;
+
+            // 2. Chuẩn bị mảng để gọi balanceOfBatch (Gửi 1 request duy nhất thay vì loop)
+            // Đây là tính năng của ERC1155 giúp check nhiều token 1 lúc
+            const tokenIds = [];
+            const accounts = [];
+            const projectMap = {}; // Map để tra cứu lại thông tin project
+
+            for (const p of allProjects) {
+                // Nếu API chưa có creditTokenId thì phải gọi contract để lấy, 
+                // nhưng tốt nhất API nên trả về luôn creditTokenId
+                if (p.tokenId) {
+                    tokenIds.push(p.tokenId);
+                    accounts.push(walletAddress); // Lặp lại địa chỉ ví user
+                    projectMap[p.tokenId] = p;
+                }
             }
 
-            const tokens = await Promise.all(
-                allMintedProjects.map(async (p: any) => {
-                    try {
-                        // Lấy thông tin creditTokenId từ Smart Contract dựa trên UUID của dự án
-                        const projectInfo = await cctContract.projectsByUUID(p.id);
-                        const creditTokenId = projectInfo.creditTokenId;
+            if (tokenIds.length === 0) return;
 
-                        // Kiểm tra số dư thực tế của ví bạn đối với Token ID này
-                        const balance = await cctContract.balanceOf(walletAddress, creditTokenId);
-                        
-                        return {
-                            tokenId: Number(creditTokenId),
-                            nftTokenId: Number(projectInfo.nftTokenId),
-                            balance: Number(balance),
-                            projectName: p.name
-                        };
-                    } catch (err) {
-                        return { tokenId: 0, nftTokenId: 0, balance: 0, projectName: p.name };
-                    }
-                })
-            );
+            // 3. Gọi Contract 1 lần duy nhất
+            // balanceOfBatch([user, user, ...], [id1, id2, ...])
+            const balances = await cctContract.balanceOfBatch(accounts, tokenIds);
 
-            // Chỉ hiển thị những Token nào bạn thực sự có số dư > 0 trong ví
-            const tokensYouPossess = tokens.filter(t => t.balance > 0);
-            setOwnedTokens(tokensYouPossess);
-            
-            console.log("Tokens found in wallet:", tokensYouPossess);
+            // 4. Lọc ra những token có số dư > 0
+            const myTokens = [];
+            for (let i = 0; i < balances.length; i++) {
+                const balance = Number(balances[i]);
+                if (balance > 0) {
+                    const p = projectMap[tokenIds[i]];
+                    myTokens.push({
+                        tokenId: tokenIds[i],
+                        nftTokenId: p.nftTokenId, // Có thể thiếu nếu API ko trả về
+                        balance: balance,
+                        projectName: p.name
+                    });
+                }
+            }
+
+            console.log('✅ Owned tokens on-chain:', myTokens);
+            setOwnedTokens(myTokens);
+
         } catch (error) {
-            console.error("Error fetching wallet tokens:", error);
-            setOwnedTokens([]);
+            console.error('❌ Error fetching owned tokens:', error);
         }
     };
 
@@ -177,7 +186,7 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
         try {
             const provider = new ethers.BrowserProvider(window.ethereum);
             const cctContract = new ethers.Contract(CCT_CONTRACT_ADDRESS, CarbonCredit.abi, provider);
-            const res = await api.get('/projects/MyProject');
+            const res = await api.get('/projects/processed-project');
             const mintedProjects = res.data.filter((p: any) => p.nftTokenId !== null);
             const tokens = await Promise.all(mintedProjects.map(async (p: any) => {
                 try {
