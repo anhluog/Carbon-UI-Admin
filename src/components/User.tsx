@@ -12,7 +12,7 @@ import api from '../utils/axiosInstance';
 import { showSuccess, showError, showInfo, showWarning } from '../utils/toast';
 const EXCHANGE_CONTRACT_ADDRESS = import.meta.env.VITE_EXCHANGE_CONTRACT_ADDRESS;
 const CCT_CONTRACT_ADDRESS = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
-const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:8080/ws';
+const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:8081/ws';
 
 interface UserProps {
     walletAddress: string;

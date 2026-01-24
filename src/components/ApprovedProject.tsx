@@ -197,10 +197,6 @@ const ApprovedProject: React.FC<ApprovedProjectProps> = ({ onOpenProjectDetail }
                             <p className='text-lg text-gray-600 mt-1'>Phê duyệt và cấp phát tín chỉ carbon cho các dự án đã thẩm định</p>
                         </div>
                     </div>
-                    <button className='flex items-center space-x-2 px-5 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all font-medium shadow-md'>
-                        <Plus className='h-5 w-5' />
-                        <span>Dự án mới</span>
-                    </button>
                 </div>
 
                 {/* Thống kê / Tabs */}
@@ -298,7 +294,7 @@ const ApprovedProject: React.FC<ApprovedProjectProps> = ({ onOpenProjectDetail }
                                             <p className='text-3xl font-bold text-gray-900'>{project.expectedCredits} <span className='text-lg font-semibold'>tCO₂</span></p>
                                         </div>
                                         <div className='bg-gray-50 rounded-2xl p-5'>
-                                            <p className='text-sm text-gray-600 font-medium mb-2 uppercase tracking-wider'>Đã bán</p>
+                                            <p className='text-sm text-gray-600 font-medium mb-2 uppercase tracking-wider'>Đã mint</p>
                                             <p className='text-3xl font-bold text-gray-900'>0 <span className='text-lg font-semibold'>tCO₂</span></p>
                                         </div>
                                     </div>

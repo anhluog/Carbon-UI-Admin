@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Calendar, MapPin, Leaf, Eye, BarChart3, CheckCircle, Clock, Map as MapIcon } from 'lucide-react';
 import api from '../utils/axiosInstance';
-import { showSuccess, showError, showInfo } from '../utils/toast'; 
+import { showSuccess, showError, showInfo } from '../utils/toast';
 
 // --- Thành phần bổ trợ: Tải ảnh từ IPFS ---
 const ProjectThumbnail = ({ ipfsHash }: { ipfsHash: string }) => {
@@ -47,8 +47,9 @@ interface Project {
 }
 
 interface VerifyProjectProps {
-  onOpenProjectDetail?: (projectId: string) => void;
+    onOpenProjectDetail?: (projectId: string, fromTab: string) => void;
 }
+
 
 const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) => {
   // Trạng thái dữ liệu
@@ -56,7 +57,7 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
   const [processingProjects, setProcessingProjects] = useState<Project[]>([]);
   const [processedProjects, setProcessedProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Trạng thái bộ lọc
   const [activeFilter, setActiveFilter] = useState('all');
   const [timeFilter, setTimeFilter] = useState('all-time');
@@ -111,8 +112,8 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
       // 1. Tải các dự án CHỜ XỬ LÝ (SUBMITTED) trước
       const resProc = await api.get('/projects/verifier-project?status=SUBMITTED');
       setProcessingProjects((resProc.data || []).map(syncMapProject));
-      
-      if (!silent) setLoading(false); 
+
+      if (!silent) setLoading(false);
 
       // 2. Tải các trạng thái khác chạy ngầm
       const processedStatuses = ['VERIFIED', 'REJECTED_BY_VERIFIER', 'APPROVED', 'REJECTED_BY_GOV'];
@@ -135,7 +136,7 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
   const currentProjects = useMemo(() => {
     const list = activeTab === 'processing' ? processingProjects : processedProjects;
     return list.filter(p => {
-      const matchesType = activeFilter === 'all' || 
+      const matchesType = activeFilter === 'all' ||
         (activeFilter === 'forest' && p.projectType === 'Bảo vệ rừng') ||
         (activeFilter === 'renewable' && p.projectType === 'Năng lượng tái tạo');
       const matchesTime = timeFilter === 'all-time' || p.vintage.toString() === timeFilter;
@@ -154,7 +155,7 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
       showSuccess(`Dự án "${projectToVerify.projectName}" đã bị từ chối`);
       setShowRejectionPopup(false);
       setRejectionReason('');
-      loadData(true); 
+      loadData(true);
     } catch (err) {
       showError("Từ chối thất bại. Vui lòng thử lại.");
     }
@@ -170,7 +171,7 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
       showSuccess(`Dự án "${projectToAccept.projectName}" đã được xác nhận thẩm định!`);
       setShowAcceptPopup(false);
       setProjectToAccept(null);
-      loadData(true); 
+      loadData(true);
     } catch (err) {
       showError("Xác nhận thất bại. Vui lòng kiểm tra lại kết nối.");
     }
@@ -188,7 +189,7 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
   return (
     <div className='min-h-screen bg-gray-50 pb-20'>
       <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12'>
-        
+
         {/* Tiêu đề */}
         <div className='flex justify-between items-center mb-10'>
           <div>
@@ -199,7 +200,7 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
 
         {/* Các thẻ tab tóm tắt */}
         <div className='grid grid-cols-1 md:grid-cols-2 gap-6 mb-10'>
-          <button 
+          <button
             onClick={() => setActiveTab('processing')}
             className={`text-left p-8 rounded-3xl transition-all border-2 ${activeTab === 'processing' ? 'bg-white border-yellow-500 shadow-xl' : 'bg-gray-100 border-transparent'}`}
           >
@@ -208,7 +209,7 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
             <h3 className='text-3xl font-black text-gray-900 mt-1'>{processingProjects.length} Dự án</h3>
           </button>
 
-          <button 
+          <button
             onClick={() => setActiveTab('processed')}
             className={`text-left p-8 rounded-3xl transition-all border-2 ${activeTab === 'processed' ? 'bg-white border-green-500 shadow-xl' : 'bg-gray-100 border-transparent'}`}
           >
@@ -220,36 +221,36 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
 
         {/* Tiêu đề danh sách & Bộ lọc */}
         <div className='flex flex-col md:flex-row justify-between items-center mb-6 px-2 gap-4'>
-           <div className='flex gap-2 overflow-x-auto pb-2 w-full md:w-auto'>
-              {[
-                { id: 'all', label: 'Tất cả' },
-                { id: 'forest', label: 'Lâm nghiệp' },
-                { id: 'renewable', label: 'Năng lượng tái tạo' }
-              ].map(filter => (
-                <button 
-                  key={filter.id}
-                  onClick={() => setActiveFilter(filter.id)}
-                  className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap uppercase tracking-wider transition-all ${activeFilter === filter.id ? 'bg-green-600 text-white shadow-md' : 'bg-white text-gray-500 hover:bg-gray-200'}`}
-                >
-                  {filter.label}
-                </button>
-              ))}
-           </div>
-           <select 
-              value={timeFilter} 
-              onChange={(e) => setTimeFilter(e.target.value)}
-              className="bg-white border-none rounded-xl px-4 py-2 text-sm font-bold text-gray-600 shadow-sm outline-none"
-           >
-              
-              <option value="all-time">Tất cả các năm</option>
-              <option value="2026">Năm thực hiện 2026</option>
-              <option value="2025">Năm thực hiện 2025</option>
-              <option value="2024">Năm thực hiện 2024</option>
-              <option value="2023">Năm thực hiện 2023</option>
-              <option value="2022">Năm thực hiện 2022</option>
-              <option value="2021">Năm thực hiện 2021</option>
-              <option value="2020">Năm thực hiện 2020</option>
-           </select>
+          <div className='flex gap-2 overflow-x-auto pb-2 w-full md:w-auto'>
+            {[
+              { id: 'all', label: 'Tất cả' },
+              { id: 'forest', label: 'Lâm nghiệp' },
+              { id: 'renewable', label: 'Năng lượng tái tạo' }
+            ].map(filter => (
+              <button
+                key={filter.id}
+                onClick={() => setActiveFilter(filter.id)}
+                className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap uppercase tracking-wider transition-all ${activeFilter === filter.id ? 'bg-green-600 text-white shadow-md' : 'bg-white text-gray-500 hover:bg-gray-200'}`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+          <select
+            value={timeFilter}
+            onChange={(e) => setTimeFilter(e.target.value)}
+            className="bg-white border-none rounded-xl px-4 py-2 text-sm font-bold text-gray-600 shadow-sm outline-none"
+          >
+
+            <option value="all-time">Tất cả các năm</option>
+            <option value="2026">Năm thực hiện 2026</option>
+            <option value="2025">Năm thực hiện 2025</option>
+            <option value="2024">Năm thực hiện 2024</option>
+            <option value="2023">Năm thực hiện 2023</option>
+            <option value="2022">Năm thực hiện 2022</option>
+            <option value="2021">Năm thực hiện 2021</option>
+            <option value="2020">Năm thực hiện 2020</option>
+          </select>
         </div>
 
         {/* Danh sách dự án */}
@@ -260,7 +261,7 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
                 <div className='lg:w-72 h-48 lg:h-auto bg-gray-200'>
                   <ProjectThumbnail ipfsHash={project.ipfsHash} />
                 </div>
-                
+
                 <div className='flex-1 p-8'>
                   <div className='flex flex-col md:flex-row justify-between gap-4'>
                     <div>
@@ -270,16 +271,16 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
                       </div>
                       <h3 className='text-2xl font-bold text-gray-900 mb-2'>{project.projectName}</h3>
                       <div className='flex items-center gap-4 text-gray-500 text-sm font-medium'>
-                        <span className='flex items-center gap-1'><MapPin className='h-3.5 w-3.5'/> {project.location}</span>
-                        <span className='flex items-center gap-1'><Calendar className='h-3.5 w-3.5'/> {new Date(project.date).toLocaleDateString('vi-VN')}</span>
+                        <span className='flex items-center gap-1'><MapPin className='h-3.5 w-3.5' /> {project.location}</span>
+                        <span className='flex items-center gap-1'><Calendar className='h-3.5 w-3.5' /> {new Date(project.date).toLocaleDateString('vi-VN')}</span>
                       </div>
                     </div>
-                    
+
                     <div className='text-left md:text-right bg-gray-50 md:bg-transparent p-4 md:p-0 rounded-2xl'>
-                       <p className='text-[10px] font-black text-gray-400 uppercase tracking-tighter'>Trạng thái thẩm định</p>
-                       <p className={`text-sm font-bold ${project.rawStatus === 'SUBMITTED' ? 'text-yellow-600' : 'text-green-600'}`}>
-                         {project.status}
-                       </p>
+                      <p className='text-[10px] font-black text-gray-400 uppercase tracking-tighter'>Trạng thái thẩm định</p>
+                      <p className={`text-sm font-bold ${project.rawStatus === 'SUBMITTED' ? 'text-yellow-600' : 'text-green-600'}`}>
+                        {project.status}
+                      </p>
                     </div>
                   </div>
 
@@ -295,22 +296,20 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
                   </div>
 
                   <div className='flex flex-wrap items-center justify-between gap-4 pt-6 border-t border-gray-50'>
-                    <button 
-                      onClick={() => onOpenProjectDetail?.(project.id)}
-                      className='text-sm font-bold text-gray-900 flex items-center gap-2 hover:underline'
-                    >
-                      <Eye className='h-4 w-4' /> Xem chi tiết dự án
+                    <button onClick={() => onOpenProjectDetail?.(project.id, 'verifyProject')} className='bg-blue-500 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-blue-600 transition-all flex items-center justify-center space-x-2 shadow-md'>
+                      <Eye className='h-4 w-4' />
+                      <span>Chi tiết</span>
                     </button>
 
                     {project.rawStatus === 'SUBMITTED' && (
                       <div className='flex gap-2'>
-                        <button 
+                        <button
                           onClick={() => { setProjectToVerify(project); setShowRejectionPopup(true); }}
                           className='px-6 py-2 text-red-600 font-bold text-sm hover:bg-red-50 rounded-xl transition-all'
                         >
                           Từ chối
                         </button>
-                        <button 
+                        <button
                           onClick={() => { setProjectToAccept(project); setAcceptCredits(project.expectedCredits); setShowAcceptPopup(true); }}
                           className='px-6 py-2 bg-green-600 text-white font-bold text-sm rounded-xl hover:bg-green-700 shadow-lg shadow-green-100 transition-all'
                         >

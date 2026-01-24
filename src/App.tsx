@@ -157,7 +157,7 @@ function App() {
       const signature = await signer.signMessage(message);  // Returns Promise<string> - type-safe
 
       // Gọi BE API auth
-      const response = await axios.post("http://localhost:8080/api/auth/login", {
+      const response = await axios.post("http://localhost:8081/api/auth/login", {
         address,
         message,
         signature
@@ -267,6 +267,14 @@ function App() {
     setActiveTab('projectDetail');  // Nhảy sang tab detail
   }, []);
 
+
+  const handleBackFromProjectDetail = useCallback(() => {
+    setSelectedProjectId(null);
+    setActiveTab(previousTab || 'project');
+  }, [previousTab]);
+
+
+
   const tabs = [
     { id: 'user', name: 'Ví', icon: UserIcon, roles: ['user', 'owner'], restricted: true },
     { id: 'requestReview', name: 'Đăng ký dự án', icon: Plus, roles: ['owner'], restricted: true },
@@ -281,7 +289,7 @@ function App() {
     { id: 'grafana', name: 'Báo cáo và phân tích', icon: Award, roles: ['admin'], restricted: false },
     { id: 'adminReport', name: 'Xuất báo cáo', icon: Award, roles: ['admin', 'superadmin'], restricted: true },
     { id: 'retire', name: 'Bù trừ tín chỉ', icon: Leaf, roles: ['user', 'owner'], restricted: true },
-    
+
   ];
 
   const displayedTabs = isWalletConnected
@@ -320,7 +328,7 @@ function App() {
           <Marketplace
             walletAddress={walletAddress}
             setActiveTab={setActiveTab}
-            onOpenProjectDetail={(projectId) => openProjectDetail(projectId, 'marketplace')} // ✅ PHẢI CÓ dòng này
+            onOpenProjectDetail={(projectId) => openProjectDetail(projectId, 'marketplace')}
           />
         );
 
@@ -337,21 +345,19 @@ function App() {
         return selectedProjectId ? (
           <ProjectDetailPage
             projectId={selectedProjectId}
-            onBack={() => {
-              setSelectedProjectId(null);
-              setActiveTab(previousTab);
-            }}
+            userRole={userRole.toUpperCase()}
+            onBack={handleBackFromProjectDetail}
           />
         ) : (
           <div className="text-center pt-16">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">No Project Selected</h2>
-            <p className="text-gray-600 mb-8">Please select a project from the Projects tab.</p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Chưa chọn dự án</h2>
+            <p className="text-gray-600 mb-8">Vui lòng chọn một dự án để xem chi tiết.</p>
             <button
               onClick={() => setActiveTab(previousTab || 'project')}
               className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-4 rounded-xl font-semibold hover:shadow-lg transition-all duration-200 flex items-center space-x-2 mx-auto"
             >
               <ArrowLeft className="h-5 w-5" />
-              <span>Back to Projects</span>
+              <span>Quay lại</span>
             </button>
           </div>
         );

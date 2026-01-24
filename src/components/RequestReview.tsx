@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Leaf, Calendar, MapPin, Award, Plus, CheckCircle } from 'lucide-react';
+import { Leaf, Calendar, MapPin, Award, Plus, CheckCircle, Loader2 } from 'lucide-react';
 import { ethers } from "ethers";
 import axios from 'axios';
 import api from '../utils/axiosInstance';
+// Import các hàm toast từ utils
+import { showSuccess, showError, showInfo, showWarning } from '../utils/toast';
 
 interface MintTokenProps {
   walletAddress: string;
@@ -29,7 +31,7 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [showSuccessUI, setShowSuccessUI] = useState(false); // Đổi tên để tránh trùng với hàm showSuccess
   const [metadataHash, setMetadataHash] = useState<string | null>(null);
   const [methodologies, setMethodologies] = useState<Methodology[]>([]);
   const [loadingMethodologies, setLoadingMethodologies] = useState(true);
@@ -42,6 +44,7 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
         setMethodologies(response.data);
       } catch (err: any) {
         console.error('Lỗi tải danh sách bên thẩm định:', err);
+        showError('Không thể tải danh sách đơn vị thẩm định từ hệ thống.');
         setMethodologies([
           { id: 'VCS', organizationName: 'Tiêu chuẩn Carbon Xác minh (VCS)', description: 'Mô tả tiêu chuẩn', version: 1 },
           { id: 'CDM', organizationName: 'Cơ chế Phát triển Sạch (CDM)', description: 'Mô tả tiêu chuẩn', version: 1 },
@@ -74,10 +77,13 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
     setIsSubmitting(true);
 
     try {
-      if (!(window as any).ethereum) throw new Error("Không tìm thấy MetaMask!");
+      if (!(window as any).ethereum) {
+        showError("Không tìm thấy MetaMask! Vui lòng cài đặt ví.");
+        setIsSubmitting(false);
+        return;
+      }
 
-      const provider = new ethers.BrowserProvider((window as any).ethereum);
-      const signer = await provider.getSigner();
+      showInfo("Bắt đầu tải tệp tin lên IPFS...");
 
       // Upload ảnh
       let imageUrls: string[] = [];
@@ -148,8 +154,10 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
         }
       );
 
-      const metadataHash = metaRes.data.IpfsHash;
-      setMetadataHash(metadataHash);
+      const metadataHashRes = metaRes.data.IpfsHash;
+      setMetadataHash(metadataHashRes);
+
+      showInfo("Đang lưu thông tin dự án vào hệ thống...");
 
       const projectData = {
         name: formData.projectName,
@@ -159,7 +167,7 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
         location: formData.location,
         verifierRoleId: formData.methodology,
         description: formData.description,
-        ipfsHash: metadataHash,
+        ipfsHash: metadataHashRes,
         verifiedBy: null,
         approvedBy: null,
         credits: 0,
@@ -168,12 +176,14 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
       };
 
       await api.post("projects/save", projectData);
-      setShowSuccess(true);
-      alert("✅ Đã lưu dự án thành công!");
+      
+      showSuccess("Đăng ký dự án thành công!");
+      setShowSuccessUI(true);
 
     } catch (err: any) {
       console.error("Lỗi:", err);
-      alert(`❌ Lỗi: ${err.response?.data?.message || err.message || "Gặp lỗi khi lưu dự án!"}`);
+      const errorMsg = err.response?.data?.message || err.message || "Gặp lỗi khi xử lý hồ sơ!";
+      showError(`Lỗi: ${errorMsg}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -186,28 +196,28 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
     { value: 'OTHERS', label: 'Khác' }
   ];
 
-  if (showSuccess) {
+  if (showSuccessUI) {
     return (
       <div className="max-w-2xl mx-auto">
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-8 border border-green-200 text-center">
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-8 border border-green-200 text-center shadow-lg">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="h-8 w-8 text-green-600" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Lưu dự án thành công!</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Gửi hồ sơ thành công!</h2>
           <p className="text-gray-600 mb-6">
-            Dữ liệu dự án của bạn đã được lưu vào hệ thống. <br />
-            Mã IPFS: {metadataHash || 'N/A'}
+            Dữ liệu dự án đã được lưu trữ an toàn. <br />
+            Mã định danh IPFS: <span className="font-mono text-sm bg-gray-100 p-1 rounded">{metadataHash || 'N/A'}</span>
           </p>
-          <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
             <p className="text-green-800 font-medium">
-              Dự kiến cấp {formData.carbonAmount} CCT cho dự án {formData.projectName}
+              Dự kiến phát hành {formData.carbonAmount} CCT cho dự án "{formData.projectName}"
             </p>
           </div>
           <button
-            onClick={() => setShowSuccess(false)}
-            className="mt-6 bg-gray-500 text-white px-6 py-2 rounded-xl hover:bg-gray-600 transition-all"
+            onClick={() => setShowSuccessUI(false)}
+            className="bg-green-600 text-white px-8 py-3 rounded-xl hover:bg-green-700 transition-all font-bold"
           >
-            Quay lại mẫu đăng ký
+            Đăng ký dự án mới
           </button>
         </div>
       </div>
@@ -217,21 +227,21 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
   return (
     <div className="max-w-4xl mx-auto p-6">
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Đăng ký dự án Carbon</h2>
-        <p className="text-gray-600">Gửi hồ sơ dự án của bạn để được thẩm định và phát hành tín chỉ Carbon (CCT).</p>
+        <h2 className="text-3xl font-black text-gray-900 mb-2">Đăng ký dự án Carbon</h2>
+        <p className="text-gray-600">Gửi hồ sơ dự án của bạn để được thẩm định và phát hành tín chỉ Carbon (CCT) trên mạng lưới.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
-          <form onSubmit={handleSubmit} className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100 space-y-6">
+          <form onSubmit={handleSubmit} className="bg-white rounded-[2rem] p-8 border border-gray-100 shadow-sm space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Tên dự án *</label>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Tên dự án *</label>
               <input
                 type="text"
                 name="projectName"
                 value={formData.projectName}
                 onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
+                className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-500 transition-all outline-none"
                 placeholder="Ví dụ: Bảo tồn rừng ngập mặn Cần Giờ"
                 required
               />
@@ -239,13 +249,13 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Số lượng tín chỉ dự kiến (CCT) *</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Lượng tín chỉ dự kiến (tCO₂) *</label>
                 <input
                   type="number"
                   name="carbonAmount"
                   value={formData.carbonAmount}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
+                  className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-500 transition-all outline-none"
                   placeholder="1000"
                   min="1"
                   step="0.1"
@@ -253,13 +263,13 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Vị trí dự án *</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Vị trí dự án *</label>
                 <input
                   type="text"
                   name="location"
                   value={formData.location}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
+                  className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-500 transition-all outline-none"
                   placeholder="TP. Hồ Chí Minh, Việt Nam"
                   required
                 />
@@ -268,13 +278,13 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Bên thẩm định *</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Đơn vị thẩm định *</label>
                 <select
                   name="methodology"
                   value={formData.methodology}
                   onChange={handleInputChange}
                   disabled={loadingMethodologies}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all disabled:opacity-50"
+                  className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-500 transition-all outline-none appearance-none disabled:opacity-50"
                   required
                 >
                   <option value="">{loadingMethodologies ? 'Đang tải dữ liệu...' : 'Chọn đơn vị thẩm định'}</option>
@@ -284,15 +294,15 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Năm thực hiện *</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Năm thực hiện (Vintage) *</label>
                 <input
                   type="number"
                   name="vintage"
                   value={formData.vintage}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
+                  className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-500 transition-all outline-none"
                   placeholder="2024"
-                  min="2020"
+                  min="2010"
                   max="2030"
                   required
                 />
@@ -300,12 +310,12 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Loại hình dự án *</label>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Loại hình dự án *</label>
               <select
                 name="type"
                 value={formData.type}
                 onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
+                className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-500 transition-all outline-none appearance-none"
                 required
               >
                 <option value="">Chọn loại hình</option>
@@ -316,62 +326,64 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Mô tả chi tiết dự án *</label>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Mô tả dự án *</label>
               <textarea
                 name="description"
                 value={formData.description}
                 onChange={handleInputChange}
                 rows={4}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all resize-none"
-                placeholder="Mô tả tác động môi trường và các chi tiết kỹ thuật của dự án..."
+                className="w-full px-5 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-500 transition-all outline-none resize-none"
+                placeholder="Mô tả tác động môi trường và chi tiết kỹ thuật của dự án..."
                 required
                 minLength={10}
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Hình ảnh dự án (Nhiều ảnh)</label>
-              <input
-                type="file"
-                multiple
-                accept="image/*"
-                onChange={(e) => handleFileChange(e, 'imageFiles')}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
-              />
-              {formData.imageFiles.length > 0 && (
-                <p className="text-sm text-gray-600 mt-1">Đã chọn {formData.imageFiles.length} ảnh</p>
-              )}
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Hình ảnh dự án</label>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={(e) => handleFileChange(e, 'imageFiles')}
+                  className="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
+                />
+                {formData.imageFiles.length > 0 && (
+                  <p className="text-[10px] text-green-600 mt-1 font-bold">Đã chọn {formData.imageFiles.length} ảnh</p>
+                )}
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Tài liệu xác minh (PDF, DOCS)</label>
-              <input
-                type="file"
-                multiple
-                accept=".pdf,.doc,.docx"
-                onChange={(e) => handleFileChange(e, 'docFiles')}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
-              />
-              {formData.docFiles.length > 0 && (
-                <p className="text-sm text-gray-600 mt-1">Đã chọn {formData.docFiles.length} tài liệu</p>
-              )}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Tài liệu pháp lý (PDF, DOCS)</label>
+                <input
+                  type="file"
+                  multiple
+                  accept=".pdf,.doc,.docx"
+                  onChange={(e) => handleFileChange(e, 'docFiles')}
+                  className="w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+                {formData.docFiles.length > 0 && (
+                  <p className="text-[10px] text-blue-600 mt-1 font-bold">Đã chọn {formData.docFiles.length} tài liệu</p>
+                )}
+              </div>
             </div>
 
             <div className="mt-8 flex justify-end">
               <button
                 type="submit"
-                disabled={isSubmitting || !formData.projectName || !formData.carbonAmount || !formData.location || !formData.vintage || !formData.methodology || !formData.description}
-                className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                disabled={isSubmitting || !formData.projectName || !formData.carbonAmount}
+                className="bg-green-600 text-white px-10 py-4 rounded-2xl font-black hover:bg-green-700 shadow-xl shadow-green-100 transition-all disabled:opacity-50 flex items-center space-x-3"
               >
                 {isSubmitting ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Đang lưu...</span>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Đang xử lý hồ sơ...</span>
                   </>
                 ) : (
                   <>
                     <Plus className="h-5 w-5" />
-                    <span>Gửi yêu cầu phê duyệt</span>
+                    <span>Nộp hồ sơ phê duyệt</span>
                   </>
                 )}
               </button>
@@ -379,46 +391,39 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
           </form>
         </div>
 
-        {/* Cột thông tin bên phải */}
         <div className="space-y-6">
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Hướng dẫn đăng ký</h3>
-            <div className="space-y-4 text-sm">
+          <div className="bg-white rounded-[2rem] p-8 border border-gray-100 shadow-sm">
+            <h3 className="text-lg font-bold text-gray-900 mb-6">Hướng dẫn đăng ký</h3>
+            <div className="space-y-6 text-sm">
               <div className="flex items-start space-x-3">
-                <Leaf className="h-5 w-5 text-green-600 mt-0.5" />
+                <div className="p-2 bg-green-50 rounded-lg"><Leaf className="h-5 w-5 text-green-600" /></div>
                 <div>
-                  <p className="font-medium text-gray-900">Chế độ lưu trữ</p>
-                  <p className="text-gray-600">Dữ liệu được lưu trữ an toàn trong cơ sở dữ liệu hệ thống.</p>
+                  <p className="font-bold text-gray-900">Lưu trữ phi tập trung</p>
+                  <p className="text-gray-500 text-xs mt-1">Dữ liệu hình ảnh và tài liệu sẽ được lưu trên IPFS (Pinata) để đảm bảo tính minh bạch.</p>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
-                <Award className="h-5 w-5 text-green-600 mt-0.5" />
+                <div className="p-2 bg-amber-50 rounded-lg"><Award className="h-5 w-5 text-amber-600" /></div>
                 <div>
-                  <p className="font-medium text-gray-900">Xác minh</p>
-                  <p className="text-gray-600">Tất cả dự án phải được thẩm định bởi các tổ chức uy tín.</p>
+                  <p className="font-bold text-gray-900">Quy trình thẩm định</p>
+                  <p className="text-gray-500 text-xs mt-1">Hồ sơ sẽ qua 2 bước: Thẩm định viên xác nhận và Chính phủ phê duyệt trước khi đúc tín chỉ.</p>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
-                <MapPin className="h-5 w-5 text-green-600 mt-0.5" />
+                <div className="p-2 bg-blue-50 rounded-lg"><MapPin className="h-5 w-5 text-blue-600" /></div>
                 <div>
-                  <p className="font-medium text-gray-900">Truy xuất nguồn gốc</p>
-                  <p className="text-gray-600">Theo dõi vị trí và phương pháp thực hiện minh bạch.</p>
+                  <p className="font-bold text-gray-900">Truy xuất nguồn gốc</p>
+                  <p className="text-gray-500 text-xs mt-1">Vị trí và phương pháp thực hiện được ghi lại vĩnh viễn trên Blockchain.</p>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
-                <Calendar className="h-5 w-5 text-green-600 mt-0.5" />
+                <div className="p-2 bg-purple-50 rounded-lg"><Calendar className="h-5 w-5 text-purple-600" /></div>
                 <div>
-                  <p className="font-medium text-gray-900">Năm thực hiện (Vintage)</p>
-                  <p className="text-gray-600">Thời gian dự án bắt đầu cắt giảm hoặc hấp thụ Carbon.</p>
+                  <p className="font-bold text-gray-900">Năm thực hiện (Vintage)</p>
+                  <p className="text-gray-500 text-xs mt-1">Năm dự án bắt đầu tạo ra tác động cắt giảm phát thải.</p>
                 </div>
               </div>
             </div>
-          </div>
-
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
-            <h4 className="font-semibold text-green-900 mb-2">Phí ước tính</h4>
-            <p className="text-2xl font-bold text-green-800 mb-1">0 ETH</p>
-            <p className="text-sm text-green-700">Miễn phí lưu trữ cơ bản</p>
           </div>
         </div>
       </div>
