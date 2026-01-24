@@ -252,8 +252,13 @@ const ApprovedProject: React.FC<ApprovedProjectProps> = ({ onOpenProjectDetail }
                         </div>
                         <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value)} className='px-5 py-3 bg-white border border-gray-200 rounded-xl font-medium text-gray-700 outline-none focus:ring-2 focus:ring-green-500'>
                             <option value='all-time'>Tất cả thời gian</option>
-                            <option value='2024'>Năm 2024</option>
-                            <option value='2023'>Năm 2023</option>
+                            <option value="2026">Năm 2026</option>
+                            <option value="2025">Năm 2025</option>
+                            <option value="2024">Năm 2024</option>
+                            <option value="2023">Năm 2023</option>
+                            <option value="2022">Năm 2022</option>
+                            <option value="2021">Năm 2021</option>
+                            <option value="2020">Năm 2020</option>
                         </select>
                     </div>
                 </div>

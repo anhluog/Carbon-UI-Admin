@@ -245,9 +245,8 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
             } catch (e) { gasLimit = BigInt(150000); }
 
             const tx = await signer.sendTransaction({ to: EXCHANGE_CONTRACT_ADDRESS, value: amountInWei, data: data, gasLimit: gasLimit });
-            showInfo('⏳ Đang xử lý giao dịch nạp tiền...'); // Thay alert
             const receipt = await tx.wait();
-            showSuccess('✅ Nạp tiền thành công!'); // Thay alert
+            showSuccess('Nạp tiền thành công!'); // Thay alert
 
             setRechargeAmount('');
             setShowRechargePopup(false);
@@ -271,16 +270,14 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
 
             const isApproved = await cctContract.isApprovedForAll(walletAddress, EXCHANGE_CONTRACT_ADDRESS);
             if (!isApproved) {
-                showInfo('⏳ Bước 1/2: Đang thực hiện Approve contract...');
                 const approveTx = await cctContract.setApprovalForAll(EXCHANGE_CONTRACT_ADDRESS, true);
                 await approveTx.wait();
-                showSuccess('✅ Approval thành công!');
+                showSuccess('Approval thành công!');
             }
 
-            showInfo('⏳ Bước 2/2: Đang thực hiện Deposit token...');
             const depositTx = await exchangeContract.depositCredit(selectedTokenId, amountBigInt);
             await depositTx.wait();
-            showSuccess('✅ Deposit Token thành công!');
+            showSuccess('Deposit Token thành công!');
 
             setSelectedTokenId(null);
             setTokenAmount('');
@@ -302,10 +299,9 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
             const exchangeContract = new ethers.Contract(EXCHANGE_CONTRACT_ADDRESS, CarbonCreditExchange.abi, signer);
             const amountInWei = ethers.parseEther(withdrawalAmount);
 
-            showInfo('⏳ Đang thực hiện rút tiền...');
             const tx = await exchangeContract.withdrawNative(amountInWei);
             await tx.wait();
-            showSuccess('✅ Rút tiền thành công!');
+            showSuccess('Rút tiền thành công!');
 
             setWithdrawalAmount('');
             setShowWithdrawalPopup(false);
@@ -327,10 +323,9 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
             const exchangeContract = new ethers.Contract(EXCHANGE_CONTRACT_ADDRESS, CarbonCreditExchange.abi, signer);
             const amountBigInt = BigInt(tokenAmount);
 
-            showInfo('⏳ Đang thực hiện rút token...');
             const tx = await exchangeContract.withdrawCredit(selectedWithdrawTokenId, amountBigInt);
             await tx.wait();
-            showSuccess('✅ Rút token thành công!');
+            showSuccess('Rút token thành công!');
 
             setSelectedWithdrawTokenId(null);
             setTokenAmount('');
@@ -351,8 +346,6 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
     const stats = [
         { name: 'Deposit', value: exchangeNativeBalance, unit: 'ETH (Exch)', icon: Wallet, action: () => setShowRechargePopup(true) },
         { name: 'Withdraw', value: totalExchangeCredits, unit: 'tCO₂ (Exch)', icon: Leaf, action: () => setShowWithdrawalPopup(true) },
-        { name: 'Portfolio Value', value: `$${portfolioValue}`, unit: 'Total Assets', icon: DollarSign, action: () => setShowTokenHistoryPopup(true) },
-        { name: 'Certificates', value: 'View', unit: 'My Offset', icon: Award, action: () => setShowCertificatePopup(true) }
     ];
 
     useEffect(() => {
@@ -511,61 +504,6 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
                 </div>
             )}
 
-            {/* PORTFOLIO POPUP */}
-            {showTokenHistoryPopup && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl animate-in zoom-in-95 duration-300">
-                        <div className="p-6 border-b flex justify-between items-center">
-                            <div><h3 className="text-xl font-bold text-gray-900">Your Portfolio</h3><p className="text-gray-500 text-sm">Manage your carbon credits</p></div>
-                            <div className="text-right mr-4 hidden md:block"><p className="text-xs text-gray-400 uppercase">Est. Value</p><p className="text-2xl font-bold text-green-600 font-mono">${portfolioValue}</p></div>
-                            <button onClick={() => setShowTokenHistoryPopup(false)} className="p-2 hover:bg-gray-100 rounded-full"><X className="h-6 w-6 text-gray-400" /></button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-6 bg-gray-50/30">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm"><p className="text-gray-500 text-sm font-medium mb-1">Total Credits Owned</p><p className="text-3xl font-bold text-green-600">{myTokens.reduce((sum, t) => sum + t.balance, 0)} tCO₂</p></div>
-                                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm"><p className="text-gray-500 text-sm font-medium mb-1">Projects Invested</p><p className="text-3xl font-bold text-gray-900">{myTokens.length}</p></div>
-                                <div className="bg-green-500 p-5 rounded-xl text-white shadow-sm"><p className="text-green-100 text-sm mb-1">Impact Status</p><p className="text-3xl font-bold">Active</p></div>
-                            </div>
-                            <div className="bg-white rounded-xl border overflow-hidden shadow-sm mb-8">
-                                <div className="px-6 py-4 border-b flex justify-between items-center"><h4 className="font-bold flex items-center"><Leaf className="w-4 h-4 mr-2 text-green-500" /> My Holdings</h4></div>
-                                {myTokens.length === 0 ? (
-                                    <div className="text-center py-16"><Search className="h-8 w-8 mx-auto mb-3 text-gray-300" /><p className="font-medium">No assets found</p></div>
-                                ) : (
-                                    <div className="overflow-x-auto">
-                                        <table className="min-w-full divide-y divide-gray-100">
-                                            <thead className="bg-gray-50"><tr><th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ID</th><th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Project</th><th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Type</th><th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Balance</th><th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Action</th></tr></thead>
-                                            <tbody className="bg-white divide-y divide-gray-100">
-                                                {myTokens.map((t) => (
-                                                    <tr key={t.tokenId} className="hover:bg-green-50 transition-colors">
-                                                        <td className="px-6 py-4 text-sm text-gray-500">#{t.tokenId}</td>
-                                                        <td className="px-6 py-4"><div className="text-sm font-bold text-gray-900">{t.projectName}</div><div className="text-xs text-gray-500">Vintage: {t.vintage}</div></td>
-                                                        <td className="px-6 py-4"><span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{t.type}</span></td>
-                                                        <td className="px-6 py-4 text-sm font-bold text-green-600">{t.balance} tCO₂</td>
-                                                        <td className="px-6 py-4 text-right"><button onClick={() => showInfo('Coming soon')} className="text-green-600 font-medium hover:underline">Manage</button></td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* CERTIFICATE POPUP (Placeholder) */}
-            {showCertificatePopup && (
-                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all">
-                    <div className="bg-white rounded-xl max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl relative animate-in zoom-in-95">
-                        <button onClick={() => setShowCertificatePopup(false)} className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full z-10"><X className="h-5 w-5 text-gray-500" /></button>
-                        <div className="p-8">
-                            <div className="text-center mb-10"><div className="inline-block p-4 rounded-full bg-green-100 mb-4"><Award className="h-10 w-10 text-green-600" /></div><h3 className="text-2xl font-bold text-gray-900">My Certificates</h3><p className="text-gray-500 mt-1">Verified proof of your environmental impact</p></div>
-                            <div className="text-center py-12 border-2 border-dashed rounded-xl bg-gray-50/50"><TrendingUp className="h-6 w-6 mx-auto mb-3 text-gray-300" /><p className="text-gray-500 font-medium">No certificates found.</p></div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

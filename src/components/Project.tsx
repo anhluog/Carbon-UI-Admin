@@ -1,8 +1,11 @@
-// components/Projects.tsx
-import { Award, Calendar, MapPin, Leaf, TrendingUp, Filter, Share2, Eye, BarChart3, Globe, Users, CheckCircle, X, Clock, Plus, AlertCircle, Clock as ClockIcon, Loader2 } from 'lucide-react';
-import api from '../utils/axiosInstance';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { 
+  Award, Calendar, MapPin, Leaf, TrendingUp, Eye, 
+  BarChart3, CheckCircle, X, Clock, Plus, AlertCircle, 
+  Clock as ClockIcon, Loader2, Share2, ArrowUpRight 
+} from 'lucide-react';
 import { ethers } from 'ethers';
+import api from '../utils/axiosInstance';
 import CarbonCreditEx from '../abi/CarbonCreditSystem.json';
 import { showSuccess, showError, showInfo, showWarning } from '../utils/toast';
 
@@ -11,6 +14,7 @@ interface ProjectsProps {
   onOpenProjectDetail?: (projectId: string) => void;
 }
 
+// Helper: Tải Metadata từ IPFS
 const fetchIpfsMetadata = async (ipfsHash: string) => {
   try {
     const res = await fetch(`https://gateway.pinata.cloud/ipfs/${ipfsHash}`);
@@ -22,6 +26,7 @@ const fetchIpfsMetadata = async (ipfsHash: string) => {
 };
 
 const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail }) => {
+  // --- States ---
   const [activeFilter, setActiveFilter] = useState('all');
   const [timeFilter, setTimeFilter] = useState('all-time');
   const [activeTab, setActiveTab] = useState<'processing' | 'processed'>('processing');
@@ -32,15 +37,43 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
   const [mintProject, setMintProject] = useState<any>(null);
   const [mintLoading, setMintLoading] = useState(false);
 
+  // --- Mappers & Config ---
+  const mapProjectType = (type: string) => {
+    const types: any = {
+      'FOREST_AND_GREENRY': 'Bảo vệ rừng',
+      'RENEWABLE_ENERGY': 'Năng lượng tái tạo',
+      'ENERGY_EFFICIENCY': 'Hiệu quả năng lượng'
+    };
+    return types[type] || 'Loại khác';
+  };
+
+  const mapStatus = (status: string) => {
+    const statuses: any = {
+      'SUBMITTED': 'Chờ thẩm định',
+      'VERIFIED': 'Chờ phê duyệt',
+      'APPROVED': 'Đã phát hành'
+    };
+    return statuses[status] || 'Bị từ chối';
+  };
+
+  const getStatusConfig = (status: string) => {
+    if (status === 'SUBMITTED' || status === 'VERIFIED') 
+        return { color: 'bg-amber-500 text-white', icon: ClockIcon, shadow: 'shadow-amber-200' };
+    if (status === 'APPROVED') 
+        return { color: 'bg-emerald-500 text-white', icon: CheckCircle, shadow: 'shadow-emerald-200' };
+    return { color: 'bg-rose-500 text-white', icon: X, shadow: 'shadow-rose-200' };
+  };
+
+  // --- Fetch Data ---
   const fetchProjects = async () => {
     try {
       const res = await api.get('/projects/MyProject');
       const mappedProjects = await Promise.all(
         res.data.map(async (p: any) => {
-          let thumbnailUrl = 'https://via.placeholder.com/400x300?text=Khong+Co+Anh';
+          let thumbnailUrl = 'https://via.placeholder.com/400x300?text=Chưa+có+ảnh';
           if (p.ipfsHash) {
             const metadata = await fetchIpfsMetadata(p.ipfsHash);
-            if (metadata?.images && Array.isArray(metadata.images) && metadata.images.length > 0) {
+            if (metadata?.images?.[0]) {
               thumbnailUrl = metadata.images[0].replace("ipfs://", "https://gateway.pinata.cloud/ipfs/");
             } else if (metadata?.image) {
               thumbnailUrl = metadata.image.replace("ipfs://", "https://gateway.pinata.cloud/ipfs/");
@@ -48,20 +81,12 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
           }
 
           return {
-            id: p.id,
-            nftTokenId: p.nftTokenId,
+            ...p,
             projectName: p.name,
-            projectType: mapProjectType(p.type),
-            location: p.location,
-            vintage: p.vintage,
-            expectedCredits: p.expectedCredits ?? 0,
-            issuedAmount: p.issueAmount ?? 0,
+            projectTypeDisplay: mapProjectType(p.type),
+            statusDisplay: mapStatus(p.status),
+            thumbnail: thumbnailUrl,
             availableToMint: Math.max(0, (p.expectedCredits ?? 0) - (p.issueAmount ?? 0)),
-            date: p.createdAt,
-            certificateId: p.onchainHash,
-            projectDescription: p.description,
-            images: [thumbnailUrl],
-            status: mapStatus(p.status),
           };
         })
       );
@@ -75,73 +100,34 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
     fetchProjects();
   }, []);
 
-  const mapProjectType = (type: string) => {
-    switch (type) {
-      case 'FOREST_AND_GREENRY': return 'Bảo vệ rừng';
-      case 'RENEWABLE_ENERGY': return 'Năng lượng tái tạo';
-      case 'ENERGY_EFFICIENCY': return 'Hiệu quả năng lượng';
-      default: return 'Loại khác';
-    }
-  };
+  // --- logic BỘ LỌC (Đã sửa lỗi không hoạt động) ---
+  const filteredProjects = useMemo(() => {
+    return projects.filter(project => {
+      // 1. Lọc theo Tab (Xử lý vs Hoàn tất)
+      const isProcessing = project.status === 'SUBMITTED' || project.status === 'VERIFIED';
+      const isProcessed = project.status === 'APPROVED' || project.status.includes('REJECTED');
+      const matchesTab = activeTab === 'processing' ? isProcessing : isProcessed;
 
-  const mapStatus = (status: string) => {
-    switch (status) {
-      case 'SUBMITTED': return 'Chờ thẩm định';
-      case 'VERIFIED': return 'Chờ phê duyệt';
-      case 'REJECTED_BY_VERIFY': return 'Bị từ chối (Thẩm định)';
-      case 'REJECTED_BY_GOVERNMENT': return 'Bị từ chối (Chính phủ)';
-      case 'APPROVED': return 'Đã phát hành';
-      default: return 'Không xác định';
-    }
-  };
+      // 2. Lọc theo Loại (Khớp ID button với Backend Enum)
+      const matchesType = activeFilter === 'all' || 
+        (activeFilter === 'forest' && project.type === 'FOREST_AND_GREENRY') ||
+        (activeFilter === 'renewable' && project.type === 'RENEWABLE_ENERGY') ||
+        (activeFilter === 'efficiency' && project.type === 'ENERGY_EFFICIENCY');
 
-  const getStatusConfig = (status: string) => {
-    switch (status) {
-      case 'Chờ thẩm định':
-      case 'Chờ phê duyệt':
-        return { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: ClockIcon, iconColor: 'text-yellow-600' };
-      case 'Đã phát hành':
-        return { color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle, iconColor: 'text-green-600' };
-      case 'Bị từ chối (Thẩm định)':
-      case 'Bị từ chối (Chính phủ)':
-        return { color: 'bg-red-100 text-red-800 border-red-200', icon: X, iconColor: 'text-red-600' };
-      default:
-        return { color: 'bg-gray-100 text-gray-800 border-gray-200', icon: AlertCircle, iconColor: 'text-gray-600' };
-    }
-  };
+      // 3. Lọc theo Thời gian (Ép kiểu về string để so sánh động)
+      const matchesTime = timeFilter === 'all-time' || project.vintage.toString() === timeFilter;
 
-  const processedValue = projects
-    .filter(p => p.status === 'Đã phát hành' || p.status.includes('Bị từ chối'))
-    .reduce((sum, p) => sum + (p.expectedCredits ?? 0), 0);
+      return matchesTab && matchesType && matchesTime;
+    });
+  }, [projects, activeTab, activeFilter, timeFilter]);
 
-  const processingValue = projects
-    .filter(p => p.status === 'Chờ thẩm định' || p.status === 'Chờ phê duyệt')
-    .reduce((sum, p) => sum + (p.expectedCredits ?? 0), 0);
+  // --- Thống kê ---
+  const stats = useMemo(() => ({
+    processingValue: projects.filter(p => p.status === 'SUBMITTED' || p.status === 'VERIFIED').reduce((sum, p) => sum + p.expectedCredits, 0),
+    processedValue: projects.filter(p => p.status === 'APPROVED').reduce((sum, p) => sum + p.expectedCredits, 0),
+  }), [projects]);
 
-  const projectTypes = [
-    { id: 'all', name: 'Tất cả dự án', count: projects.length },
-    { id: 'forest', name: 'Bảo vệ rừng', count: projects.filter(p => p.projectType === 'Bảo vệ rừng').length },
-    { id: 'renewable', name: 'Năng lượng tái tạo', count: projects.filter(p => p.projectType === 'Năng lượng tái tạo').length },
-    { id: 'efficiency', name: 'Hiệu quả năng lượng', count: projects.filter(p => p.projectType === 'Hiệu quả năng lượng').length },
-  ];
-
-  const filteredProjects = projects.filter(project => {
-    const matchesTab = activeTab === 'processing' 
-      ? (project.status === 'Chờ thẩm định' || project.status === 'Chờ phê duyệt')
-      : (project.status === 'Đã phát hành' || project.status.includes('Bị từ chối'));
-
-    const matchesType = activeFilter === 'all' ||
-      (activeFilter === 'forest' && project.projectType === 'Bảo vệ rừng') ||
-      (activeFilter === 'renewable' && project.projectType === 'Năng lượng tái tạo') ||
-      (activeFilter === 'efficiency' && project.projectType === 'Hiệu quả năng lượng');
-
-    const matchesTime = timeFilter === 'all-time' ||
-      (timeFilter === '2024' && project.vintage === 2024) ||
-      (timeFilter === '2023' && project.vintage === 2023);
-
-    return matchesTab && matchesType && matchesTime;
-  });
-
+  // --- Hành động: Mint ---
   const handleMint = (project: any) => {
     setMintProject(project);
     setMintAmount(0);
@@ -150,207 +136,156 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
 
   const confirmMint = async () => {
     const contractAddress = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
-
-    if (!mintProject || mintAmount <= 0) {
-      showWarning('Vui lòng nhập số lượng hợp lệ để đúc.');
-      return;
-    }
+    if (!mintProject || mintAmount <= 0) return showWarning('Vui lòng nhập số lượng hợp lệ.');
     
-    if (mintAmount > mintProject.availableToMint) {
-      showWarning('Số lượng vượt quá số tín chỉ khả dụng.');
-      return;
-    }
-
     setMintLoading(true);
-    showInfo("Vui lòng xác nhận giao dịch trên ví của bạn...");
-
     try {
-      if (!(window as any).ethereum) {
-        showError("Không tìm thấy MetaMask. Vui lòng cài đặt ví.");
-        setMintLoading(false);
-        return;
-      }
-
       const provider = new ethers.BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(contractAddress, CarbonCreditEx.abi, signer);
 
       const tx = await contract.mintCreditByUUID(mintProject.id, BigInt(mintAmount));
-      showInfo("Giao dịch đã gửi. Đang chờ mạng lưới xác nhận...");
-      
+      showInfo("Giao dịch đang chờ xác nhận...");
       await tx.wait();
 
       setMintModalOpen(false);
-      await fetchProjects(); 
-
-      showSuccess(`Đã đúc thành công ${mintAmount} tCO₂!\nMã giao dịch: ${tx.hash.slice(0, 10)}...`);
+      fetchProjects(); 
+      showSuccess(`Đã đúc thành công ${mintAmount} tCO₂!`);
     } catch (err: any) {
-      console.error("Lỗi Mint:", err);
-      let errorMessage = "Đúc tín chỉ thất bại. Vui lòng thử lại.";
-
-      if (err.reason) errorMessage = err.reason;
-      else if (err.message?.includes("user rejected")) errorMessage = "Người dùng đã từ chối giao dịch.";
-
-      showError(errorMessage);
+      showError(err.reason || "Đúc tín chỉ thất bại.");
     } finally {
       setMintLoading(false);
     }
   };
 
   return (
-    <div className='min-h-screen bg-gray-50'>
+    <div className='min-h-screen bg-[#f8fafc] pb-24'>
       <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12'>
-        {/* Header */}
-        <div className='flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-4'>
-          <div className='flex items-center space-x-4'>
-            <div className='h-14 w-14 rounded-2xl bg-green-500 flex items-center justify-center shadow-xl'>
-              <Leaf className='h-8 w-8 text-white' />
+        
+        {/* Header - Phong cách hiện đại */}
+        <div className='relative mb-16 p-10 rounded-[3rem] bg-slate-900 overflow-hidden shadow-2xl'>
+          <div className='absolute top-0 right-0 w-80 h-80 bg-green-500/10 rounded-full blur-3xl -mr-20 -mt-20'></div>
+          <div className='absolute bottom-0 left-0 w-60 h-60 bg-emerald-500/5 rounded-full blur-3xl -ml-20 -mb-20'></div>
+          
+          <div className='relative z-10 flex flex-col md:flex-row justify-between items-center gap-8'>
+            <div className='flex items-center space-x-6 text-center md:text-left'>
+              <div className='h-20 w-20 rounded-3xl bg-green-500 flex items-center justify-center shadow-lg transform -rotate-3 hover:rotate-0 transition-transform duration-300'>
+                <Leaf className='h-10 w-10 text-white' />
+              </div>
+              <div>
+                <h1 className='text-4xl font-black text-white tracking-tight'>Dự án của tôi</h1>
+                <p className='text-emerald-400 font-medium mt-1'>Theo dõi giá trị tài sản Carbon của bạn</p>
+              </div>
             </div>
-            <div>
-              <h1 className='text-4xl font-extrabold text-gray-900 tracking-tight'>Dự án của tôi</h1>
-              <p className='text-lg text-gray-500'>Theo dõi và quản lý các dự án tín chỉ carbon của bạn</p>
+            <div className='flex p-1.5 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10'>
+              <button onClick={() => setActiveTab('processing')} className={`px-8 py-3 rounded-xl text-sm font-black transition-all ${activeTab === 'processing' ? 'bg-green-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>Đang xử lý</button>
+              <button onClick={() => setActiveTab('processed')} className={`px-8 py-3 rounded-xl text-sm font-black transition-all ${activeTab === 'processed' ? 'bg-green-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>Hoàn tất</button>
             </div>
           </div>
-          <button 
-            onClick={() => showInfo("Tính năng nộp dự án mới sắp ra mắt!")}
-            className='flex items-center space-x-2 px-6 py-3.5 bg-green-600 text-white rounded-2xl hover:bg-green-700 hover:shadow-lg transition-all font-bold'
-          >
-            <Plus className='h-5 w-5' />
-            <span>Nộp Dự án Mới</span>
-          </button>
         </div>
 
         {/* Summary Cards */}
         <div className='grid grid-cols-1 md:grid-cols-2 gap-8 mb-12'>
-          <div 
-            onClick={() => setActiveTab('processing')}
-            className={`group bg-white rounded-[2rem] p-8 cursor-pointer transition-all duration-300 border-2 ${activeTab === 'processing' ? 'shadow-2xl border-yellow-400 scale-[1.02]' : 'shadow-sm border-transparent hover:border-yellow-200'}`}
-          >
-            <div className='flex items-center justify-between mb-8'>
-              <div className='h-16 w-16 rounded-2xl bg-yellow-50 flex items-center justify-center'>
-                <Clock className='h-8 w-8 text-yellow-600' />
-              </div>
-              <div className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest ${activeTab === 'processing' ? 'bg-yellow-400 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                Đang xử lý
-              </div>
+          <div className='bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/50 border border-slate-100'>
+            <div className='flex items-center justify-between mb-6'>
+                <div className='h-12 w-12 rounded-xl bg-amber-50 flex items-center justify-center'><ClockIcon className='text-amber-500' /></div>
+                <span className='text-[10px] font-black text-slate-300 uppercase tracking-widest'>Giá trị kỳ vọng</span>
             </div>
-            <p className='text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-2'>Tổng đang xử lý</p>
-            <h3 className='text-4xl font-black text-gray-900 mb-2'>{processingValue.toFixed(0)} <span className='text-lg font-bold text-gray-400'>tCO₂</span></h3>
-            <p className='text-sm text-gray-500 flex items-center font-medium'><BarChart3 className='h-4 w-4 text-yellow-500 mr-2' />Đang chờ xác thực</p>
+            <h3 className='text-4xl font-black text-slate-900'>{stats.processingValue.toLocaleString()} <span className='text-lg font-bold text-slate-400'>tCO₂</span></h3>
+            <p className='text-sm text-slate-400 mt-2 font-medium italic'>* Đang chờ xác thực từ các bên liên quan</p>
           </div>
-
-          <div 
-            onClick={() => setActiveTab('processed')}
-            className={`group bg-white rounded-[2rem] p-8 cursor-pointer transition-all duration-300 border-2 ${activeTab === 'processed' ? 'shadow-2xl border-green-400 scale-[1.02]' : 'shadow-sm border-transparent hover:border-green-200'}`}
-          >
-            <div className='flex items-center justify-between mb-8'>
-              <div className='h-16 w-16 rounded-2xl bg-green-50 flex items-center justify-center'>
-                <CheckCircle className='h-8 w-8 text-green-600' />
-              </div>
-              <div className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest ${activeTab === 'processed' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                Đã hoàn tất
-              </div>
+          <div className='bg-white rounded-[2.5rem] p-8 shadow-xl shadow-slate-200/50 border border-slate-100'>
+            <div className='flex items-center justify-between mb-6'>
+                <div className='h-12 w-12 rounded-xl bg-emerald-50 flex items-center justify-center'><CheckCircle className='text-emerald-500' /></div>
+                <span className='text-[10px] font-black text-slate-300 uppercase tracking-widest'>Tài sản khả dụng</span>
             </div>
-            <p className='text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-2'>Tổng đã xử lý</p>
-            <h3 className='text-4xl font-black text-gray-900 mb-2'>{processedValue.toFixed(0)} <span className='text-lg font-bold text-gray-400'>tCO₂</span></h3>
-            <p className='text-sm text-gray-500 flex items-center font-medium'><TrendingUp className='h-4 w-4 text-green-500 mr-2' />Đã phát hành & Chốt sổ</p>
+            <h3 className='text-4xl font-black text-slate-900'>{stats.processedValue.toLocaleString()} <span className='text-lg font-bold text-slate-400'>tCO₂</span></h3>
+            <p className='text-sm text-slate-400 mt-2 font-medium italic'>* Có thể giao dịch hoặc đúc thành NFT</p>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className='bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-10'>
-          <div className='flex flex-col lg:flex-row gap-6 justify-between items-start lg:items-center'>
-            <div className='flex flex-wrap gap-2'>
-              {projectTypes.map((type) => (
-                <button
-                  key={type.id}
-                  onClick={() => setActiveFilter(type.id)}
-                  className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${activeFilter === type.id ? 'bg-green-600 text-white shadow-md' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
-                >
-                  {type.name} <span className={`ml-2 px-2 py-0.5 rounded-lg text-[10px] ${activeFilter === type.id ? 'bg-green-500' : 'bg-gray-200'}`}>{type.count}</span>
-                </button>
-              ))}
-            </div>
-            <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value)} className='px-5 py-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-green-500 font-bold text-sm text-gray-700 outline-none'>
-              <option value='all-time'>Tất cả thời gian</option>
-              <option value='2024'>Năm 2024</option>
-              <option value='2023'>Năm 2023</option>
-            </select>
+        {/* Filter Bar */}
+        <div className='flex flex-col lg:flex-row justify-between items-center mb-10 gap-6'>
+          <div className='flex p-1.5 bg-gray-200 rounded-2xl w-full lg:w-auto overflow-x-auto'>
+            {[
+              { id: 'all', name: 'Tất cả' },
+              { id: 'forest', name: 'Lâm nghiệp' },
+              { id: 'renewable', name: 'Năng lượng' },
+              { id: 'efficiency', name: 'Hiệu quả' }
+            ].map((t) => (
+              <button key={t.id} onClick={() => setActiveFilter(t.id)} className={`flex-1 lg:flex-none px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${activeFilter === t.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                {t.name}
+              </button>
+            ))}
           </div>
+          <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value)} className='w-full lg:w-auto px-6 py-3 bg-white border-2 border-slate-100 rounded-2xl font-bold text-slate-600 outline-none focus:border-green-500 transition-colors'>
+             <option value='all-time'>Mọi Vintage</option>
+             {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map(y => <option key={y} value={y.toString()}>{y}</option>)}
+          </select>
         </div>
 
         {/* Project List */}
-        <div className='grid gap-8'>
+        <div className='grid gap-10'>
           {filteredProjects.map((project) => {
-            const statusConfig = getStatusConfig(project.status);
+            const statusCfg = getStatusConfig(project.status);
             return (
-              <div key={project.id} className='group bg-white rounded-[2.5rem] overflow-hidden shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-500'>
+              <div key={project.id} className='group bg-white rounded-[3rem] shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden hover:translate-y-[-5px] transition-all duration-500'>
                 <div className='flex flex-col lg:flex-row'>
-                  <div className="lg:w-96 h-72 lg:h-auto relative bg-gray-200 overflow-hidden">
-                    <img src={project.images[0]} alt={project.projectName} loading="lazy" onError={(e) => (e.target as HTMLImageElement).src = "https://via.placeholder.com/400x300?text=Khong+Co+Anh"} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                  {/* Left: Project Image */}
+                  <div className="lg:w-[420px] h-72 lg:h-auto relative overflow-hidden m-5 rounded-[2.5rem] bg-slate-100">
+                    <img src={project.thumbnail} alt={project.projectName} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
                     <div className="absolute top-4 left-4">
-                        <div className={`flex items-center space-x-2 px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-wider shadow-lg backdrop-blur-md ${statusConfig.color} border`}>
-                            {React.createElement(statusConfig.icon, { className: `h-3 w-3 ${statusConfig.iconColor}` })}
-                            <span>{project.status}</span>
-                        </div>
+                      <div className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl ${statusCfg.color}`}>
+                        <statusCfg.icon className="h-3 w-3" />
+                        <span>{statusCfg.label}</span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className='flex-1 p-10 flex flex-col'>
+                  {/* Right: Content */}
+                  <div className='flex-1 p-8 lg:p-12 flex flex-col'>
                     <div className='flex justify-between items-start mb-6'>
                       <div>
-                        <h3 className='text-3xl font-black text-gray-900 mb-4 group-hover:text-green-600 transition-colors'>{project.projectName}</h3>
-                        <div className='flex flex-wrap gap-6 text-sm text-gray-400 font-bold'>
-                          <span className='flex items-center'><MapPin className='h-4 w-4 mr-2 text-green-500' />{project.location}</span>
-                          <span className='flex items-center'><Calendar className='h-4 w-4 mr-2 text-green-500' />Vintage {project.vintage}</span>
-                          <span className='flex items-center'><Leaf className='h-4 w-4 mr-2 text-green-500' />{project.projectType}</span>
+                        <h3 className='text-3xl font-black text-slate-900 leading-tight mb-4 group-hover:text-green-600 transition-colors'>{project.projectName}</h3>
+                        <div className='flex flex-wrap gap-4'>
+                          <span className='px-4 py-2 bg-slate-50 text-slate-500 rounded-xl text-xs font-bold border border-slate-100 flex items-center'><MapPin className='h-3 w-3 mr-2 text-green-500' />{project.location}</span>
+                          <span className='px-4 py-2 bg-slate-50 text-slate-500 rounded-xl text-xs font-bold border border-slate-100 flex items-center'><Calendar className='h-3 w-3 mr-2 text-green-500' />Vintage {project.vintage}</span>
                         </div>
-                      </div>
-                      <div className='hidden sm:block text-right'>
-                        <span className='text-[10px] font-black text-gray-300 uppercase tracking-widest'>Ngày nộp</span>
-                        <p className='text-sm font-bold text-gray-900'>{new Date(project.date).toLocaleDateString('vi-VN', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                       </div>
                     </div>
 
-                    <div className='grid grid-cols-2 gap-4 mb-8'>
-                      <div className='bg-green-50/50 rounded-3xl p-6 border border-green-100'>
-                        <p className='text-[10px] font-black text-green-600 uppercase tracking-widest mb-2'>Khả dụng để đúc</p>
-                        <p className='text-3xl font-black text-green-900'>{project.availableToMint} <span className='text-xs font-bold text-green-600/50'>tCO₂</span></p>
+                    {/* Dashboard-style Stats */}
+                    <div className='grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8'>
+                      <div className='bg-slate-900 rounded-[1.5rem] p-6 text-white shadow-inner'>
+                        <p className='text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1'>Khả dụng</p>
+                        <p className='text-2xl font-black text-green-400'>{project.availableToMint.toLocaleString()} <span className='text-xs font-normal text-slate-500'>tCO₂</span></p>
                       </div>
-                      <div className='bg-gray-50 rounded-3xl p-6 border border-gray-100'>
-                        <p className='text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2'>Tổng dự kiến</p>
-                        <p className='text-3xl font-black text-gray-900'>{project.expectedCredits} <span className='text-xs font-bold text-gray-400'>tCO₂</span></p>
+                      <div className='bg-emerald-50 rounded-[1.5rem] p-6 border border-emerald-100'>
+                        <p className='text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1'>Đã đúc</p>
+                        <p className='text-2xl font-black text-emerald-900'>{project.issuedAmount.toLocaleString()}</p>
+                      </div>
+                      <div className='bg-slate-50 rounded-[1.5rem] p-6 border border-slate-100'>
+                        <p className='text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1'>Dự kiến</p>
+                        <p className='text-2xl font-black text-slate-700'>{project.expectedCredits.toLocaleString()}</p>
                       </div>
                     </div>
 
-                    <div className='mt-auto flex flex-col sm:flex-row justify-between items-center gap-6 pt-8 border-t border-gray-100'>
-                      <div className='flex items-center space-x-3'>
-                        <div className='h-10 w-10 bg-green-100 rounded-full flex items-center justify-center'>
-                            <BarChart3 className='h-5 w-5 text-green-600' />
-                        </div>
-                        <div>
-                            <span className='text-[10px] font-black text-gray-400 uppercase tracking-wider block'>Hiện đã phát hành</span>
-                            <span className='text-lg font-black text-green-700'>{project.issuedAmount} <span className='text-xs'>tCO₂</span></span>
-                        </div>
-                      </div>
-                      <div className='flex items-center space-x-3 w-full sm:w-auto'>
-                        {project.nftTokenId !== null && project.status === 'Đã phát hành' && project.availableToMint > 0 && (
-                          <button 
-                            onClick={() => handleMint(project)} 
-                            className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-8 py-3.5 bg-green-600 text-white rounded-2xl font-black shadow-lg shadow-green-100 hover:bg-green-700 transition-all"
-                          >
-                            <Share2 className="h-4 w-4" />
-                            <span>Đúc Tín chỉ</span>
+                    <div className='mt-auto flex flex-wrap items-center justify-between gap-6 pt-8 border-t border-slate-100'>
+                       <button onClick={() => onOpenProjectDetail?.(project.id)} className='text-xs font-black text-slate-400 hover:text-green-600 transition-colors flex items-center group/btn uppercase tracking-widest'>
+                          Xem hồ sơ kỹ thuật <ArrowUpRight className='ml-1 h-4 w-4 transform group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform' />
+                       </button>
+
+                       <div className='flex gap-3 w-full sm:w-auto'>
+                        {project.availableToMint > 0 && project.status === 'APPROVED' && (
+                          <button onClick={() => handleMint(project)} className='flex-1 sm:flex-none px-10 py-4 bg-green-500 text-white rounded-2xl font-black text-sm hover:bg-green-600 shadow-xl shadow-green-200 transition-all flex items-center justify-center gap-2'>
+                            <Share2 className='h-4 w-4' /> ĐÚC NGAY
                           </button>
                         )}
-                        <button 
-                          onClick={() => onOpenProjectDetail?.(project.id)} 
-                          className='flex-1 sm:flex-none flex items-center justify-center space-x-2 px-8 py-3.5 bg-gray-900 text-white rounded-2xl font-black hover:bg-black transition-all'
-                        >
-                          <Eye className='h-4 w-4' />
-                          <span>Xem chi tiết</span>
+                        <button onClick={() => onOpenProjectDetail?.(project.id)} className='flex-1 sm:flex-none px-8 py-4 bg-slate-100 text-slate-900 rounded-2xl font-black text-sm hover:bg-slate-200 transition-all uppercase tracking-widest'>
+                           Pháp lý
                         </button>
-                      </div>
+                       </div>
                     </div>
                   </div>
                 </div>
@@ -359,63 +294,49 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
           })}
         </div>
 
+        {/* Empty State */}
         {filteredProjects.length === 0 && (
-          <div className='bg-white rounded-[3rem] p-24 text-center shadow-sm border border-gray-100 mt-10'>
-            <div className='h-24 w-24 bg-gray-50 rounded-[2rem] flex items-center justify-center mx-auto mb-8'>
-              <Award className='h-12 w-12 text-gray-200' />
-            </div>
-            <h3 className='text-3xl font-black text-gray-900 mb-4'>Không tìm thấy dự án nào</h3>
-            <p className='text-gray-400 font-medium max-w-sm mx-auto'>Hãy thử điều chỉnh bộ lọc để tìm thấy các dự án bạn đang tìm kiếm.</p>
+          <div className='bg-white rounded-[3.5rem] p-24 text-center border-2 border-dashed border-slate-200 mt-10'>
+            <Award className='h-20 w-20 text-slate-200 mx-auto mb-6' />
+            <h3 className='text-3xl font-black text-slate-900 mb-2 uppercase'>Không tìm thấy dự án</h3>
+            <p className='text-slate-400 font-medium max-w-sm mx-auto'>Chúng tôi không tìm thấy kết quả phù hợp với bộ lọc hiện tại của bạn.</p>
           </div>
         )}
 
         {/* Mint Modal */}
         {mintModalOpen && mintProject && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
-            <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md p-10 animate-in zoom-in-95 duration-200">
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
+            <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-md p-10 animate-in zoom-in-95 duration-300">
               <div className="flex justify-between items-center mb-8">
-                <h3 className="text-2xl font-black text-gray-900">Đúc Tín chỉ Carbon</h3>
-                <button onClick={() => setMintModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                    <X className="h-6 w-6 text-gray-400" />
-                </button>
+                <h3 className="text-2xl font-black text-slate-900">Đúc Tín Chỉ</h3>
+                <button onClick={() => setMintModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X className="text-slate-400" /></button>
               </div>
 
-              <div className="bg-gray-50 p-6 rounded-3xl mb-8">
-                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-2">Tên dự án</label>
-                <div className="text-gray-900 font-bold text-lg">{mintProject.projectName}</div>
+              <div className="bg-slate-50 p-6 rounded-3xl mb-8 border border-slate-100">
+                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Dự án lựa chọn</p>
+                <p className="text-slate-900 font-bold text-lg leading-tight">{mintProject.projectName}</p>
               </div>
 
               <div className="mb-10">
                 <div className="flex justify-between items-center mb-3">
-                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Số lượng cần đúc (tCO₂)</label>
-                    <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-lg">Khả dụng: {mintProject.availableToMint}</span>
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Lượng đúc (tCO₂)</label>
+                    <span className="text-[10px] font-black text-green-600">Max: {mintProject.availableToMint}</span>
                 </div>
                 <div className="relative">
                     <input
                         type="number"
-                        min={1}
-                        max={mintProject.availableToMint}
                         value={mintAmount}
                         onChange={(e) => setMintAmount(Math.max(0, Math.min(mintProject.availableToMint, Number(e.target.value))))}
-                        className="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-500 font-black text-xl outline-none"
+                        className="w-full px-6 py-5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-green-500 font-black text-2xl outline-none"
                         placeholder="0"
                     />
-                    <div className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-300 font-bold">tCO₂</div>
+                    <div className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 font-black">tCO₂</div>
                 </div>
               </div>
 
-              <div className="flex flex-col space-y-3">
-                <button
-                  disabled={mintAmount <= 0 || mintLoading}
-                  onClick={confirmMint}
-                  className="w-full py-4 rounded-2xl bg-green-600 text-white font-black text-lg shadow-xl shadow-green-100 hover:bg-green-700 transition-all disabled:opacity-50 flex items-center justify-center space-x-3"
-                >
-                  {mintLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : <span>Xác nhận & Đúc</span>}
-                </button>
-                <button onClick={() => setMintModalOpen(false)} className="w-full py-4 text-gray-400 font-bold hover:text-gray-600 transition-colors">
-                  Để sau
-                </button>
-              </div>
+              <button disabled={mintAmount <= 0 || mintLoading} onClick={confirmMint} className="w-full py-5 rounded-2xl bg-green-500 text-white font-black text-lg shadow-xl shadow-green-100 hover:bg-green-600 transition-all flex items-center justify-center gap-3 disabled:opacity-50">
+                  {mintLoading ? <Loader2 className="animate-spin" /> : <span>XÁC NHẬN ĐÚC</span>}
+              </button>
             </div>
           </div>
         )}

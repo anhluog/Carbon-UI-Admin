@@ -252,28 +252,6 @@ function Profile({ walletAddress }: ProfileProps) {
                         </div>
                       </div>
 
-                      {/* Document Hash */}
-                      <div className="group">
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Document Hash</label>
-                        <div className="relative">
-                           <div className="absolute top-3 left-3 flex items-start pointer-events-none">
-                            <Hash className="h-5 w-5 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
-                          </div>
-                          <textarea
-                            name="documentHash"
-                            value={user.documentHash}
-                            onChange={handleInputChange}
-                            disabled={!isEditing}
-                            rows={3}
-                            className={`block w-full pl-10 pr-3 py-3 rounded-xl border-2 transition-all duration-200 outline-none resize-none ${
-                              isEditing 
-                                ? 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white' 
-                                : 'border-transparent bg-gray-50 text-gray-700'
-                            }`}
-                            placeholder={isEditing ? "Nhập mã hash tài liệu..." : "Chưa có dữ liệu"}
-                          />
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>

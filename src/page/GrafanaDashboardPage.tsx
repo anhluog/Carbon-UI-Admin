@@ -12,38 +12,37 @@ const DASHBOARD_ISSUED_RETIRED = "e56df18b-b739-4d94-8587-791e0f87a5c8";
 const PANELS = [
     {
         id: 1,
-        name: "📦 Projects",
+        name: "Dự án",
         uid: DASHBOARD_TYPE_PROJECT,
-        grafanaPanelId: 1,  // ⚠️ Đã thêm dấu phẩy ở đây
+        grafanaPanelId: 1,  
         subChartPanelId: 3,
         subChartPanelId2: 4,
-        tablePanelId: 2,    // ID của bảng trong dashboard này
+        tablePanelId: 2,   
 
     },
     {
         id: 2,
-        name: "📈 Credits",
+        name: "Tín chỉ Carbon ",
         uid: DASHBOARD_CREDITS_UID,
-        grafanaPanelId: 1,  // ⚠️ Đã thêm dấu phẩy
+        grafanaPanelId: 1, 
         subChartPanelId: 2,
         subChartPanelId2: 3,
         subChartPanelId3: 4,
-        // (Lưu ý: Bạn phải check xem dashboard này bảng có ID là 15 thật không nhé)
     },
     {
         id: 3,
-        name: "💰 Trades",
+        name: "Giao dịch",
         uid: DASHBOARD_BUY_SELL,
-        grafanaPanelId: 1,  // ⚠️ Đã thêm dấu phẩy
+        grafanaPanelId: 1,  
         subChartPanelId: 2,
         subChartPanelId2: 3,
         subChartPanelId3: 4,
     },
     {
         id: 4,
-        name: "👤 OrderBook",
+        name: "Số lệnh",
         uid: DASHBOARD_ISSUED_RETIRED,
-        grafanaPanelId: 3,  // ⚠️ Đã thêm dấu phẩy
+        grafanaPanelId: 3, 
         subChartPanelId: 4,
         subChartPanelId2: 1,
         subChartPanelId3: 2,
@@ -61,12 +60,12 @@ const GrafanaDashboardPage = () => {
 
     // Các mốc thời gian
     const TIME_RANGES = [
-        { label: "Last 1h", from: "now-1h", to: "now" },
-        { label: "Last 6h", from: "now-6h", to: "now" },
-        { label: "Last 12h", from: "now-12h", to: "now" },
-        { label: "Last 24h", from: "now-24h", to: "now" },
-        { label: "Last 7d", from: "now-7d", to: "now" },
-        { label: "Last 30d", from: "now-30d", to: "now" },
+        { label: "1 giờ", from: "now-1h", to: "now" },
+        { label: "6 giờ", from: "now-6h", to: "now" },
+        { label: "12 giờ", from: "now-12h", to: "now" },
+        { label: "24 giờ", from: "now-24h", to: "now" },
+        { label: "7 ngày", from: "now-7d", to: "now" },
+        { label: "30 ngày", from: "now-30d", to: "now" },
     ];
 
     // Tìm panel hiện tại dựa trên activeTabId
@@ -76,7 +75,7 @@ const GrafanaDashboardPage = () => {
         <div className="p-6 space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <h2 className="text-2xl font-bold text-gray-900">
-                    📊 Carbon Credit Analytics
+                    Báo cáo Hệ thống
                 </h2>
 
                 {/* Time Filter */}
@@ -186,7 +185,7 @@ const GrafanaDashboardPage = () => {
                                     })
                             }
                         >
-                            ⬇ Export CSV
+                            Tạo file CSV
                         </button>
                     </div>
 
