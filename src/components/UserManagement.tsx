@@ -374,7 +374,7 @@ const UserManagement: React.FC = () => {
       case 'ADMIN': return 'Quản trị viên';
       case 'GOVERNMENT': return 'Chính phủ';
       case 'VERIFIER': return 'Thẩm định viên';
-      case 'OWNER': return 'Chủ dự án';
+      case 'OWNER': return 'Doan nghiệp phát triển';
       case 'USER': return 'Người dùng';
       default: return role;
     }
@@ -392,23 +392,8 @@ const UserManagement: React.FC = () => {
             <div className="bg-gradient-to-br from-green-600 to-emerald-600 p-3 rounded-xl"><Users className="h-6 w-6 text-white" /></div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Quản lý Hệ thống</h2>
-              <p className="text-sm text-gray-500">
-                {activeSection === 'users' ? 'Quản lý người dùng và vai trò' : activeSection === 'retire' ? 'Thu hồi tín chỉ carbon' : 'Xem các chứng nhận thu hồi'}
-              </p>
             </div>
           </div>
-        </div>
-
-        <div className="flex space-x-2 bg-gray-100 rounded-xl p-1">
-          <button onClick={() => setActiveSection('users')} className={`flex-1 py-2.5 px-4 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 ${activeSection === 'users' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500'}`}>
-            <Users className="w-4 h-4" /> Người dùng
-          </button>
-          <button onClick={() => setActiveSection('retire')} className={`flex-1 py-2.5 px-4 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 ${activeSection === 'retire' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500'}`}>
-            <Leaf className="w-4 h-4" /> Thu hồi tín chỉ
-          </button>
-          <button onClick={() => setActiveSection('certificates')} className={`flex-1 py-2.5 px-4 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 ${activeSection === 'certificates' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500'}`}>
-            <Award className="w-4 h-4" /> Chứng nhận ({myCertificates.length})
-          </button>
         </div>
       </div>
 

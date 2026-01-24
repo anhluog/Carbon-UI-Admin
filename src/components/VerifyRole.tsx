@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Users, Edit3, Eye, CheckCircle, Loader2, 
-  AlertTriangle, RefreshCw, X, Shield, ExternalLink 
+import {
+  Users, Edit3, Eye, CheckCircle, Loader2,
+  AlertTriangle, RefreshCw, X, Shield, ExternalLink
 } from 'lucide-react';
 import api from '../utils/axiosInstance';
 import { ethers } from 'ethers';
@@ -14,7 +14,7 @@ interface RoleRequest {
   requestedRole: string;
   reason?: string;
   status: string;
-  // Giả sử backend trả về thêm thông tin verifier
+  documentHash: string;
   verifierRoleId?: string;
   verifierOrganizationName?: string;
 }
@@ -24,7 +24,7 @@ const VerifyRole: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<RoleRequest | null>(null);
-  
+
   // Rejection State
   const [showRejectionPopup, setShowRejectionPopup] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
@@ -36,8 +36,8 @@ const VerifyRole: React.FC = () => {
     try {
       setLoading(true);
       const response = await api.get('/role-request/request-confirm');
-      const safeData = Array.isArray(response.data) 
-        ? response.data.filter((r: any) => r && r.id) 
+      const safeData = Array.isArray(response.data)
+        ? response.data.filter((r: any) => r && r.id)
         : [];
       setRequests(safeData);
     } catch (err: any) {
@@ -57,7 +57,7 @@ const VerifyRole: React.FC = () => {
       showError('Vui lòng nhập lý do từ chối');
       return;
     }
-    
+
     setSubmitting(true);
     try {
       await api.put(`/role-request/reject/${requestToVerify.id}?reason=${encodeURIComponent(rejectionReason)}`);
@@ -76,7 +76,7 @@ const VerifyRole: React.FC = () => {
     if (!request.userId) return showError('Địa chỉ ví không hợp lệ');
 
     setSubmitting(true);
-    
+
     try {
       // 1. Nếu là OWNER: Chỉ xử lý qua API (Không cần Blockchain)
       if (request.requestedRole === 'OWNER') {
@@ -94,7 +94,7 @@ const VerifyRole: React.FC = () => {
       }
 
       showInfo(`Đang khởi tạo giao dịch cấp quyền ${request.requestedRole} trên Blockchain...`);
-      
+
       const provider = new ethers.BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CarbonCreditEx.abi, signer);
@@ -119,10 +119,10 @@ const VerifyRole: React.FC = () => {
       // 3. Sau khi Blockchain thành công -> Cập nhật API
       showInfo('Blockchain xác nhận thành công. Đang cập nhật hệ thống...');
       await api.put(`/role-request/approve/${request.id}`);
-      
+
       showSuccess(`Phê duyệt quyền ${request.requestedRole} thành công!`);
       setRequests(prev => prev.filter(r => r.id !== request.id));
-      
+
     } catch (err: any) {
       console.error('Accept Error:', err);
       if (err.code === 'ACTION_REJECTED') {
@@ -192,7 +192,7 @@ const VerifyRole: React.FC = () => {
                         {request.requestedRole}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-500 mt-1">Trạng thái: 
+                    <p className="text-sm text-gray-500 mt-1">Trạng thái:
                       <span className="ml-1 text-amber-600 font-bold uppercase text-[10px] bg-amber-50 px-2 py-0.5 rounded">
                         {request.status}
                       </span>
@@ -209,7 +209,7 @@ const VerifyRole: React.FC = () => {
                     {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
                     <span>Chấp thuận</span>
                   </button>
-                  
+
                   <button
                     onClick={() => { setRequestToVerify(request); setShowRejectionPopup(true); }}
                     disabled={submitting}
@@ -220,7 +220,12 @@ const VerifyRole: React.FC = () => {
                   </button>
 
                   <button
-                    onClick={() => setSelectedRequest(request)}
+                    onClick={() => {
+                      // Kiểm tra trực tiếp biến request trước khi set vào State
+                      console.log('Dữ liệu toàn bộ Request:', request);
+                      console.log('Document Hash:', (request as any).documentHash);
+                      setSelectedRequest(request);
+                    }}
                     className="flex-1 lg:flex-none flex items-center justify-center space-x-2 px-5 py-2.5 bg-gray-50 text-gray-600 rounded-xl font-bold hover:bg-gray-100 transition-all"
                   >
                     <Eye className="h-4 w-4" />
@@ -239,7 +244,7 @@ const VerifyRole: React.FC = () => {
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
             <h2 className="text-2xl font-black mb-2">Từ chối yêu cầu</h2>
             <p className="text-gray-500 text-sm mb-6">Lý do từ chối sẽ được gửi qua email cho người dùng.</p>
-            
+
             <textarea
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
@@ -268,6 +273,8 @@ const VerifyRole: React.FC = () => {
       )}
 
       {/* MODAL: CHI TIẾT */}
+      {/* ... Các phần khác giữ nguyên ... */}
+
       {selectedRequest && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
@@ -277,7 +284,9 @@ const VerifyRole: React.FC = () => {
                   <h3 className="text-2xl font-black text-gray-900 mb-1">Chi tiết yêu cầu</h3>
                   <p className="text-gray-500 font-mono text-xs">{selectedRequest.userId}</p>
                 </div>
-                <button onClick={() => setSelectedRequest(null)} className="p-2 hover:bg-gray-100 rounded-full">
+                <button onClick={
+                  () => setSelectedRequest(null)} className="p-2 hover:bg-gray-100 rounded-full">
+
                   <X className="h-6 w-6" />
                 </button>
               </div>
@@ -310,18 +319,41 @@ const VerifyRole: React.FC = () => {
               </div>
 
               <div className="mt-8 flex flex-col space-y-3">
-                <a 
+                {/* NÚT XEM HỒ SƠ CID ĐÃ ĐƯỢC CẬP NHẬT */}
+                {selectedRequest.documentHash ? (
+
+
+                  <a
+                    href={`https://gateway.pinata.cloud/ipfs/${selectedRequest.documentHash}`}
+                    target="_blank"
+                    rel="noreferrer"
+
+                    className="flex items-center justify-center space-x-2 py-3.5 bg-emerald-600 text-white rounded-2xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
+                  >
+
+                    <Eye className="h-4 w-4" />
+                    <span>Xem hồ sơ thẩm định (IPFS)</span>
+                  </a>
+                ) : (
+                  <div className="py-3 px-4 bg-gray-50 text-gray-400 rounded-2xl text-xs text-center italic border border-dashed border-gray-200">
+                    Hồ sơ đính kèm không tồn tại
+                  </div>
+                )}
+
+                {/* Bạn vẫn có thể giữ link Etherscan ở dạng nhỏ hơn nếu muốn, hoặc xóa đi */}
+                <a
                   href={`https://sepolia.etherscan.io/address/${selectedRequest.userId}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center justify-center space-x-2 py-3 bg-gray-100 text-gray-700 rounded-2xl font-bold text-sm hover:bg-gray-200 transition-all"
+                  className="flex items-center justify-center space-x-2 py-2 text-gray-400 hover:text-gray-600 transition-all text-xs"
                 >
-                  <ExternalLink className="h-4 w-4" />
-                  <span>Xem ví trên Etherscan</span>
+                  <ExternalLink className="h-3 w-3" />
+                  <span>Kiểm tra ví trên Etherscan</span>
                 </a>
-                <button 
+
+                <button
                   onClick={() => setSelectedRequest(null)}
-                  className="py-3 font-bold text-gray-500"
+                  className="py-3 font-bold text-gray-500 hover:text-gray-700 transition-colors"
                 >
                   Đóng cửa sổ
                 </button>

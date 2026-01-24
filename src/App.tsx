@@ -268,10 +268,10 @@ function App() {
   }, []);
 
   const tabs = [
-    { id: 'user', name: 'Trang chủ', icon: UserIcon, roles: ['user', 'admin', 'superadmin', 'verifier', 'government', 'owner'], restricted: true },
+    { id: 'user', name: 'Ví', icon: UserIcon, roles: ['user', 'owner'], restricted: true },
     { id: 'requestReview', name: 'Đăng ký dự án', icon: Plus, roles: ['owner'], restricted: true },
     { id: 'requestRole', name: 'Đăng kí nhà phát triển', icon: Users, roles: ['user',], restricted: true },
-    { id: 'marketplace', name: 'Sàn giao dịch', icon: ShoppingCart, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: false },
+    { id: 'marketplace', name: 'Sàn giao dịch', icon: ShoppingCart, roles: ['user', 'owner'], restricted: false },
     { id: 'project', name: 'Dự án', icon: Award, roles: ['owner'], restricted: false },
     { id: 'verifyRole', name: 'Xác minh doanh nghiệp', icon: CheckCircle, roles: ['admin', 'superadmin'], restricted: true },
     { id: 'verifyProject', name: 'Thẩm định dự án', icon: Shield, roles: ['verifier'], restricted: true },
@@ -280,8 +280,8 @@ function App() {
     { id: 'userManagement', name: 'Quản lí người dùng', icon: Users, roles: ['superadmin', 'admin'], restricted: true },
     { id: 'grafana', name: 'Báo cáo và phân tích', icon: Award, roles: ['admin'], restricted: false },
     { id: 'adminReport', name: 'Xuất báo cáo', icon: Award, roles: ['admin', 'superadmin'], restricted: true },
-    { id: 'retire', name: 'Bù trừ tín chỉ', icon: Leaf, roles: ['user', 'owner', 'verifier', 'admin', 'government'], restricted: true },
-
+    { id: 'retire', name: 'Bù trừ tín chỉ', icon: Leaf, roles: ['user', 'owner'], restricted: true },
+    
   ];
 
   const displayedTabs = isWalletConnected

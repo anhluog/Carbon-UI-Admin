@@ -9,28 +9,31 @@ interface RequestRoleProps {
 }
 
 const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
-  const [selectedRole, setSelectedRole] = useState<string>('OWNER');
   const [formData, setFormData] = useState({ reason: '' });
   const [licenseFiles, setLicenseFiles] = useState<File[]>([]);
+  
+  // Thay đổi: Lưu cả mã CID để gửi cho Backend
+  const [uploadedCids, setUploadedCids] = useState<string[]>([]); 
   const [uploadedDocUrls, setUploadedDocUrls] = useState<string[]>([]);
+  
   const [uploading, setUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessUI, setShowSuccessUI] = useState(false);
 
   /* ===================== UPLOAD IPFS ===================== */
-  const uploadToIPFS = async (files: File[]): Promise<string[]> => {
+  const uploadToIPFS = async (files: File[]) => {
     setUploading(true);
-    showInfo(`Đang tải lên ${files.length} tài liệu lên IPFS...`);
+    showInfo(`Đ đang tải lên ${files.length} tài liệu...`);
 
     try {
-      const urls = await Promise.all(
+      const results = await Promise.all(
         files.map(async (file) => {
-          const formData = new FormData();
-          formData.append('file', file);
+          const data = new FormData();
+          data.append('file', file);
 
           const res = await axios.post(
             'https://api.pinata.cloud/pinning/pinFileToIPFS',
-            formData,
+            data,
             {
               headers: {
                 pinata_api_key: import.meta.env.VITE_PINATA_API_KEY,
@@ -38,13 +41,22 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
               },
             }
           );
-
-          return `https://gateway.pinata.cloud/ipfs/${res.data.IpfsHash}`;
+          // Trả về cả Hash và URL
+          return {
+            cid: res.data.IpfsHash,
+            url: `https://gateway.pinata.cloud/ipfs/${res.data.IpfsHash}`
+          };
         })
       );
 
+      const cids = results.map(r => r.cid);
+      const urls = results.map(r => r.url);
+
+      setUploadedCids(cids);
+      setUploadedDocUrls(urls);
+      
       showSuccess('Tải tài liệu lên IPFS thành công');
-      return urls;
+      return { cids, urls };
     } catch (err) {
       showError('Lỗi khi tải tài liệu lên IPFS');
       throw err;
@@ -53,13 +65,12 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
     }
   };
 
-  /* ===================== UPDATE PROFILE ===================== */
+  /* ===================== UPDATE PROFILE (Optional) ===================== */
   const updateUserProfileWithUrls = async (urls: string[]) => {
     try {
       await api.put('/user/updateProfile', { documentUrls: urls });
-      showSuccess('Đã cập nhật hồ sơ người dùng');
     } catch (err: any) {
-      showError(err.response?.data?.message || 'Cập nhật hồ sơ thất bại');
+      console.error('Cập nhật profile thất bại', err);
     }
   };
 
@@ -71,21 +82,19 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
     setLicenseFiles(files);
 
     try {
-      const urls = await uploadToIPFS(files);
-      setUploadedDocUrls(urls);
+      const { cids, urls } = await uploadToIPFS(files);
+      // Cập nhật profile người dùng bằng các URL để họ xem được ảnh
       await updateUserProfileWithUrls(urls);
-    } catch {
-      /* lỗi đã toast */
-    }
+    } catch { /* lỗi đã toast */ }
   };
 
   const removeFile = (index: number) => {
     setLicenseFiles((prev) => prev.filter((_, i) => i !== index));
     setUploadedDocUrls((prev) => prev.filter((_, i) => i !== index));
-    showInfo('Đã xóa file khỏi danh sách');
+    setUploadedCids((prev) => prev.filter((_, i) => i !== index));
   };
 
-  /* ===================== SUBMIT ===================== */
+  /* ===================== SUBMIT (GỬI CID CHO BACKEND) ===================== */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -96,15 +105,21 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
 
     setIsSubmitting(true);
     try {
+      // Vì RoleRequestDTO.documentHash là String, 
+      // nếu có nhiều file ta có thể nối chuỗi bằng dấu phẩy hoặc lấy cái đầu tiên
+      const docHash = uploadedCids.length > 0 ? uploadedCids.join(',') : null;
+
       await api.post('/role-request/request', {
         requestedRole: 'OWNER',
         reason: formData.reason,
+        documentHash: docHash, // Khớp với trường documentHash trong DTO của bạn
+        verifierRoleId: null   // Điền nếu cần thiết
       });
 
       showSuccess('Gửi yêu cầu cấp quyền thành công');
       setShowSuccessUI(true);
     } catch (err: any) {
-      showError(err.response?.data?.message || 'Lỗi khi gửi yêu cầu');
+      showError(err.response?.data?.[0] || err.response?.data?.message || 'Lỗi khi gửi yêu cầu');
     } finally {
       setIsSubmitting(false);
     }
@@ -136,56 +151,29 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
   }
 
   /* ===================== MAIN UI ===================== */
-  return (
+ return (
     <div className="max-w-3xl mx-auto p-4">
       <h2 className="text-3xl font-bold mb-2">Yêu cầu quyền Owner</h2>
-      <p className="text-gray-600 mb-6">
-        Gửi hồ sơ để được cấp quyền quản lý dự án và tín chỉ carbon.
-      </p>
+      <p className="text-gray-600 mb-6">Gửi hồ sơ để được cấp quyền quản lý dự án và tín chỉ carbon.</p>
 
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white rounded-2xl p-6 border shadow-sm space-y-6"
-      >
-        {/* Wallet */}
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 border shadow-sm space-y-6">
         <div>
-          <label className="text-sm font-medium text-gray-700">
-            Địa chỉ ví
-          </label>
-          <input
-            value={walletAddress}
-            readOnly
-            className="w-full mt-2 px-4 py-3 rounded-xl border bg-gray-50 text-sm"
-          />
+          <label className="text-sm font-medium text-gray-700">Địa chỉ ví</label>
+          <input value={walletAddress} readOnly className="w-full mt-2 px-4 py-3 rounded-xl border bg-gray-50 text-sm" />
         </div>
 
-        {/* Role (fixed OWNER) */}
         <div className="border-2 border-green-500 bg-green-50 rounded-xl p-4">
           <Award className="h-6 w-6 text-green-600 mb-2" />
           <p className="font-bold">OWNER</p>
-          <p className="text-xs text-gray-600">
-            Toàn quyền quản lý dự án và tín chỉ carbon
-          </p>
+          <p className="text-xs text-gray-600">Toàn quyền quản lý dự án và tín chỉ carbon</p>
         </div>
 
-        {/* Upload */}
         <div>
-          <label className="text-sm font-medium text-gray-700 mb-2 block">
-            Tài liệu hỗ trợ (nếu có)
-          </label>
+          <label className="text-sm font-medium text-gray-700 mb-2 block">Tài liệu hỗ trợ (Bắt buộc để xét duyệt)</label>
           <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100">
             <Upload className={`h-6 w-6 mb-2 ${uploading ? 'animate-bounce text-blue-500' : 'text-gray-500'}`} />
-            <span className="text-sm text-gray-500">
-              {uploading ? 'Đang tải...' : 'Nhấp để tải lên hoặc kéo thả'}
-            </span>
-            <input
-              type="file"
-              multiple
-              className="hidden"
-              accept=".pdf,.jpg,.jpeg,.png"
-              onChange={handleFileChange}
-              disabled={uploading}
-            />
+            <span className="text-sm text-gray-500">{uploading ? 'Đang xử lý...' : 'Tải lên hồ sơ năng lực/giấy phép'}</span>
+            <input type="file" multiple className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} disabled={uploading || isSubmitting} />
           </label>
 
           {licenseFiles.map((file, i) => (
@@ -194,40 +182,28 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
                 <FileText className="h-5 w-5 text-blue-500" />
                 <span className="truncate text-sm">{file.name}</span>
               </div>
-              <button type="button" onClick={() => removeFile(i)}>
+              <button type="button" onClick={() => removeFile(i)} disabled={isSubmitting}>
                 <X className="h-5 w-5 text-red-500" />
               </button>
             </div>
           ))}
         </div>
 
-        {/* Reason */}
         <div>
-          <label className="text-sm font-medium text-gray-700 mb-2 block">
-            Lý do yêu cầu *
-          </label>
-          <textarea
-            rows={4}
-            required
-            value={formData.reason}
-            onChange={(e) => setFormData({ reason: e.target.value })}
+          <label className="text-sm font-medium text-gray-700 mb-2 block">Lý do yêu cầu *</label>
+          <textarea rows={4} required value={formData.reason} onChange={(e) => setFormData({ reason: e.target.value })}
             className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500"
-            placeholder="Mô tả lý do và kinh nghiệm của bạn..."
+            placeholder="Mô tả năng lực và dự án bạn dự định thực hiện..."
           />
         </div>
 
-        {/* Submit */}
-        <button
-          type="submit"
-          disabled={isSubmitting || uploading}
+        <button type="submit" disabled={isSubmitting || uploading}
           className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 rounded-xl font-bold flex justify-center items-center"
         >
-          {isSubmitting ? (
-            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
+          {isSubmitting ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : (
             <>
               <Users className="h-5 w-5 mr-2" />
-              Gửi yêu cầu
+              Gửi yêu cầu xét duyệt
             </>
           )}
         </button>
