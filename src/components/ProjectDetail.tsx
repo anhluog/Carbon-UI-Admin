@@ -108,7 +108,7 @@ const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({
         onClick={onBack}
         className="mb-6 flex items-center gap-2 text-gray-600 hover:text-green-600"
       >
-        <ArrowLeft size={18} /> Quay lại
+        <ArrowLeft size={18} /> Quay lại danh sách dự án
       </button>
 
       <div className="bg-white/80 backdrop-blur rounded-2xl p-6 border border-green-200 shadow-sm">
@@ -244,19 +244,19 @@ const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({
 
         {/* ===== THÔNG TIN BLOCKCHAIN (TÁCH RIÊNG) ===== */}
         {project.onchainHash && (
-          <div className="mt-6 bg-green-50 border-2 border-green-100 rounded-2xl p-6">
-            <h4 className="text-sm uppercase tracking-widest text-green-700 mb-3 font-bold">
-              Chứng chỉ Blockchain
+          <div className="mt-6 bg-gray-900 text-white rounded-2xl p-6">
+            <h4 className="text-sm uppercase tracking-widest text-gray-400 mb-3">
+              Thông tin Blockchain
             </h4>
 
             <div className="flex justify-between text-sm mb-2">
-              <span className="text-gray-600">NFT Token ID</span>
-              <span className="font-mono text-green-600 font-bold">
+              <span>NFT Token ID</span>
+              <span className="font-mono text-green-400">
                 #{project.nftTokenId}
               </span>
             </div>
 
-            <div className="text-xs font-mono break-all text-gray-500 mb-4 bg-white border border-green-100 p-3 rounded-xl">
+            <div className="text-xs font-mono break-all text-gray-300 mb-4">
               Tx Hash: {project.onchainHash}
             </div>
 
@@ -264,9 +264,9 @@ const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({
               href={`https://etherscan.io/tx/${project.onchainHash}`}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 text-green-600 text-sm hover:underline font-bold"
+              className="inline-flex items-center gap-1 text-green-400 text-sm hover:underline"
             >
-              <ExternalLink size={14} /> Xem trên Etherscan
+              <ExternalLink size={14} /> Kiểm tra Blockchain
             </a>
           </div>
         )}
