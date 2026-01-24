@@ -4,7 +4,7 @@ import api from '../utils/axiosInstance';
 import React, { useEffect, useState } from 'react';
 import { ethers } from 'ethers';
 import CarbonCreditEx from '../abi/CarbonCreditSystem.json';
-import { showSuccess, showError, showInfo, showWarning } from '../utils/toast'; // Import toast utilities
+import { showSuccess, showError, showInfo, showWarning } from '../utils/toast';
 
 interface ProjectsProps {
   walletAddress: string;
@@ -16,7 +16,7 @@ const fetchIpfsMetadata = async (ipfsHash: string) => {
     const res = await fetch(`https://gateway.pinata.cloud/ipfs/${ipfsHash}`);
     return await res.json();
   } catch (err) {
-    console.error('Fetch IPfs metadata failed:', ipfsHash, err);
+    console.error('Lỗi khi tải metadata từ IPFS:', ipfsHash, err);
     return null;
   }
 };
@@ -37,7 +37,7 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
       const res = await api.get('/projects/MyProject');
       const mappedProjects = await Promise.all(
         res.data.map(async (p: any) => {
-          let thumbnailUrl = 'https://via.placeholder.com/400x300?text=No+Image';
+          let thumbnailUrl = 'https://via.placeholder.com/400x300?text=Khong+Co+Anh';
           if (p.ipfsHash) {
             const metadata = await fetchIpfsMetadata(p.ipfsHash);
             if (metadata?.images && Array.isArray(metadata.images) && metadata.images.length > 0) {
@@ -67,7 +67,7 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
       );
       setProjects(mappedProjects);
     } catch (e) {
-      showError('Failed to load projects list.');
+      showError('Không thể tải danh sách dự án.');
     }
   };
 
@@ -77,33 +77,33 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
 
   const mapProjectType = (type: string) => {
     switch (type) {
-      case 'FOREST_AND_GREENRY': return 'Forest Protection';
-      case 'RENEWABLE_ENERGY': return 'Renewable Energy';
-      case 'ENERGY_EFFICIENCY': return 'Energy Efficiency';
-      default: return 'Other';
+      case 'FOREST_AND_GREENRY': return 'Bảo vệ rừng';
+      case 'RENEWABLE_ENERGY': return 'Năng lượng tái tạo';
+      case 'ENERGY_EFFICIENCY': return 'Hiệu quả năng lượng';
+      default: return 'Loại khác';
     }
   };
 
   const mapStatus = (status: string) => {
     switch (status) {
-      case 'SUBMITTED': return 'Waiting for Review';
-      case 'VERIFIED': return 'Waiting for Approval';
-      case 'REJECTED_BY_VERIFY': return 'Rejected by Verifier';
-      case 'REJECTED_BY_GOVERNMENT': return 'Rejected by Government';
-      case 'APPROVED': return 'Issued';
-      default: return 'Unknown';
+      case 'SUBMITTED': return 'Chờ thẩm định';
+      case 'VERIFIED': return 'Chờ phê duyệt';
+      case 'REJECTED_BY_VERIFY': return 'Bị từ chối (Thẩm định)';
+      case 'REJECTED_BY_GOVERNMENT': return 'Bị từ chối (Chính phủ)';
+      case 'APPROVED': return 'Đã phát hành';
+      default: return 'Không xác định';
     }
   };
 
   const getStatusConfig = (status: string) => {
     switch (status) {
-      case 'Waiting for Review':
-      case 'Waiting for Approval':
+      case 'Chờ thẩm định':
+      case 'Chờ phê duyệt':
         return { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: ClockIcon, iconColor: 'text-yellow-600' };
-      case 'Issued':
+      case 'Đã phát hành':
         return { color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle, iconColor: 'text-green-600' };
-      case 'Rejected by Verifier':
-      case 'Rejected by Government':
+      case 'Bị từ chối (Thẩm định)':
+      case 'Bị từ chối (Chính phủ)':
         return { color: 'bg-red-100 text-red-800 border-red-200', icon: X, iconColor: 'text-red-600' };
       default:
         return { color: 'bg-gray-100 text-gray-800 border-gray-200', icon: AlertCircle, iconColor: 'text-gray-600' };
@@ -111,29 +111,29 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
   };
 
   const processedValue = projects
-    .filter(p => p.status === 'Issued' || p.status === 'Rejected by Verifier' || p.status === 'Rejected by Government')
+    .filter(p => p.status === 'Đã phát hành' || p.status.includes('Bị từ chối'))
     .reduce((sum, p) => sum + (p.expectedCredits ?? 0), 0);
 
   const processingValue = projects
-    .filter(p => p.status === 'Waiting for Review' || p.status === 'Waiting for Approval')
+    .filter(p => p.status === 'Chờ thẩm định' || p.status === 'Chờ phê duyệt')
     .reduce((sum, p) => sum + (p.expectedCredits ?? 0), 0);
 
   const projectTypes = [
-    { id: 'all', name: 'All Projects', count: projects.length },
-    { id: 'forest', name: 'Forest Protection', count: projects.filter(p => p.projectType === 'Forest Protection').length },
-    { id: 'renewable', name: 'Renewable Energy', count: projects.filter(p => p.projectType === 'Renewable Energy').length },
-    { id: 'efficiency', name: 'Energy Efficiency', count: projects.filter(p => p.projectType === 'Energy Efficiency').length },
+    { id: 'all', name: 'Tất cả dự án', count: projects.length },
+    { id: 'forest', name: 'Bảo vệ rừng', count: projects.filter(p => p.projectType === 'Bảo vệ rừng').length },
+    { id: 'renewable', name: 'Năng lượng tái tạo', count: projects.filter(p => p.projectType === 'Năng lượng tái tạo').length },
+    { id: 'efficiency', name: 'Hiệu quả năng lượng', count: projects.filter(p => p.projectType === 'Hiệu quả năng lượng').length },
   ];
 
   const filteredProjects = projects.filter(project => {
     const matchesTab = activeTab === 'processing' 
-      ? (project.status === 'Waiting for Review' || project.status === 'Waiting for Approval')
-      : (project.status === 'Issued' || project.status === 'Rejected by Verifier' || project.status === 'Rejected by Government');
+      ? (project.status === 'Chờ thẩm định' || project.status === 'Chờ phê duyệt')
+      : (project.status === 'Đã phát hành' || project.status.includes('Bị từ chối'));
 
     const matchesType = activeFilter === 'all' ||
-      (activeFilter === 'forest' && project.projectType === 'Forest Protection') ||
-      (activeFilter === 'renewable' && project.projectType === 'Renewable Energy') ||
-      (activeFilter === 'efficiency' && project.projectType === 'Energy Efficiency');
+      (activeFilter === 'forest' && project.projectType === 'Bảo vệ rừng') ||
+      (activeFilter === 'renewable' && project.projectType === 'Năng lượng tái tạo') ||
+      (activeFilter === 'efficiency' && project.projectType === 'Hiệu quả năng lượng');
 
     const matchesTime = timeFilter === 'all-time' ||
       (timeFilter === '2024' && project.vintage === 2024) ||
@@ -152,21 +152,21 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
     const contractAddress = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
 
     if (!mintProject || mintAmount <= 0) {
-      showWarning('Please enter a valid amount to mint.');
+      showWarning('Vui lòng nhập số lượng hợp lệ để đúc.');
       return;
     }
     
     if (mintAmount > mintProject.availableToMint) {
-      showWarning('Amount exceeds available credits to mint.');
+      showWarning('Số lượng vượt quá số tín chỉ khả dụng.');
       return;
     }
 
     setMintLoading(true);
-    showInfo("Confirming transaction on your wallet...");
+    showInfo("Vui lòng xác nhận giao dịch trên ví của bạn...");
 
     try {
       if (!(window as any).ethereum) {
-        showError("MetaMask not detected. Please install a wallet.");
+        showError("Không tìm thấy MetaMask. Vui lòng cài đặt ví.");
         setMintLoading(false);
         return;
       }
@@ -176,20 +176,20 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
       const contract = new ethers.Contract(contractAddress, CarbonCreditEx.abi, signer);
 
       const tx = await contract.mintCreditByUUID(mintProject.id, BigInt(mintAmount));
-      showInfo("Transaction sent. Waiting for network confirmation...");
+      showInfo("Giao dịch đã gửi. Đang chờ mạng lưới xác nhận...");
       
       await tx.wait();
 
       setMintModalOpen(false);
       await fetchProjects(); 
 
-      showSuccess(`Successfully minted ${mintAmount} tCO₂!\nTx: ${tx.hash.slice(0, 10)}...`);
+      showSuccess(`Đã đúc thành công ${mintAmount} tCO₂!\nMã giao dịch: ${tx.hash.slice(0, 10)}...`);
     } catch (err: any) {
-      console.error("Mint error:", err);
-      let errorMessage = "Minting failed. Please try again.";
+      console.error("Lỗi Mint:", err);
+      let errorMessage = "Đúc tín chỉ thất bại. Vui lòng thử lại.";
 
       if (err.reason) errorMessage = err.reason;
-      else if (err.message?.includes("user rejected")) errorMessage = "Transaction was rejected by user.";
+      else if (err.message?.includes("user rejected")) errorMessage = "Người dùng đã từ chối giao dịch.";
 
       showError(errorMessage);
     } finally {
@@ -207,16 +207,16 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
               <Leaf className='h-8 w-8 text-white' />
             </div>
             <div>
-              <h1 className='text-4xl font-extrabold text-gray-900 tracking-tight'>My Projects</h1>
-              <p className='text-lg text-gray-500'>Track and manage your carbon credit projects</p>
+              <h1 className='text-4xl font-extrabold text-gray-900 tracking-tight'>Dự án của tôi</h1>
+              <p className='text-lg text-gray-500'>Theo dõi và quản lý các dự án tín chỉ carbon của bạn</p>
             </div>
           </div>
           <button 
-            onClick={() => showInfo("Project submission coming soon!")}
+            onClick={() => showInfo("Tính năng nộp dự án mới sắp ra mắt!")}
             className='flex items-center space-x-2 px-6 py-3.5 bg-green-600 text-white rounded-2xl hover:bg-green-700 hover:shadow-lg transition-all font-bold'
           >
             <Plus className='h-5 w-5' />
-            <span>Submit New Project</span>
+            <span>Nộp Dự án Mới</span>
           </button>
         </div>
 
@@ -231,12 +231,12 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
                 <Clock className='h-8 w-8 text-yellow-600' />
               </div>
               <div className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest ${activeTab === 'processing' ? 'bg-yellow-400 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                In Review
+                Đang xử lý
               </div>
             </div>
-            <p className='text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-2'>Processing Total</p>
+            <p className='text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-2'>Tổng đang xử lý</p>
             <h3 className='text-4xl font-black text-gray-900 mb-2'>{processingValue.toFixed(0)} <span className='text-lg font-bold text-gray-400'>tCO₂</span></h3>
-            <p className='text-sm text-gray-500 flex items-center font-medium'><BarChart3 className='h-4 w-4 text-yellow-500 mr-2' />Pending verification</p>
+            <p className='text-sm text-gray-500 flex items-center font-medium'><BarChart3 className='h-4 w-4 text-yellow-500 mr-2' />Đang chờ xác thực</p>
           </div>
 
           <div 
@@ -248,12 +248,12 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
                 <CheckCircle className='h-8 w-8 text-green-600' />
               </div>
               <div className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest ${activeTab === 'processed' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                Completed
+                Đã hoàn tất
               </div>
             </div>
-            <p className='text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-2'>Processed Total</p>
+            <p className='text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-2'>Tổng đã xử lý</p>
             <h3 className='text-4xl font-black text-gray-900 mb-2'>{processedValue.toFixed(0)} <span className='text-lg font-bold text-gray-400'>tCO₂</span></h3>
-            <p className='text-sm text-gray-500 flex items-center font-medium'><TrendingUp className='h-4 w-4 text-green-500 mr-2' />Issued & Finalized</p>
+            <p className='text-sm text-gray-500 flex items-center font-medium'><TrendingUp className='h-4 w-4 text-green-500 mr-2' />Đã phát hành & Chốt sổ</p>
           </div>
         </div>
 
@@ -272,9 +272,9 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
               ))}
             </div>
             <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value)} className='px-5 py-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-green-500 font-bold text-sm text-gray-700 outline-none'>
-              <option value='all-time'>All Time</option>
-              <option value='2024'>Year 2024</option>
-              <option value='2023'>Year 2023</option>
+              <option value='all-time'>Tất cả thời gian</option>
+              <option value='2024'>Năm 2024</option>
+              <option value='2023'>Năm 2023</option>
             </select>
           </div>
         </div>
@@ -287,7 +287,7 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
               <div key={project.id} className='group bg-white rounded-[2.5rem] overflow-hidden shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-500'>
                 <div className='flex flex-col lg:flex-row'>
                   <div className="lg:w-96 h-72 lg:h-auto relative bg-gray-200 overflow-hidden">
-                    <img src={project.images[0]} alt={project.projectName} loading="lazy" onError={(e) => (e.target as HTMLImageElement).src = "https://via.placeholder.com/400x300?text=No+Image"} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    <img src={project.images[0]} alt={project.projectName} loading="lazy" onError={(e) => (e.target as HTMLImageElement).src = "https://via.placeholder.com/400x300?text=Khong+Co+Anh"} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                     <div className="absolute top-4 left-4">
                         <div className={`flex items-center space-x-2 px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-wider shadow-lg backdrop-blur-md ${statusConfig.color} border`}>
                             {React.createElement(statusConfig.icon, { className: `h-3 w-3 ${statusConfig.iconColor}` })}
@@ -307,18 +307,18 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
                         </div>
                       </div>
                       <div className='hidden sm:block text-right'>
-                        <span className='text-[10px] font-black text-gray-300 uppercase tracking-widest'>Submitted On</span>
-                        <p className='text-sm font-bold text-gray-900'>{new Date(project.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                        <span className='text-[10px] font-black text-gray-300 uppercase tracking-widest'>Ngày nộp</span>
+                        <p className='text-sm font-bold text-gray-900'>{new Date(project.date).toLocaleDateString('vi-VN', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                       </div>
                     </div>
 
                     <div className='grid grid-cols-2 gap-4 mb-8'>
                       <div className='bg-green-50/50 rounded-3xl p-6 border border-green-100'>
-                        <p className='text-[10px] font-black text-green-600 uppercase tracking-widest mb-2'>Available to Mint</p>
+                        <p className='text-[10px] font-black text-green-600 uppercase tracking-widest mb-2'>Khả dụng để đúc</p>
                         <p className='text-3xl font-black text-green-900'>{project.availableToMint} <span className='text-xs font-bold text-green-600/50'>tCO₂</span></p>
                       </div>
                       <div className='bg-gray-50 rounded-3xl p-6 border border-gray-100'>
-                        <p className='text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2'>Total Expected</p>
+                        <p className='text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2'>Tổng dự kiến</p>
                         <p className='text-3xl font-black text-gray-900'>{project.expectedCredits} <span className='text-xs font-bold text-gray-400'>tCO₂</span></p>
                       </div>
                     </div>
@@ -329,18 +329,18 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
                             <BarChart3 className='h-5 w-5 text-green-600' />
                         </div>
                         <div>
-                            <span className='text-[10px] font-black text-gray-400 uppercase tracking-wider block'>Currently Issued</span>
+                            <span className='text-[10px] font-black text-gray-400 uppercase tracking-wider block'>Hiện đã phát hành</span>
                             <span className='text-lg font-black text-green-700'>{project.issuedAmount} <span className='text-xs'>tCO₂</span></span>
                         </div>
                       </div>
                       <div className='flex items-center space-x-3 w-full sm:w-auto'>
-                        {project.nftTokenId !== null && project.status === 'Issued' && project.availableToMint > 0 && (
+                        {project.nftTokenId !== null && project.status === 'Đã phát hành' && project.availableToMint > 0 && (
                           <button 
                             onClick={() => handleMint(project)} 
                             className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-8 py-3.5 bg-green-600 text-white rounded-2xl font-black shadow-lg shadow-green-100 hover:bg-green-700 transition-all"
                           >
                             <Share2 className="h-4 w-4" />
-                            <span>Mint Credits</span>
+                            <span>Đúc Tín chỉ</span>
                           </button>
                         )}
                         <button 
@@ -348,7 +348,7 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
                           className='flex-1 sm:flex-none flex items-center justify-center space-x-2 px-8 py-3.5 bg-gray-900 text-white rounded-2xl font-black hover:bg-black transition-all'
                         >
                           <Eye className='h-4 w-4' />
-                          <span>View Details</span>
+                          <span>Xem chi tiết</span>
                         </button>
                       </div>
                     </div>
@@ -364,8 +364,8 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
             <div className='h-24 w-24 bg-gray-50 rounded-[2rem] flex items-center justify-center mx-auto mb-8'>
               <Award className='h-12 w-12 text-gray-200' />
             </div>
-            <h3 className='text-3xl font-black text-gray-900 mb-4'>No projects found</h3>
-            <p className='text-gray-400 font-medium max-w-sm mx-auto'>Try adjusting your filters to find the projects you are looking for.</p>
+            <h3 className='text-3xl font-black text-gray-900 mb-4'>Không tìm thấy dự án nào</h3>
+            <p className='text-gray-400 font-medium max-w-sm mx-auto'>Hãy thử điều chỉnh bộ lọc để tìm thấy các dự án bạn đang tìm kiếm.</p>
           </div>
         )}
 
@@ -374,21 +374,21 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
             <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md p-10 animate-in zoom-in-95 duration-200">
               <div className="flex justify-between items-center mb-8">
-                <h3 className="text-2xl font-black text-gray-900">Mint Credits</h3>
+                <h3 className="text-2xl font-black text-gray-900">Đúc Tín chỉ Carbon</h3>
                 <button onClick={() => setMintModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                     <X className="h-6 w-6 text-gray-400" />
                 </button>
               </div>
 
               <div className="bg-gray-50 p-6 rounded-3xl mb-8">
-                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-2">Project Name</label>
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-2">Tên dự án</label>
                 <div className="text-gray-900 font-bold text-lg">{mintProject.projectName}</div>
               </div>
 
               <div className="mb-10">
                 <div className="flex justify-between items-center mb-3">
-                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Amount to mint (tCO₂)</label>
-                    <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-lg">Available: {mintProject.availableToMint}</span>
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Số lượng cần đúc (tCO₂)</label>
+                    <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-lg">Khả dụng: {mintProject.availableToMint}</span>
                 </div>
                 <div className="relative">
                     <input
@@ -410,10 +410,10 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
                   onClick={confirmMint}
                   className="w-full py-4 rounded-2xl bg-green-600 text-white font-black text-lg shadow-xl shadow-green-100 hover:bg-green-700 transition-all disabled:opacity-50 flex items-center justify-center space-x-3"
                 >
-                  {mintLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : <span>Confirm & Mint</span>}
+                  {mintLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : <span>Xác nhận & Đúc</span>}
                 </button>
                 <button onClick={() => setMintModalOpen(false)} className="w-full py-4 text-gray-400 font-bold hover:text-gray-600 transition-colors">
-                  Maybe Later
+                  Để sau
                 </button>
               </div>
             </div>

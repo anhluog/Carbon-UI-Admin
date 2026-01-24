@@ -278,8 +278,8 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
   return (
     <div className="max-w-4xl mx-auto p-6">
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Send Project Carbon Credit</h2>
-        <p className="text-gray-600">Create new carbon credit tokens from verified environmental projects.</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Đăng ký dự án carbon</h2>
+        <p className="text-gray-600">Đăng ký dự án carbon để tạo token carbon credit từ các dự án môi trường được xác minh.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -289,7 +289,7 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
             {/* Project Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Project Name *
+                Tên dự án *
               </label>
               <input
                 type="text"
@@ -306,7 +306,7 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Carbon Amount (tCO₂) *
+                  Số lượng carbon dự kiến (CCT) *
                 </label>
                 <input
                   type="number"
@@ -322,7 +322,7 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Location *
+                  Vị trí dự án *
                 </label>
                 <input
                   type="text"
@@ -340,7 +340,7 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Methodology *
+                  Bên kiểm định *
                 </label>
                 <select
                   name="methodology"
@@ -362,7 +362,7 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Vintage Year *
+                  Năm thực hiện dự án *
                 </label>
                 <input
                   type="number"
@@ -381,7 +381,7 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
             {/* Type */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Type *
+                Loại dự án *
               </label>
               <select
                 name="type"
@@ -390,7 +390,7 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
                 required
               >
-                <option value="">Select Type</option>
+                <option value="">Loại dự án</option>
                 {typeOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -402,7 +402,7 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
             {/* Description */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Project Description *
+                Mô tả dự án *
               </label>
               <textarea
                 name="description"
@@ -419,7 +419,7 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
             {/* Project Image */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Project Images (Optional - Multiple)
+                Hình ảnh dự án (Tùy chọn - Nhiều hình ảnh)
               </label>
               <input
                 type="file"
@@ -439,7 +439,7 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
             {/* Verification Documents */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Verification Documents (Optional - Multiple PDFs/Docs)
+                Tài liệu xác minh (Tùy chọn - Nhiều PDF/Docs)
               </label>
               <input
                 type="file"
@@ -471,7 +471,7 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
                 ) : (
                   <>
                     <Plus className="h-5 w-5" />
-                    <span>Save Project</span>
+                    <span>Lưu dự án</span>
                   </>
                 )}
               </button>
@@ -482,7 +482,7 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
         {/* Info Panel */}
         <div className="space-y-6">
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-100">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Saving Information</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Thông tin lưu trữ</h3>
             <div className="space-y-4 text-sm">
               <div className="flex items-start space-x-3">
                 <Leaf className="h-5 w-5 text-green-600 mt-0.5" />

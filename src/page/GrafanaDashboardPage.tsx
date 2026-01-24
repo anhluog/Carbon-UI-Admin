@@ -25,10 +25,10 @@ const PANELS = [
         name: "📈 Credits",
         uid: DASHBOARD_CREDITS_UID,
         grafanaPanelId: 1,  // ⚠️ Đã thêm dấu phẩy
-        subChartPanelId: 2, 
+        subChartPanelId: 2,
         subChartPanelId2: 3,
         subChartPanelId3: 4,
-          // (Lưu ý: Bạn phải check xem dashboard này bảng có ID là 15 thật không nhé)
+        // (Lưu ý: Bạn phải check xem dashboard này bảng có ID là 15 thật không nhé)
     },
     {
         id: 3,
@@ -43,25 +43,60 @@ const PANELS = [
         id: 4,
         name: "👤 OrderBook",
         uid: DASHBOARD_ISSUED_RETIRED,
-        grafanaPanelId: 1,  // ⚠️ Đã thêm dấu phẩy
-        subChartPanelId: 2,
-        subChartPanelId2: 3,
-        subChartPanelId3: 4,
+        grafanaPanelId: 3,  // ⚠️ Đã thêm dấu phẩy
+        subChartPanelId: 4,
+        subChartPanelId2: 1,
+        subChartPanelId3: 2,
     },
 
 ];
 
 const GrafanaDashboardPage = () => {
     const [activeTabId, setActiveTabId] = useState(PANELS[0].id);
+    const [timeRange, setTimeRange] = useState({
+        label: "Last 24h",
+        from: "now-24h",
+        to: "now"
+    });
+
+    // Các mốc thời gian
+    const TIME_RANGES = [
+        { label: "Last 1h", from: "now-1h", to: "now" },
+        { label: "Last 6h", from: "now-6h", to: "now" },
+        { label: "Last 12h", from: "now-12h", to: "now" },
+        { label: "Last 24h", from: "now-24h", to: "now" },
+        { label: "Last 7d", from: "now-7d", to: "now" },
+        { label: "Last 30d", from: "now-30d", to: "now" },
+    ];
 
     // Tìm panel hiện tại dựa trên activeTabId
     const currentPanel = PANELS.find(p => p.id === activeTabId);
 
     return (
         <div className="p-6 space-y-6">
-            <h2 className="text-2xl font-bold text-gray-900">
-                📊 Carbon Credit Analytics
-            </h2>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <h2 className="text-2xl font-bold text-gray-900">
+                    📊 Carbon Credit Analytics
+                </h2>
+
+                {/* Time Filter */}
+                <div className="bg-white rounded-lg shadow border p-1 flex items-center gap-1 overflow-x-auto">
+                    {TIME_RANGES.map((range) => (
+                        <button
+                            key={range.label}
+                            onClick={() => setTimeRange(range)}
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors
+                                ${timeRange.label === range.label
+                                    ? "bg-green-100 text-green-700 border border-green-200"
+                                    : "text-gray-600 hover:bg-gray-100"
+                                }
+                            `}
+                        >
+                            {range.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
 
             {/* Panel selector */}
             <div className="flex flex-wrap gap-3">
@@ -88,6 +123,8 @@ const GrafanaDashboardPage = () => {
                         dashboardUid={currentPanel.uid}
                         panelId={currentPanel.grafanaPanelId}
                         height={600}
+                        from={timeRange.from}
+                        to={timeRange.to}
                     />
                 )}
             </div>
@@ -98,6 +135,8 @@ const GrafanaDashboardPage = () => {
                         dashboardUid={currentPanel.uid}
                         panelId={currentPanel.subChartPanelId}
                         height={400}
+                        from={timeRange.from}
+                        to={timeRange.to}
                     />
                 </div>
             )}
@@ -107,6 +146,8 @@ const GrafanaDashboardPage = () => {
                         dashboardUid={currentPanel.uid}
                         panelId={currentPanel.subChartPanelId2}
                         height={400}
+                        from={timeRange.from}
+                        to={timeRange.to}
                     />
                 </div>
             )}
@@ -116,21 +157,24 @@ const GrafanaDashboardPage = () => {
                         dashboardUid={currentPanel.uid}
                         panelId={currentPanel.subChartPanelId3}
                         height={400}
+                        from={timeRange.from}
+                        to={timeRange.to}
                     />
                 </div>
             )}
             {/* 2. BẢNG DỮ LIỆU CHI TIẾT (TABLE) */}
-            {/* ⚠️ Đã sửa logic đóng mở ngoặc ở đây */}
             {currentPanel?.tablePanelId && (
                 <div className="bg-white rounded-xl border shadow p-4">
                     <div className="flex justify-between items-center mb-2">
                         <h3 className="text-lg font-bold">Dữ liệu chi tiết</h3>
                         <button
                             onClick={() =>
-                                fetch("http://localhost:8081/api/grafana/export?dashboardUid=" +
+                                fetch("http://localhost:80/api/grafana/export?dashboardUid=" +
                                     currentPanel.uid +
                                     "&panelId=" +
-                                    currentPanel.tablePanelId
+                                    currentPanel.tablePanelId +
+                                    "&from=" + timeRange.from +
+                                    "&to=" + timeRange.to
                                 )
                                     .then(res => res.blob())
                                     .then(blob => {
@@ -150,9 +194,11 @@ const GrafanaDashboardPage = () => {
                         dashboardUid={currentPanel.uid}
                         panelId={currentPanel.tablePanelId}
                         height={400}
+                        from={timeRange.from}
+                        to={timeRange.to}
                     />
                 </div>
-            )} {/* ⚠️ Đóng ngoặc nhọn kết thúc điều kiện */}
+            )}
 
         </div>
     );
