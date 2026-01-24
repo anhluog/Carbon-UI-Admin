@@ -276,7 +276,6 @@ const ApprovedProject: React.FC<ApprovedProjectProps> = ({ onOpenProjectDetail }
 
     } catch (err: any) {
         console.error('Blockchain error detail:', err);
-        // Cố gắng lấy lý do Revert (nếu có)
         if (err.data) {
             alert("Lỗi từ Contract: " + err.data.message);
         } else {
