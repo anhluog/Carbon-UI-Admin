@@ -3,7 +3,7 @@ import { Client } from '@stomp/stompjs';
 import { ArrowUpRight, ArrowDownRight, Zap, RefreshCw } from 'lucide-react';
 import api from '../utils/axiosInstance';
 
-const SOCKET_URL = 'ws://localhost:8080/ws';
+const SOCKET_URL = 'ws://localhost:8081/ws';
 
 interface RecentTradesProps {
   creditId?: string;

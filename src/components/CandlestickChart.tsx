@@ -12,7 +12,7 @@ import { Client } from '@stomp/stompjs';
 import { TrendingUp, TrendingDown, BarChart3, RefreshCw } from 'lucide-react';
 import api from '../utils/axiosInstance';
 
-const SOCKET_URL = 'ws://localhost:8080/ws';
+const SOCKET_URL = 'ws://localhost:8081/ws';
 
 interface CandlestickChartProps {
   creditId: string;

@@ -47,7 +47,7 @@ interface Project {
 }
 
 interface VerifyProjectProps {
-    onOpenProjectDetail?: (projectId: string, fromTab: string) => void;
+  onOpenProjectDetail?: (projectId: string, fromTab: string) => void;
 }
 
 
@@ -69,6 +69,7 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
   const [showAcceptPopup, setShowAcceptPopup] = useState(false);
   const [acceptCredits, setAcceptCredits] = useState<number | ''>('');
   const [projectToAccept, setProjectToAccept] = useState<Project | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // --- Chuyển đổi ngôn ngữ ---
   const mapProjectType = (type: string) => {
@@ -163,17 +164,37 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
 
   const handleConfirmAccept = async () => {
     if (!projectToAccept || !acceptCredits) return;
+
+    setIsSubmitting(true);
     try {
       await api.post(`/projects/${projectToAccept.id}/verify`, {
         approved: true,
         expectedCredits: acceptCredits,
       });
-      showSuccess(`Dự án "${projectToAccept.projectName}" đã được xác nhận thẩm định!`);
+
+      showSuccess(`Dự án "${projectToAccept.projectName}" đã được xác nhận!`);
+
+      // 1. Tạo đối tượng dự án đã cập nhật trạng thái mới để đưa sang tab Lịch sử
+      const verifiedProject: Project = {
+        ...projectToAccept,
+        expectedCredits: Number(acceptCredits),
+        status: 'Chờ phê duyệt', // Tương ứng với mapStatus('VERIFIED')
+        rawStatus: 'VERIFIED',
+      };
+
+      // 2. Xóa khỏi danh sách "Chờ xử lý"
+      setProcessingProjects(prev => prev.filter(p => p.id !== projectToAccept.id));
+
+      // 3. THÊM VÀO danh sách "Lịch sử xử lý" (đưa lên đầu danh sách)
+      setProcessedProjects(prev => [verifiedProject, ...prev]);
+
       setShowAcceptPopup(false);
       setProjectToAccept(null);
-      loadData(true);
+
     } catch (err) {
-      showError("Xác nhận thất bại. Vui lòng kiểm tra lại kết nối.");
+      showError("Xác nhận thất bại. Vui lòng thử lại.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -310,7 +331,11 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
                           Từ chối
                         </button>
                         <button
-                          onClick={() => { setProjectToAccept(project); setAcceptCredits(project.expectedCredits); setShowAcceptPopup(true); }}
+                          onClick={() => {
+                            setProjectToAccept(project);
+                            setAcceptCredits(project.expectedCredits);
+                            setShowAcceptPopup(true);
+                          }}
                           className='px-6 py-2 bg-green-600 text-white font-bold text-sm rounded-xl hover:bg-green-700 shadow-lg shadow-green-100 transition-all'
                         >
                           Xác nhận & Tiếp tục
@@ -368,7 +393,20 @@ const VerifyProject: React.FC<VerifyProjectProps> = ({ onOpenProjectDetail }) =>
               </div>
               <div className="flex gap-3">
                 <button onClick={() => setShowAcceptPopup(false)} className="flex-1 py-3 font-bold text-gray-500 hover:bg-gray-100 rounded-2xl transition-all">Hủy</button>
-                <button onClick={handleConfirmAccept} className="flex-1 py-3 bg-green-600 text-white font-bold rounded-2xl transition-all">Xác nhận dự án</button>
+                <button
+                  onClick={handleConfirmAccept}
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 bg-green-600 text-white font-bold rounded-2xl transition-all disabled:bg-gray-400"
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Đang lưu...</span>
+                    </div>
+                  ) : (
+                    "Xác nhận dự án"
+                  )}
+                </button>
               </div>
             </div>
           </div>

@@ -23,7 +23,6 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
   /* ===================== UPLOAD IPFS ===================== */
   const uploadToIPFS = async (files: File[]) => {
     setUploading(true);
-    showInfo(`Đ đang tải lên ${files.length} tài liệu...`);
 
     try {
       const results = await Promise.all(

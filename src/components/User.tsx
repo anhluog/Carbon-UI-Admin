@@ -12,7 +12,7 @@ import api from '../utils/axiosInstance';
 import { showSuccess, showError, showInfo, showWarning } from '../utils/toast';
 const EXCHANGE_CONTRACT_ADDRESS = import.meta.env.VITE_EXCHANGE_CONTRACT_ADDRESS;
 const CCT_CONTRACT_ADDRESS = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
-const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:8081/ws';
+const SOCKET_URL = 'ws://localhost:8081/ws';
 
 interface UserProps {
     walletAddress: string;
@@ -71,7 +71,6 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
         availableBalance: string;
         projectName: string;
     }>>([]);
-
     const [myTokens, setMyTokens] = useState<Array<{
         tokenId: number;
         projectId: string;
@@ -97,7 +96,7 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
             const price = 2.35;
             setPortfolioValue((parseFloat(formattedBalance) * price).toFixed(2));
         } catch (error) {
-            console.error('❌ Error fetching data:', error);
+            console.error('❌ Error fetching dashboard data:', error);
         }
     };
 
@@ -157,7 +156,7 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
             setOwnedTokens(myTokens);
 
         } catch (error) {
-            console.error('❌ Error fetching owned tokens:', error);
+            showError('❌ Error fetching owned tokens:', error);
         }
     };
 
@@ -207,23 +206,49 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
         } catch (error) { setNotifications([]); }
     };
 
-    const connectWebSocket = useCallback(() => {
+    useEffect(() => {
+        // 1. Chỉ chạy khi có walletAddress
         if (!walletAddress) return;
+
+        // 2. Tạo URL chuẩn (Bỏ đoạn /websocket)
+        const socketUrl = SOCKET_URL;
+
         const client = new Client({
-            brokerURL: WS_URL.replace(/^http/, 'ws') + "/ws/websocket",
+            brokerURL: socketUrl,
             reconnectDelay: 5000,
+            heartbeatIncoming: 4000,
+            heartbeatOutgoing: 4000,
             onConnect: () => {
+                console.log("🚀 WS Connected Private");
+                // Đảm bảo topic khớp với Backend: /topic/private/0x...
                 client.subscribe(`/topic/private/${walletAddress.toLowerCase()}`, (message) => {
-                    const newNote: Notification = JSON.parse(message.body);
-                    setNotifications(prev => [newNote, ...prev]);
-                    showInfo(`🔔 Thông báo mới: ${newNote.title}`); // Thay alert
+                    const newNote = JSON.parse(message.body);
+                    setNotifications((prev) => {
+                        const exists = prev.find(n => n.id === newNote.id);
+                        if (exists) return prev;
+                        return [newNote, ...prev];
+                    });
+
+                    fetchExchangeNativeBalance();
+                    fetchExchangeCreditBalances();
                 });
-                
             },
+            onStompError: (frame) => {
+                console.error('Broker Error:', frame.headers['message']);
+            }
         });
+
         client.activate();
         stompClientRef.current = client;
-    }, [walletAddress]);
+
+        // 3. Cleanup: Ngắt kết nối khi component bị hủy (Unmount)
+        return () => {
+            if (stompClientRef.current) {
+                stompClientRef.current.deactivate();
+                console.log("🔴 WS Disconnected Private");
+            }
+        };
+    }, [walletAddress]); // useEffect sẽ chạy lại khi walletAddress thay đổi
 
     // --- ACTIONS VỚI TOAST ---
 
@@ -252,7 +277,7 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
             setShowRechargePopup(false);
             await fetchData();
         } catch (error: any) {
-            showError('❌ Lỗi: ' + (error.reason || error.message));
+            showError(' Lỗi: ' + (error.reason || error.message));
         } finally {
             setIsDepositing(false);
         }
@@ -284,7 +309,7 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
             setShowRechargePopup(false);
             await fetchData();
         } catch (error: any) {
-            showError('❌ Lỗi: ' + (error.reason || error.message));
+            showError(' Lỗi: ' + (error.reason || error.message));
         } finally {
             setIsDepositing(false);
         }
@@ -308,7 +333,7 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
             await fetchData();
             await fetchExchangeNativeBalance();
         } catch (error: any) {
-            showError('❌ Lỗi: ' + (error.reason || error.message));
+            showError(' Lỗi: ' + (error.reason || error.message));
         } finally {
             setIsWithdrawing(false);
         }
@@ -344,17 +369,19 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
 
     const totalExchangeCredits = exchangeCreditBalances.reduce((sum, c) => sum + parseFloat(c.availableBalance || '0'), 0).toFixed(2);
     const stats = [
-        { name: 'Deposit', value: exchangeNativeBalance, unit: 'ETH (Exch)', icon: Wallet, action: () => setShowRechargePopup(true) },
-        { name: 'Withdraw', value: totalExchangeCredits, unit: 'tCO₂ (Exch)', icon: Leaf, action: () => setShowWithdrawalPopup(true) },
+        { name: 'Nạp', value: exchangeNativeBalance, unit: 'ETH (Exch)', icon: Wallet, action: () => setShowRechargePopup(true) },
+        { name: 'Rút', value: totalExchangeCredits, unit: 'tCO₂ (Exch)', icon: Leaf, action: () => setShowWithdrawalPopup(true) },
     ];
 
     useEffect(() => {
         fetchData();
         fetchExchangeNativeBalance();
+         fetchExchangeCreditBalances(); // Thêm dòng này
+        fetchOwnedTokens();  
         fetchNotifications();
-        connectWebSocket();
+
         return () => stompClientRef.current?.deactivate();
-    }, [walletAddress, connectWebSocket]);
+    }, [walletAddress]);
 
     useEffect(() => { if (showRechargePopup) fetchOwnedTokens(); }, [showRechargePopup, walletAddress]);
     useEffect(() => { if (showWithdrawalPopup) { fetchExchangeNativeBalance(); fetchExchangeCreditBalances(); } }, [showWithdrawalPopup, walletAddress]);
@@ -390,7 +417,7 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
             <div className="bg-white rounded-3xl p-6 border border-green-100 shadow-sm">
                 <div className="flex items-center mb-6">
                     <div className="p-2 bg-green-50 rounded-lg mr-3"><Bell className="h-5 w-5 text-green-600" /></div>
-                    <h3 className="text-lg font-bold text-gray-900">Notifications</h3>
+                    <h3 className="text-lg font-bold text-gray-900">Thông báo</h3>
                 </div>
                 {notifications.length === 0 ? (
                     <div className="text-center py-10 text-gray-400 bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
@@ -430,34 +457,34 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
                 <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
                     <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="bg-gradient-to-r from-green-500 to-green-600 p-6 flex justify-between items-center text-white">
-                            <div><h3 className="text-xl font-bold">Deposit Assets</h3><p className="text-green-50 text-sm">Add funds to Exchange</p></div>
+                            <div><h3 className="text-xl font-bold">Nạp</h3><p className="text-green-50 text-sm">Nạp tài sản vào ví hệ thống</p></div>
                             <button onClick={() => setShowRechargePopup(false)} className="p-2 hover:bg-white/20 rounded-full"><X className="h-5 w-5" /></button>
                         </div>
                         <div className="p-6">
                             <div className="flex bg-gray-50 p-1 rounded-lg mb-6">
-                                <button onClick={() => setRechargeType('Money')} className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${rechargeType === 'Money' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500'}`}>Native (ETH)</button>
-                                <button onClick={() => setRechargeType('Token')} className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${rechargeType === 'Token' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500'}`}>Credit Token</button>
+                                <button onClick={() => setRechargeType('Money')} className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${rechargeType === 'Money' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500'}`}>Nạp ETH</button>
+                                <button onClick={() => setRechargeType('Token')} className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${rechargeType === 'Token' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500'}`}>Nạp tín chỉ</button>
                             </div>
                             {rechargeType === 'Money' ? (
                                 <div className="space-y-5">
                                     <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex justify-between items-center">
-                                        <span className="text-gray-600 text-sm font-medium">Exchange Native Bal</span>
+                                        <span className="text-gray-600 text-sm font-medium">Số dư khả dụng</span>
                                         <span className="text-xl font-bold text-gray-900 font-mono">{exchangeNativeBalance} ETH</span>
                                     </div>
                                     <input type="number" placeholder="0.00" value={rechargeAmount} onChange={(e) => setRechargeAmount(e.target.value)} disabled={isDepositing} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none font-mono" />
                                     <button onClick={handleDepositNative} disabled={isDepositing} className="w-full py-3.5 rounded-xl font-bold text-white bg-green-500 hover:bg-green-600 disabled:bg-gray-300 transition-all">
-                                        {isDepositing ? 'Processing...' : 'Confirm Deposit'}
+                                        {isDepositing ? 'Đang xử lý...' : 'Xác nhận Nạp'}
                                     </button>
                                 </div>
                             ) : (
                                 <div className="space-y-5">
                                     <select value={selectedTokenId ?? ''} onChange={(e) => setSelectedTokenId(Number(e.target.value))} disabled={isDepositing} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none">
-                                        <option value="">-- Choose from Wallet --</option>
+                                        <option value="">-- Chọn tín chỉ --</option>
                                         {ownedTokens.map(token => <option key={token.tokenId} value={token.tokenId}>{token.projectName} (Bal: {token.balance})</option>)}
                                     </select>
                                     <input type="number" placeholder="Enter amount" value={tokenAmount} onChange={(e) => setTokenAmount(e.target.value)} disabled={!selectedTokenId || isDepositing} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none font-mono" />
                                     <button onClick={handleDepositToken} disabled={!selectedTokenId || !tokenAmount || isDepositing} className="w-full py-3.5 rounded-xl font-bold text-white bg-green-500 hover:bg-green-600 disabled:bg-gray-300">
-                                        {isDepositing ? 'Processing...' : 'Deposit Token'}
+                                        {isDepositing ? 'Đang xử lý...' : 'Xác nhận Rút'}
                                     </button>
                                 </div>
                             )}
@@ -471,31 +498,31 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
                 <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
                     <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="bg-gradient-to-r from-green-600 to-green-700 p-6 flex justify-between items-center text-white">
-                            <div><h3 className="text-xl font-bold">Withdraw Assets</h3><p className="text-green-100 text-sm">Retrieve funds to Personal Wallet</p></div>
+                            <div><h3 className="text-xl font-bold">Rút</h3><p className="text-green-100 text-sm">Rút tiền về ví Blockchain</p></div>
                             <button onClick={() => setShowWithdrawalPopup(false)} className="p-2 hover:bg-white/20 rounded-full"><X className="h-5 w-5" /></button>
                         </div>
                         <div className="p-6">
                             <div className="flex bg-gray-50 p-1 rounded-lg mb-6">
-                                <button onClick={() => setWithdrawalType('Money')} className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${withdrawalType === 'Money' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500'}`}>Withdraw ETH</button>
-                                <button onClick={() => setWithdrawalType('Token')} className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${withdrawalType === 'Token' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500'}`}>Withdraw Token</button>
+                                <button onClick={() => setWithdrawalType('Money')} className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${withdrawalType === 'Money' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500'}`}>Rút ETH</button>
+                                <button onClick={() => setWithdrawalType('Token')} className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${withdrawalType === 'Token' ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500'}`}>Rút tín chỉ</button>
                             </div>
                             {withdrawalType === 'Money' ? (
                                 <div className="space-y-5">
-                                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex justify-between items-center"><span className="text-gray-600 text-sm font-medium">Avail ETH in Exchange</span><span className="text-xl font-bold font-mono">{exchangeNativeBalance} ETH</span></div>
+                                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex justify-between items-center"><span className="text-gray-600 text-sm font-medium">Số dư khả dụng</span><span className="text-xl font-bold font-mono">{exchangeNativeBalance} ETH</span></div>
                                     <input type="number" value={withdrawalAmount} onChange={(e) => setWithdrawalAmount(e.target.value)} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none font-mono" placeholder="0.00" />
                                     <button onClick={handleWithdrawNative} disabled={isWithdrawing} className="w-full py-3.5 rounded-xl font-bold text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-300">
-                                        {isWithdrawing ? 'Processing...' : 'Withdraw ETH'}
+                                        {isWithdrawing ? 'Đang xử lý...' : 'Rút ETH'}
                                     </button>
                                 </div>
                             ) : (
                                 <div className="space-y-5">
                                     <select value={selectedWithdrawTokenId ?? ''} onChange={(e) => setSelectedWithdrawTokenId(Number(e.target.value))} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none">
-                                        <option value="">-- Select Token from Exchange --</option>
+                                        <option value="">-- Chọn tín chỉ --</option>
                                         {exchangeCreditBalances.map(c => <option key={c.tokenId} value={c.tokenId}>{c.projectName} (Avail: {c.availableBalance})</option>)}
                                     </select>
                                     <input type="number" placeholder="Amount" value={tokenAmount} onChange={(e) => setTokenAmount(e.target.value)} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none font-mono" />
                                     <button onClick={handleWithdrawToken} disabled={isWithdrawing} className="w-full py-3.5 rounded-xl font-bold text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-300">
-                                        {isWithdrawing ? 'Processing...' : 'Withdraw Token'}
+                                        {isWithdrawing ? 'Đang xử lý...' : 'Rút tín chỉ'}
                                     </button>
                                 </div>
                             )}

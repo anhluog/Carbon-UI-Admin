@@ -42,7 +42,7 @@ function App() {
     setWalletAddress(address);
     setIsWalletConnected(true);
     setUserRole(role);
-    setActiveTab('user');
+    setActiveTab('marketplace');
     setError(null);
   }, []);
 

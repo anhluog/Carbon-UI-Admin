@@ -83,8 +83,6 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
         return;
       }
 
-      showInfo("Bắt đầu tải tệp tin lên IPFS...");
-
       // Upload ảnh
       let imageUrls: string[] = [];
       if (formData.imageFiles.length > 0) {
@@ -157,7 +155,6 @@ const RequestReview: React.FC<MintTokenProps> = ({ walletAddress }) => {
       const metadataHashRes = metaRes.data.IpfsHash;
       setMetadataHash(metadataHashRes);
 
-      showInfo("Đang lưu thông tin dự án vào hệ thống...");
 
       const projectData = {
         name: formData.projectName,

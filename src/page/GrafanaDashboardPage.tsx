@@ -4,10 +4,10 @@ import { exportGrafanaPanelCSV } from "../utils/exportGrafanaCsv";
 
 
 // UID của các Dashboard
-const DASHBOARD_TYPE_PROJECT = "c57ca550-c215-42a7-abf4-34b2d82e1b9b";
-const DASHBOARD_CREDITS_UID = "b60bcaa1-9cdf-4f5f-98e6-20b25da881d4";
-const DASHBOARD_BUY_SELL = "a8931dcd-18cb-4e26-b8e7-a2b603b521da";
-const DASHBOARD_ISSUED_RETIRED = "e56df18b-b739-4d94-8587-791e0f87a5c8";
+const DASHBOARD_TYPE_PROJECT = "fec970ce-ff5d-459b-81ff-93eff0dbca15";
+const DASHBOARD_CREDITS_UID = "b79b4029-d444-4c3c-a01a-798c4a38c755";
+const DASHBOARD_BUY_SELL = "b0e4afb1-68e2-4072-ad01-46821e03ce76";
+const DASHBOARD_ISSUED_RETIRED = "d1d78f4a-8bab-4d05-a4ad-44c71b6a14a3";
 
 const PANELS = [
     {

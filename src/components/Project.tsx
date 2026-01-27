@@ -171,7 +171,7 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
     }
 
     setMintLoading(true);
-    showInfo("Vui lòng xác nhận giao dịch trên ví của bạn...");
+    
 
     try {
       if (!(window as any).ethereum) {
@@ -185,7 +185,7 @@ const Projects: React.FC<ProjectsProps> = ({ walletAddress, onOpenProjectDetail 
       const contract = new ethers.Contract(contractAddress, CarbonCreditEx.abi, signer);
 
       const tx = await contract.mintCreditByUUID(mintProject.id, BigInt(mintAmount));
-      showInfo("Giao dịch đã gửi. Đang chờ mạng lưới xác nhận...");
+      
 
       await tx.wait();
 
