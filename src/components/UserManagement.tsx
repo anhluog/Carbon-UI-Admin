@@ -198,7 +198,6 @@ const UserManagement: React.FC = () => {
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CarbonCredit.abi, signer);
 
-      showInfo("Vui lòng xác nhận thu hồi trên ví của bạn...");
       const tx = await contract.retireCreditBatch(retireItems.map(i => i.tokenId), retireItems.map(i => i.amount));
       const receipt = await tx.wait(1);
 
@@ -325,7 +324,6 @@ const UserManagement: React.FC = () => {
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CarbonCredit.abi, signer);
 
       let tx;
-      showInfo("Đang khởi tạo giao dịch trên blockchain...");
       if (newRoleName === 'VERIFIER') {
         if (!selectedVerifierRole) return showError('Vui lòng chọn Tổ chức Thẩm định');
         const orgName = verifierRoles.find(r => r.id === selectedVerifierRole)?.organizationName;

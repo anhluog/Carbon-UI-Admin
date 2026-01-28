@@ -29,7 +29,7 @@ const ProjectThumbnail = ({ ipfsHash }: { ipfsHash: string }) => {
     }, [ipfsHash]);
 
     return imgUrl ? (
-        <img src={imgUrl} alt="Dự án" className="w-full h-full object-cover" />
+        <img src={imgUrl} alt="Dự án" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
     ) : (
         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-green-100 to-emerald-100">
             <Leaf className="h-16 w-16 text-green-500 opacity-50" />
@@ -62,6 +62,9 @@ const ApprovedProject: React.FC<ApprovedProjectProps> = ({ onOpenProjectDetail }
     const [projects, setProjects] = useState<Project[]>([]);
     const [processedProjects, setProcessedProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [processingId, setProcessingId] = useState<string | null>(null);
+    
     const [activeFilter, setActiveFilter] = useState('all');
     const [timeFilter, setTimeFilter] = useState('all-time');
     const [activeTab, setActiveTab] = useState<'processing' | 'processed'>('processing');
@@ -70,90 +73,56 @@ const ApprovedProject: React.FC<ApprovedProjectProps> = ({ onOpenProjectDetail }
     const [rejectionReason, setRejectionReason] = useState('');
     const [projectToVerify, setProjectToVerify] = useState<Project | null>(null);
 
-    const fetchRequests = async (silent = false) => {
-        if (!silent) setLoading(true);
-        try {
-            const response = await api.get('/projects/ProjectVerified');
-            setProjects(Array.isArray(response.data) ? response.data : []);
-        } catch (err) {
-            showError("Không thể tải danh sách dự án đã thẩm định");
-        } finally {
-            if (!silent) setLoading(false);
-        }
-    };
-
-    const fetchProcessedProjects = async () => {
-        try {
-            const response = await api.get('/projects/processed-project');
-            setProcessedProjects(Array.isArray(response.data) ? response.data : []);
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
+    // Tải dữ liệu ban đầu
     useEffect(() => {
-        fetchRequests();
-        fetchProcessedProjects();
+        const loadAllData = async () => {
+            setLoading(true);
+            try {
+                const [resPending, resProcessed] = await Promise.all([
+                    api.get('/projects/ProjectVerified'),
+                    api.get('/projects/processed-project')
+                ]);
+                setProjects(Array.isArray(resPending.data) ? resPending.data : []);
+                setProcessedProjects(Array.isArray(resProcessed.data) ? resProcessed.data : []);
+            } catch (err) {
+                showError("Không thể tải danh sách dự án");
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadAllData();
     }, []);
 
+    // Helper map dữ liệu UI
     const mapProjectType = (type: string) => {
-        switch (type) {
-            case 'FOREST_AND_GREENRY': return 'Bảo vệ rừng';
-            case 'RENEWABLE_ENERGY': return 'Năng lượng tái tạo';
-            case 'ENERGY_EFFICIENCY': return 'Hiệu quả năng lượng';
-            default: return 'Khác';
-        }
+        const types: any = { 'FOREST_AND_GREENRY': 'Bảo vệ rừng', 'RENEWABLE_ENERGY': 'Năng lượng tái tạo', 'ENERGY_EFFICIENCY': 'Hiệu quả năng lượng' };
+        return types[type] || 'Khác';
     };
 
     const mapStatus = (status: string) => {
-        switch (status) {
-            case 'VERIFIED': return 'Đang chờ phê duyệt';
-            case 'APPROVED': return 'Đã cấp phát';
-            case 'REJECTED_BY_GOVERNMENT': return 'Bị Chính phủ từ chối';
-            default: return status;
-        }
+        const statuses: any = { 'VERIFIED': 'Đang chờ phê duyệt', 'APPROVED': 'Đã cấp phát', 'REJECTED_BY_GOVERNMENT': 'Bị Chính phủ từ chối' };
+        return statuses[status] || status;
     };
 
-    const processingValue = projects.reduce((sum, p) => sum + (p.expectedCredits ?? 0), 0);
-    const processedValue = processedProjects.reduce((sum, p) => sum + (p.expectedCredits ?? 0), 0);
+    // Logic lọc danh sách dựa trên Tab và Bộ lọc
+    const currentList = useMemo(() => {
+        const baseList = activeTab === 'processing' ? projects : processedProjects;
+        return baseList.filter(project => {
+            const matchesType = activeFilter === 'all' || 
+                (activeFilter === 'forest' && project.type === 'FOREST_AND_GREENRY') ||
+                (activeFilter === 'renewable' && project.type === 'RENEWABLE_ENERGY');
+            const matchesTime = timeFilter === 'all-time' || project.vintage.toString() === timeFilter;
+            return matchesType && matchesTime;
+        });
+    }, [activeTab, projects, processedProjects, activeFilter, timeFilter]);
 
-    const currentProjects = activeTab === 'processing' ? projects : processedProjects;
-
-    const filteredProjects = currentProjects.filter(project => {
-        const mappedStatus = mapStatus(project.status);
-        const matchesTab = activeTab === 'processing'
-            ? mappedStatus === 'Đang chờ phê duyệt'
-            : (mappedStatus === 'Đã cấp phát' || mappedStatus === 'Bị Chính phủ từ chối');
-
-        const matchesType = activeFilter === 'all' ||
-            (activeFilter === 'forest' && mapProjectType(project.type) === 'Bảo vệ rừng') ||
-            (activeFilter === 'renewable' && mapProjectType(project.type) === 'Năng lượng tái tạo');
-
-        const matchesTime = timeFilter === 'all-time' || project.vintage.toString() === timeFilter;
-
-        return matchesTab && matchesType && matchesTime;
-    });
-
-    const handleReject = async () => {
-        if (rejectionReason.trim() === '' || !projectToVerify) return;
-        try {
-            await api.post(`/projects/${projectToVerify.id}/approved`, {
-                approved: false,
-                reason: rejectionReason
-            });
-            showSuccess(`Dự án ${projectToVerify.name} đã bị từ chối.`);
-            fetchRequests(true);
-            fetchProcessedProjects();
-            setShowRejectionPopup(false);
-            setRejectionReason('');
-        } catch (err) {
-            showError("Từ chối dự án thất bại.");
-        }
-    };
-
+    // Xử lý DUYỆT & MINT (Blockchain)
     const handleConfirmAccept = async (project: Project) => {
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+        setProcessingId(project.id);
+        
         try {
-            showInfo("Vui lòng xác nhận giao dịch trên ví của bạn...");
             const contractAddress = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
             const provider = new ethers.BrowserProvider((window as any).ethereum);
             const signer = await provider.getSigner();
@@ -161,189 +130,222 @@ const ApprovedProject: React.FC<ApprovedProjectProps> = ({ onOpenProjectDetail }
             const myAddress = await signer.getAddress();
 
             const tx = await contract.approveAndMintProject(
-                project.id,
-                project.ownerId,
-                project.verifiedBy,
-                myAddress,
-                project.ipfsHash,
-                project.expectedCredits
+                project.id, project.ownerId, project.verifiedBy,
+                myAddress, project.ipfsHash, project.expectedCredits
             );
 
-            showInfo("Giao dịch đang được xử lý...");
             await tx.wait();
-            showSuccess("Phê duyệt và đúc tín chỉ trên Blockchain thành công!");
-            fetchRequests(true);
-            fetchProcessedProjects();
+
+            showSuccess(`Phê duyệt thành công dự án ${project.name}`);
+
+            // Cập nhật State cục bộ để nhảy Tab ngay lập tức
+            const updated: Project = { ...project, status: 'APPROVED', updatedAt: new Date().toISOString() };
+            setProjects(prev => prev.filter(p => p.id !== project.id));
+            setProcessedProjects(prev => [updated, ...prev]);
+
         } catch (err: any) {
-            showError(err.reason || "Giao dịch Blockchain thất bại");
+            showError(err.reason || "Giao dịch thất bại hoặc bị hủy");
+        } finally {
+            setIsSubmitting(false);
+            setProcessingId(null);
+        }
+    };
+
+    // Xử lý TỪ CHỐI (API)
+    const handleReject = async () => {
+        if (!rejectionReason.trim() || !projectToVerify || isSubmitting) return;
+        
+        setIsSubmitting(true);
+        try {
+            await api.post(`/projects/${projectToVerify.id}/approved`, {
+                approved: false, reason: rejectionReason
+            });
+
+            showSuccess(`Đã từ chối dự án ${projectToVerify.name}`);
+
+            // Cập nhật State cục bộ
+            const updated: Project = { ...projectToVerify, status: 'REJECTED_BY_GOVERNMENT', updatedAt: new Date().toISOString() };
+            setProjects(prev => prev.filter(p => p.id !== projectToVerify.id));
+            setProcessedProjects(prev => [updated, ...prev]);
+
+            setShowRejectionPopup(false);
+            setRejectionReason('');
+            setProjectToVerify(null);
+        } catch (err) {
+            showError("Từ chối thất bại");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     if (loading) {
-        return <div className="flex items-center justify-center h-screen font-medium"><p>Đang tải danh sách dự án...</p></div>;
+        return <div className="flex flex-col items-center justify-center h-screen space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+            <p className="text-gray-500 font-medium tracking-wide">Đang tải dữ liệu Chính phủ...</p>
+        </div>;
     }
 
     return (
-        <div className='min-h-screen bg-gray-50'>
+        <div className='min-h-screen bg-gray-50 pb-20'>
             <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12'>
                 {/* Header */}
-                <div className='flex justify-between items-center mb-12'>
-                    <div className='flex items-center space-x-3'>
-                        <div className='h-12 w-12 rounded-2xl bg-green-500 flex items-center justify-center shadow-lg'>
-                            <Leaf className='h-6 w-6 text-white' />
-                        </div>
-                        <div>
-                            <h1 className='text-4xl font-bold text-gray-900'>Quản lý phê duyệt</h1>
-                            <p className='text-lg text-gray-600 mt-1'>Phê duyệt và cấp phát tín chỉ carbon cho các dự án đã thẩm định</p>
-                        </div>
-                    </div>
+                <div className='mb-12'>
+                    <h1 className='text-4xl font-black text-gray-900 tracking-tight'>Quản lý phê duyệt</h1>
+                    <p className='text-lg text-gray-500 mt-2 font-medium'>Cơ quan quản lý: Phê duyệt và đúc tín chỉ carbon lên Blockchain</p>
                 </div>
 
                 {/* Thống kê / Tabs */}
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-6 mb-10'>
-                    <div onClick={() => setActiveTab('processing')} className={`group bg-white rounded-3xl p-8 cursor-pointer transition-all duration-300 ${activeTab === 'processing' ? 'shadow-lg border-2 border-yellow-200' : 'shadow-md hover:shadow-lg'}`}>
+                    <div onClick={() => setActiveTab('processing')} className={`group p-8 rounded-[2.5rem] cursor-pointer transition-all duration-500 border-4 ${activeTab === 'processing' ? 'bg-white border-yellow-400 shadow-2xl scale-[1.02]' : 'bg-gray-100 border-transparent opacity-70 hover:opacity-100'}`}>
                         <div className='flex items-center justify-between mb-6'>
-                            <div className='h-14 w-14 rounded-2xl bg-yellow-100 flex items-center justify-center'>
-                                <Clock className='h-7 w-7 text-yellow-600' />
+                            <div className={`h-16 w-16 rounded-2xl flex items-center justify-center ${activeTab === 'processing' ? 'bg-yellow-400 text-white' : 'bg-gray-200 text-gray-400'}`}>
+                                <Clock className='h-8 w-8' />
                             </div>
-                            <div className={`px-3 py-1 rounded-full ${activeTab === 'processing' ? 'bg-yellow-100 text-yellow-700 font-semibold' : 'bg-gray-100 text-gray-500 text-xs'}`}>
-                                Đang chờ xử lý
-                            </div>
+                            <span className='text-xs font-black uppercase tracking-widest text-gray-400'>Chờ xử lý</span>
                         </div>
-                        <p className='text-sm font-medium text-gray-500 mb-2 uppercase tracking-wider'>Tổng lượng đang chờ</p>
-                        <h3 className='text-4xl font-bold text-gray-900 mb-1'>{processingValue.toFixed(0)} tCO₂</h3>
-                        <p className='text-sm text-gray-600 flex items-center space-x-1 mb-4'><BarChart3 className='h-4 w-4 text-yellow-500' /><span>Đang thẩm định</span></p>
-                        <button className={`w-full py-2 px-4 rounded-xl font-medium transition-all ${activeTab === 'processing' ? 'bg-yellow-500 text-white shadow-lg' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'}`}>
-                            Xem các dự án chờ xử lý
-                        </button>
+                        <h3 className='text-4xl font-black text-gray-900'>{projects.length} Dự án</h3>
+                        <p className='text-gray-500 font-bold mt-2'>Tổng {projects.reduce((s, p) => s + (p.expectedCredits || 0), 0).toLocaleString()} tCO₂</p>
                     </div>
 
-                    <div onClick={() => setActiveTab('processed')} className={`group bg-white rounded-3xl p-8 cursor-pointer transition-all duration-300 ${activeTab === 'processed' ? 'shadow-lg border-2 border-green-200' : 'shadow-md hover:shadow-lg'}`}>
+                    <div onClick={() => setActiveTab('processed')} className={`group p-8 rounded-[2.5rem] cursor-pointer transition-all duration-500 border-4 ${activeTab === 'processed' ? 'bg-white border-green-500 shadow-2xl scale-[1.02]' : 'bg-gray-100 border-transparent opacity-70 hover:opacity-100'}`}>
                         <div className='flex items-center justify-between mb-6'>
-                            <div className='h-14 w-14 rounded-2xl bg-green-100 flex items-center justify-center'>
-                                <CheckCircle className='h-7 w-7 text-green-600' />
+                            <div className={`h-16 w-16 rounded-2xl flex items-center justify-center ${activeTab === 'processed' ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-400'}`}>
+                                <CheckCircle className='h-8 w-8' />
                             </div>
-                            <div className={`px-3 py-1 rounded-full ${activeTab === 'processed' ? 'bg-green-100 text-green-700 font-semibold' : 'bg-gray-100 text-gray-500 text-xs'}`}>
-                                Đã hoàn tất
-                            </div>
+                            <span className='text-xs font-black uppercase tracking-widest text-gray-400'>Lịch sử</span>
                         </div>
-                        <p className='text-sm font-medium text-gray-500 mb-2 uppercase tracking-wider'>Tổng lượng đã xử lý</p>
-                        <h3 className='text-4xl font-bold text-gray-900 mb-1'>{processedValue.toFixed(0)} tCO₂</h3>
-                        <p className='text-sm text-gray-600 flex items-center space-x-1 mb-4'><TrendingUp className='h-4 w-4 text-green-500' /><span>Đã cấp phát & Từ chối</span></p>
-                        <button className={`w-full py-2 px-4 rounded-xl font-medium transition-all ${activeTab === 'processed' ? 'bg-green-500 text-white shadow-lg' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>
-                            Xem lịch sử xử lý
-                        </button>
+                        <h3 className='text-4xl font-black text-gray-900'>{processedProjects.length} Dự án</h3>
+                        <p className='text-gray-500 font-bold mt-2'>Đã xử lý xong dữ liệu</p>
                     </div>
                 </div>
 
                 {/* Bộ lọc */}
-                <div className='bg-white rounded-3xl p-6 shadow-md mb-10'>
-                    <div className='flex flex-col lg:flex-row gap-6 justify-between items-start lg:items-center'>
-                        <div className='flex flex-wrap gap-3'>
-                            {['all', 'forest', 'renewable'].map((id) => (
-                                <button key={id} onClick={() => setActiveFilter(id)} className={`px-5 py-2.5 rounded-xl font-medium text-sm transition-all ${activeFilter === id ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                                    {id === 'all' ? 'Tất cả dự án' : id === 'forest' ? 'Bảo vệ rừng' : 'Năng lượng tái tạo'}
-                                </button>
-                            ))}
-                        </div>
-                        <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value)} className='px-5 py-3 bg-white border border-gray-200 rounded-xl font-medium text-gray-700 outline-none focus:ring-2 focus:ring-green-500'>
-                            <option value='all-time'>Tất cả thời gian</option>
-                            <option value="2026">Năm 2026</option>
-                            <option value="2025">Năm 2025</option>
-                            <option value="2024">Năm 2024</option>
-                            <option value="2023">Năm 2023</option>
-                            <option value="2022">Năm 2022</option>
-                            <option value="2021">Năm 2021</option>
-                            <option value="2020">Năm 2020</option>
-                        </select>
+                <div className='flex flex-col md:flex-row justify-between gap-4 mb-8 px-2'>
+                    <div className='flex gap-2 overflow-x-auto pb-2'>
+                        {['all', 'forest', 'renewable'].map((id) => (
+                            <button key={id} onClick={() => setActiveFilter(id)} className={`px-6 py-2.5 rounded-full font-bold text-xs uppercase tracking-widest transition-all ${activeFilter === id ? 'bg-black text-white shadow-lg' : 'bg-white text-gray-500 hover:bg-gray-200'}`}>
+                                {id === 'all' ? 'Tất cả' : id === 'forest' ? 'Lâm nghiệp' : 'Năng lượng'}
+                            </button>
+                        ))}
                     </div>
+                    <select value={timeFilter} onChange={(e) => setTimeFilter(e.target.value)} className='px-6 py-2.5 bg-white border-none rounded-2xl font-bold text-sm text-gray-600 shadow-sm focus:ring-2 focus:ring-green-500 outline-none'>
+                        <option value='all-time'>Mọi Vintage</option>
+                        {["2026", "2025", "2024", "2023", "2022"].map(y => <option key={y} value={y}>Năm {y}</option>)}
+                    </select>
                 </div>
 
                 {/* Danh sách dự án */}
-                <div className='grid gap-6'>
-                    {filteredProjects.map((project) => (
-                        <div key={project.id} className='group bg-white rounded-3xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-500'>
+                <div className='grid gap-8'>
+                    {currentList.map((project) => (
+                        <div key={project.id} className='group bg-white rounded-[2.5rem] overflow-hidden shadow-sm hover:shadow-xl border border-gray-100 transition-all duration-500'>
                             <div className='flex flex-col lg:flex-row'>
-                                <div className="lg:w-80 h-64 lg:h-auto relative overflow-hidden bg-gray-100">
+                                <div className="lg:w-80 h-64 lg:h-auto relative bg-gray-100 overflow-hidden">
                                     <ProjectThumbnail ipfsHash={project.ipfsHash} />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
                                 </div>
 
-                                <div className='flex-1 p-8'>
-                                    <div className='flex justify-between items-start mb-4'>
+                                <div className='flex-1 p-8 lg:p-10'>
+                                    <div className='flex justify-between items-start mb-6'>
                                         <div>
-                                            <h3 className='text-2xl font-bold text-gray-900 mb-3'>{project.name}</h3>
-                                            <div className='flex items-center space-x-2 mb-3'>
-                                                <Clock className='h-4 w-4 text-yellow-600' />
-                                                <span className='px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800'>{mapStatus(project.status)}</span>
+                                            <div className='flex items-center gap-3 mb-3'>
+                                                <span className='px-3 py-1 bg-gray-100 text-gray-600 text-[10px] font-black uppercase rounded-lg'>{mapProjectType(project.type)}</span>
+                                                <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase ${project.status === 'VERIFIED' ? 'bg-yellow-100 text-yellow-700' : project.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                    {mapStatus(project.status)}
+                                                </span>
                                             </div>
-                                            <div className='flex flex-wrap gap-4 text-sm text-gray-600 font-medium'>
-                                                <span className='flex items-center space-x-2'><MapPin className='h-4 w-4 text-gray-400' /><span>{project.location}</span></span>
-                                                <span className='flex items-center space-x-2'><Calendar className='h-4 w-4 text-gray-400' /><span>Vintage {project.vintage}</span></span>
-                                                <span className='flex items-center space-x-2'><Leaf className='h-4 w-4 text-gray-400' /><span>{mapProjectType(project.type)}</span></span>
+                                            <h3 className='text-3xl font-black text-gray-900 mb-2'>{project.name}</h3>
+                                            <div className='flex gap-5 text-gray-400 text-sm font-bold uppercase tracking-tight'>
+                                                <span className='flex items-center gap-1.5'><MapPin className='h-4 w-4' /> {project.location}</span>
+                                                <span className='flex items-center gap-1.5'><Calendar className='h-4 w-4' /> Vintage {project.vintage}</span>
                                             </div>
-                                        </div>
-                                        <div className='text-right'>
-                                            <p className='text-sm text-gray-500 font-medium'>{new Date(project.createdAt).toLocaleDateString('vi-VN')}</p>
                                         </div>
                                     </div>
 
-                                    <div className='grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6'>
-                                        <div className='bg-gray-50 rounded-2xl p-5'>
-                                            <p className='text-sm text-gray-600 font-medium mb-2 uppercase tracking-wider'>Tín chỉ dự kiến</p>
-                                            <p className='text-3xl font-bold text-gray-900'>{project.expectedCredits} <span className='text-lg font-semibold'>tCO₂</span></p>
+                                    <div className='grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8'>
+                                        <div className='bg-gray-50 rounded-3xl p-6'>
+                                            <p className='text-[10px] font-black text-gray-400 uppercase mb-1'>Số lượng phê duyệt</p>
+                                            <p className='text-3xl font-black text-gray-900'>{project.expectedCredits.toLocaleString()} <span className='text-sm font-bold text-gray-400'>tCO₂</span></p>
                                         </div>
-                                        <div className='bg-gray-50 rounded-2xl p-5'>
-                                            <p className='text-sm text-gray-600 font-medium mb-2 uppercase tracking-wider'>Đã mint</p>
-                                            <p className='text-3xl font-bold text-gray-900'>0 <span className='text-lg font-semibold'>tCO₂</span></p>
+                                        <div className='bg-gray-50 rounded-3xl p-6'>
+                                            <p className='text-[10px] font-black text-gray-400 uppercase mb-1'>Thời gian gửi</p>
+                                            <p className='text-lg font-bold text-gray-700'>{new Date(project.createdAt).toLocaleDateString('vi-VN')}</p>
                                         </div>
                                     </div>
 
-                                    <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-6 border-t border-gray-100'>
-                                        <div className='flex items-center space-x-2 text-sm text-gray-600'>
-                                            <div className='h-2 w-2 bg-gray-400 rounded-full' />
-                                            <span className='font-medium'>Chủ dự án: <span className='text-gray-700 font-bold'>{project.ownerId.slice(0, 10)}...</span></span>
-                                        </div>
-                                        <div className='flex items-center space-x-3 w-full sm:w-auto'>
+                                    <div className='flex flex-wrap items-center justify-between gap-4 pt-8 border-t border-gray-50'>
+                                        <div className='text-xs font-bold text-gray-400'>ID: {project.id.slice(0, 8)}...</div>
+                                        
+                                        <div className='flex gap-3'>
+                                            <button onClick={() => onOpenProjectDetail?.(project.id, 'approvedProject')} className='p-3 bg-gray-100 text-gray-600 rounded-2xl hover:bg-gray-200 transition-all'>
+                                                <Eye className='h-5 w-5' />
+                                            </button>
+
                                             {activeTab === 'processing' && (
                                                 <>
-                                                    <button onClick={() => handleConfirmAccept(project)} className="flex items-center space-x-2 px-4 py-2.5 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all font-semibold">
-                                                        <CheckCircle className="h-4 w-4" />
-                                                        <span>Chấp thuận</span>
+                                                    <button 
+                                                        disabled={isSubmitting}
+                                                        onClick={() => { setProjectToVerify(project); setShowRejectionPopup(true); }}
+                                                        className="px-6 py-3 border-2 border-red-100 text-red-600 rounded-2xl hover:bg-red-50 font-bold text-sm transition-all disabled:opacity-50"
+                                                    >
+                                                        Từ chối
                                                     </button>
-                                                    <button onClick={() => { setProjectToVerify(project); setShowRejectionPopup(true); }} className="flex items-center space-x-2 px-4 py-2.5 border border-red-300 text-red-600 rounded-xl hover:bg-red-50 transition-all font-semibold">
-                                                        <X className="h-4 w-4" />
-                                                        <span>Từ chối</span>
+                                                    <button 
+                                                        disabled={isSubmitting}
+                                                        onClick={() => handleConfirmAccept(project)}
+                                                        className="px-8 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 font-bold text-sm shadow-xl shadow-green-100 transition-all disabled:bg-gray-400 flex items-center gap-2"
+                                                    >
+                                                        {isSubmitting && processingId === project.id ? (
+                                                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                        ) : (
+                                                            <CheckCircle className="h-4 w-4" />
+                                                        )}
+                                                        {isSubmitting && processingId === project.id ? "Đang xử lý..." : "Phê duyệt & Mint"}
                                                     </button>
                                                 </>
                                             )}
-                                            <button onClick={() => onOpenProjectDetail?.(project.id, 'approvedProject')} className='bg-blue-500 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-blue-600 transition-all flex items-center justify-center space-x-2 shadow-md'>
-                                                <Eye className='h-4 w-4' />
-                                                <span>Chi tiết</span>
-                                            </button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     ))}
-                    {filteredProjects.length === 0 && (
-                        <div className="text-center py-20 bg-white rounded-3xl shadow-sm">
-                            <p className="text-gray-500 font-medium">Không tìm thấy dự án nào phù hợp.</p>
+
+                    {currentList.length === 0 && (
+                        <div className="text-center py-24 bg-white rounded-[3rem] border-4 border-dashed border-gray-50">
+                            <BarChart3 className="h-16 w-16 text-gray-100 mx-auto mb-4" />
+                            <p className="text-gray-300 font-black uppercase tracking-widest">Danh mục trống</p>
                         </div>
                     )}
                 </div>
 
-                {/* Modal từ chối */}
-                {showRejectionPopup && projectToVerify && (
-                    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-                        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8">
-                            <h3 className="text-2xl font-bold text-gray-900 mb-6">Từ chối dự án</h3>
-                            <p className="mb-4 text-gray-600 font-medium">Nhập lý do từ chối dự án "{projectToVerify.name}":</p>
-                            <textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="Nhập lý do tại đây..." className="w-full px-4 py-3 border border-gray-300 rounded-xl mb-6 outline-none focus:ring-2 focus:ring-red-500" rows={4} />
-                            <div className="flex justify-end space-x-3">
-                                <button onClick={() => setShowRejectionPopup(false)} className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-600 font-semibold hover:bg-gray-100 transition-all">Hủy bỏ</button>
-                                <button onClick={handleReject} disabled={!rejectionReason.trim()} className="px-6 py-2.5 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600 transition-all disabled:opacity-50">Từ chối</button>
+                {/* Modal Từ chối */}
+                {showRejectionPopup && (
+                    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-md flex items-center justify-center p-4">
+                        <div className="bg-white rounded-[2.5rem] w-full max-w-md p-10 shadow-2xl animate-in zoom-in-95 duration-200">
+                            <h3 className="text-2xl font-black text-gray-900 mb-2">Từ chối dự án</h3>
+                            <p className="text-gray-500 text-sm mb-8 font-medium">Lý do từ chối sẽ được gửi mail thông báo đến chủ dự án.</p>
+                            
+                            <textarea 
+                                value={rejectionReason} 
+                                onChange={(e) => setRejectionReason(e.target.value)} 
+                                placeholder="Nhập lý do chi tiết..." 
+                                className="w-full p-5 bg-gray-50 border-none rounded-3xl mb-8 h-40 outline-none focus:ring-4 focus:ring-red-50 font-medium"
+                            />
+                            
+                            <div className="flex gap-4">
+                                <button 
+                                    onClick={() => setShowRejectionPopup(false)} 
+                                    className="flex-1 py-4 font-black text-gray-400 hover:text-gray-600 transition-all"
+                                >
+                                    Hủy
+                                </button>
+                                <button 
+                                    onClick={handleReject} 
+                                    disabled={!rejectionReason.trim() || isSubmitting}
+                                    className="flex-1 py-4 bg-red-600 text-white font-black rounded-[1.5rem] shadow-lg shadow-red-100 transition-all disabled:opacity-50 flex justify-center items-center gap-2"
+                                >
+                                    {isSubmitting && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                                    Xác nhận
+                                </button>
                             </div>
                         </div>
                     </div>

@@ -80,7 +80,7 @@ const VerifyRole: React.FC = () => {
     try {
       // 1. Nếu là OWNER: Chỉ xử lý qua API (Không cần Blockchain)
       if (request.requestedRole === 'OWNER') {
-        showInfo('Đang phê duyệt quyền Owner...');
+        
         await api.put(`/role-request/approve/${request.id}`);
         showSuccess('Đã cấp quyền Owner thành công!');
         setRequests(prev => prev.filter(r => r.id !== request.id));
@@ -92,8 +92,6 @@ const VerifyRole: React.FC = () => {
       if (!CONTRACT_ADDRESS || !ethers.isAddress(CONTRACT_ADDRESS)) {
         throw new Error('Địa chỉ Smart Contract không hợp lệ. Vui lòng kiểm tra .env');
       }
-
-      showInfo(`Đang khởi tạo giao dịch cấp quyền ${request.requestedRole} trên Blockchain...`);
 
       const provider = new ethers.BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
@@ -112,12 +110,11 @@ const VerifyRole: React.FC = () => {
         throw new Error(`Quyền ${request.requestedRole} không hỗ trợ trên Blockchain`);
       }
 
-      showInfo('Đang chờ xác nhận từ mạng lưới...');
+
       const receipt = await tx.wait();
       console.log('Blockchain Receipt:', receipt);
 
       // 3. Sau khi Blockchain thành công -> Cập nhật API
-      showInfo('Blockchain xác nhận thành công. Đang cập nhật hệ thống...');
       await api.put(`/role-request/approve/${request.id}`);
 
       showSuccess(`Phê duyệt quyền ${request.requestedRole} thành công!`);
