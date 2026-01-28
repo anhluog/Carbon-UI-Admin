@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import CryptoMarket from "./CryptoMarket";
 import api from "../utils/axiosInstance";
+import { showSuccess, showError, showInfo, showWarning } from '../utils/toast';
 
 interface MarketplaceProps {
   walletAddress: string;
@@ -108,7 +109,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({
       setLoading(false);
     } catch (error: any) {
       console.error("❌ Failed to load marketplace projects:", error);
-      setError("Không thể tải danh sách dự án. Vui lòng thử lại.");
+      showError("Không thể tải danh sách dự án. Vui lòng thử lại.");
       setLoading(false);
     }
   };
@@ -133,12 +134,12 @@ const Marketplace: React.FC<MarketplaceProps> = ({
     const status = tradingStatuses.get(project.id);
 
     if (!status?.canTrade) {
-      alert("⚠️ Dự án này chưa có tín chỉ carbon để giao dịch.");
+      showWarning("⚠️ Dự án này chưa có tín chỉ carbon để giao dịch.");
       return;
     }
 
     if (!status.tokenId) {
-      alert("⚠️ Không tìm thấy Token ID.");
+      showError("⚠️ Không tìm thấy Token ID.");
       return;
     }
 

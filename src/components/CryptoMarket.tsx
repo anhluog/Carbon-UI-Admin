@@ -17,6 +17,7 @@ import {
   ArrowDownRight
 } from 'lucide-react';
 import api from '../utils/axiosInstance';
+import { showSuccess, showError, showInfo, showWarning } from '../utils/toast';
 
 interface CryptoMarketProps {
   walletAddress: string;
@@ -81,7 +82,7 @@ const TradeHistory: React.FC<{ creditId: string }> = ({ creditId }) => {
       alert('✅ Hủy lệnh thành công');
       loadOrders();
     } catch (error: any) {
-      alert(`❌ ${error.response?.data?.message || 'Không thể hủy lệnh'}`);
+      showSuccess('Hủy lệnh thành công.');
     }
   };
 
@@ -96,9 +97,12 @@ const TradeHistory: React.FC<{ creditId: string }> = ({ creditId }) => {
   const mapStatus = (status: string) => {
     switch (status) {
       case 'OPEN': return 'ĐANG MỞ';
-      case 'FILLED': return 'ĐÃ KHỚP';
+      case 'PARTIALLY_FILLED': return 'ĐÃ KHỚP MỘT PHẦN';
       case 'CANCELLED': return 'ĐÃ HỦY';
       case 'PENDING': return 'CHỜ XỬ LÝ';
+      case 'PENDING_SETTLEMENT': return 'CHỜ THANH TOÁN';
+      case 'SETTLEMENT': return 'THÀNH CÔNG';
+      case 'FAILED': return 'LỖI';
       default: return status;
     }
   };
@@ -183,25 +187,25 @@ const CryptoMarket: React.FC<CryptoMarketProps> = ({ walletAddress, creditId }) 
   };
 
   const handlePlaceOrder = async () => {
-    if (!selectedCreditId) return alert('⚠️ Vui lòng chọn một loại tín chỉ carbon');
+    if (!selectedCreditId) return showWarning('⚠️ Vui lòng chọn một loại tín chỉ carbon');
     
     const amountNum = parseFloat(amount);
     if (!amount || isNaN(amountNum) || amountNum <= 0) {
-      return alert('⚠️ Vui lòng nhập số lượng hợp lệ');
+      return showWarning('⚠️ Vui lòng nhập số lượng hợp lệ');
     }
 
     let priceNum = 0;
     if (orderCondition === 'LIMIT') {
         priceNum = parseFloat(price);
         if (!price || isNaN(priceNum) || priceNum <= 0) {
-            return alert('⚠️ Vui lòng nhập giá hợp lệ cho Lệnh Giới hạn');
+            return showWarning('⚠️ Vui lòng nhập giá hợp lệ cho Lệnh Giới hạn');
         }
     }
 
     try {
       setLoading(true);
       const token = localStorage.getItem('token') || localStorage.getItem('authToken');
-      if (!token) return alert('⚠️ Vui lòng đăng nhập để thực hiện giao dịch');
+      if (!token) return showError(' Vui lòng đăng nhập để thực hiện giao dịch');
 
       await api.post(`/orders/place`, {
         creditId: selectedCreditId,
@@ -213,13 +217,13 @@ const CryptoMarket: React.FC<CryptoMarketProps> = ({ walletAddress, creditId }) 
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      alert(`✅ Đặt lệnh ${tradeType === 'Buy' ? 'Mua' : 'Bán'} thành công!`);
+      showSuccess('Đặt lệnh thành công.');
       setPrice('');
       setAmount('');
       setSliderValue(0);
       setTradeType('History');
     } catch (error: any) {
-      alert(`❌ ${error.response?.data?.message || 'Đặt lệnh thất bại'}`);
+      showError(error.response?.data?.message || 'Không thể đặt lệnh');
     } finally {
       setLoading(false);
     }

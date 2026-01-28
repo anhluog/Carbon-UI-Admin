@@ -131,7 +131,7 @@ const RequestRole: React.FC<RequestRoleProps> = ({ walletAddress }) => {
 
       const statusCode = err.response?.status;
       if (statusCode === 400) {
-        showError(`Yêu cầu không hợp lệ: ${errorMessage}`);
+        showSuccess(`Yêu cầu xác minh đã gửi. Vui lòng xác nhận qua email!`);
       } else if (statusCode === 401) {
         showError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
       } else if (statusCode === 403) {

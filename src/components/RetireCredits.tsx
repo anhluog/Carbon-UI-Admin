@@ -601,7 +601,6 @@ const RetireCredits: React.FC = () => {
               <div className="text-center py-16">
                 <Loader2 className="w-16 h-16 text-green-600 animate-spin mx-auto mb-4" />
                 <h3 className="text-xl font-bold text-gray-900">Đang xử lý giao dịch</h3>
-                <p className="text-gray-500">Vui lòng xác nhận trên ví của bạn...</p>
               </div>
             )}
 

@@ -36,7 +36,6 @@ const AdminReport = () => {
 
     try {
       setLoading(true);
-      showInfo(`Đang tạo báo cáo tháng ${month}/${year}...`);
 
       if (pdfUrl) window.URL.revokeObjectURL(pdfUrl);
       setPdfUrl(null);

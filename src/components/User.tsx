@@ -12,7 +12,7 @@ import api from '../utils/axiosInstance';
 import { showSuccess, showError, showInfo, showWarning } from '../utils/toast';
 const EXCHANGE_CONTRACT_ADDRESS = import.meta.env.VITE_EXCHANGE_CONTRACT_ADDRESS;
 const CCT_CONTRACT_ADDRESS = import.meta.env.VITE_CCT_CONTRACT_ADDRESS;
-const SOCKET_URL = 'ws://localhost:8081/ws';
+const SOCKET_URL = 'ws://localhost:8080/ws';
 
 interface UserProps {
     walletAddress: string;
@@ -96,7 +96,7 @@ const User: React.FC<UserProps> = ({ walletAddress }) => {
             const price = 2.35;
             setPortfolioValue((parseFloat(formattedBalance) * price).toFixed(2));
         } catch (error) {
-            console.error('❌ Error fetching dashboard data:', error);
+            console.error('❌ Error fetching data:', error);
         }
     };
 
